@@ -178,21 +178,14 @@ def _persist_write(cls, obj_id):
         if not cols:
             return
         qcols = ['"{}"'.format(c) for c in cols]
+        all_cols = '"id",' + ','.join(qcols)
+        all_ph = '%s,' + ','.join(['%s' for _ in cols])
+        update_set = ', '.join(['{}=EXCLUDED.{}'.format(q, q) for q in qcols])
+        sql = 'INSERT INTO "{}" ({}) VALUES ({}) ON CONFLICT (id) DO UPDATE SET {}'.format(
+            table, all_cols, all_ph, update_set)
         cur = conn.cursor()
-        cur.execute('SELECT id FROM "{}" WHERE id=%s'.format(table), (obj_id,))
-        existing = cur.fetchone()
+        cur.execute(sql, [obj_id] + vals)
         cur.close()
-        if existing:
-            set_clause = ', '.join(['{}=%s'.format(q) for q in qcols])
-            cur = conn.cursor()
-            cur.execute('UPDATE "{}" SET {} WHERE id=%s'.format(table, set_clause), vals + [obj_id])
-            cur.close()
-        else:
-            all_cols = '"id",' + ','.join(qcols)
-            all_ph = '%s,' + ','.join(['%s' for _ in cols])
-            cur = conn.cursor()
-            cur.execute('INSERT INTO "{}" ({}) VALUES ({})'.format(table, all_cols, all_ph), [obj_id] + vals)
-            cur.close()
         conn.commit()
     except Exception as e:
         import traceback

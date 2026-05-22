@@ -424,57 +424,48 @@ let App = {
     if (!overlay || !video) return
     if (this._scannerStream) this.stopScanner()
 
-    video.style.height = '300px'
-    overlay.style.display = 'flex'
-    void overlay.offsetHeight
-    if (status) { status.textContent = 'Requesting camera...'; status.style.color = '#666' }
+    const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || '#666' } }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (status) { status.textContent = 'Camera not available (requires HTTPS)'; status.style.color = 'red' }
+      setStatus('Camera not available (requires HTTPS)', 'red')
       return
     }
 
-    const constraints = { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } }
-    navigator.mediaDevices.getUserMedia(constraints)
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       .then(stream => {
         this._scannerStream = stream
+        video.style.width = '100%'
+        video.style.height = '300px'
+        overlay.style.display = 'flex'
         video.srcObject = stream
-        video.onloadeddata = () => {
-          video.play()
-          if (status) { status.textContent = 'Point camera at a barcode'; status.style.color = 'var(--success)' }
-        }
-
+        video.onloadedmetadata = () => { video.play().catch(() => {}) }
+        setStatus('Camera active', 'green')
         this._scanTimer = setInterval(() => {
           if (video.readyState < 2) return
           try {
-            const canvas = document.createElement('canvas')
-            canvas.width = video.videoWidth || 640
-            canvas.height = video.videoHeight || 480
-            canvas.getContext('2d').drawImage(video, 0, 0)
-
+            const c = document.createElement('canvas')
+            c.width = video.videoWidth || 640
+            c.height = video.videoHeight || 480
+            c.getContext('2d').drawImage(video, 0, 0)
             if ('BarcodeDetector' in globalThis) {
-              new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code'] })
-                .detect(canvas).then(barcodes => {
-                  if (barcodes && barcodes.length > 0) {
+              new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf','qr_code'] })
+                .detect(c).then(b => {
+                  if (b && b.length > 0) {
                     this.stopScanner()
-                    const code = barcodes[0].rawValue.trim()
+                    const code = b[0].rawValue.trim()
                     if (onScan) onScan(code)
                     else {
-                      const input = document.getElementById('pos-barcode')
-                      if (input) input.value = code
+                      document.getElementById('pos-barcode').value = code
                       this.handleBarcodeScan(code)
                     }
                   }
                 }).catch(() => {})
-            } else if (status) {
-              status.textContent = 'Barcode detection requires iOS 16.4+'
-              status.style.color = 'orange'
-            }
+            } else setStatus('Barcode detection requires iOS 16.4+', 'orange')
           } catch(e) {}
         }, 800)
       })
       .catch(err => {
-        if (status) { status.textContent = 'Camera error: ' + err.message; status.style.color = 'red' }
+        setStatus('Camera denied: ' + err.message, 'red')
         this.showBarcodeFeedback('Camera: ' + err.message, 'error')
       })
   },

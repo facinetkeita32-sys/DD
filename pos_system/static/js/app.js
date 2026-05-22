@@ -451,7 +451,7 @@ let App = {
               c.width = Math.min(video.videoWidth, 640)
               c.height = Math.min(video.videoHeight, 480)
               c.getContext('2d').drawImage(video, 0, 0, c.width, c.height)
-              new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_e','itf','pdf417','aztec','data_matrix','code_93'] })
+              new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf','pdf417','aztec','data_matrix','code_93','codabar'] })
                 .detect(c).then(b => {
                   if (b && b.length > 0) {
                     this.stopScanner()
@@ -473,8 +473,12 @@ let App = {
       setStatus('Starting scanner...')
       Quagga.init({
         inputStream: { name: 'Live', type: 'LiveStream', target: viewport,
-          constraints: { facingMode: 'environment', width: 640, height: 480 } },
-        decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader'] }
+          constraints: { facingMode: 'environment', width: 640, height: 480 },
+          area: { top: '0%', right: '0%', left: '0%', bottom: '0%' } },
+        decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader','i2of5_reader'],
+          locate: true },
+        locate: true,
+        numOfWorkers: 0
       }, err => {
         if (err) { setStatus('Init error: ' + (err.message || err), 'red'); return }
         this._scannerActive = true

@@ -425,6 +425,7 @@ let App = {
     if (this._scannerActive) this.stopScanner()
 
     const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || '#666' } }
+    this._scannerActive = true
 
     if ('BarcodeDetector' in globalThis) {
       overlay.style.display = 'flex'
@@ -453,7 +454,9 @@ let App = {
               c.getContext('2d').drawImage(video, 0, 0, c.width, c.height)
               new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf','pdf417','aztec','data_matrix','code_93','codabar'] })
                 .detect(c).then(b => {
-                  if (b && b.length > 0) {
+                  if (b && b.length > 0 && this._scannerActive) {
+                    this._scannerActive = false
+                    if (navigator.vibrate) navigator.vibrate(200)
                     this.stopScanner()
                     const code = b[0].rawValue.trim()
                     if (onScan) onScan(code)
@@ -478,14 +481,17 @@ let App = {
         decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader','i2of5_reader'],
           locate: true },
         locate: true,
-        numOfWorkers: 0
+        numOfWorkers: 0,
+        locator: { patchSize: 'medium', halfSample: true }
       }, err => {
         if (err) { setStatus('Init error: ' + (err.message || err), 'red'); return }
         this._scannerActive = true
         Quagga.start()
         setStatus('Point camera at a barcode', 'green')
         Quagga.onDetected(result => {
-          if (!result || !result.codeResult) return
+          if (!result || !result.codeResult || !this._scannerActive) return
+          this._scannerActive = false
+          if (navigator.vibrate) navigator.vibrate(200)
           this.stopScanner()
           const code = result.codeResult.code.trim()
           if (onScan) onScan(code)

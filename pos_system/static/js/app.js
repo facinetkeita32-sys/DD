@@ -474,7 +474,7 @@ let App = {
       Quagga.init({
         inputStream: { name: 'Live', type: 'LiveStream', target: viewport,
           constraints: { facingMode: 'environment', width: 640, height: 480 } },
-        decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader','i2of5_reader','qr_code_reader'] }
+        decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader'] }
       }, err => {
         if (err) { setStatus('Init error: ' + (err.message || err), 'red'); return }
         this._scannerActive = true

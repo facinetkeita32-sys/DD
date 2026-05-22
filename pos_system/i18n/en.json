@@ -40,6 +40,8 @@
   "pos.new_order": "New Order",
   "pos.barcode": "Scan barcode...",
   "pos.added": "added",
+  "pos.scanner_title": "Scan Barcode",
+  "pos.scanner_hint": "Point camera at a barcode",
 
   "payment.title": "Payment",
   "payment.method": "Payment Method",

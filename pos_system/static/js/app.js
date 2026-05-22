@@ -78,6 +78,10 @@ let App = {
     }
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
+    const camBtn = document.getElementById('pos-camera-scan')
+    if (camBtn) camBtn.onclick = () => this.startScanner()
+    const scannerClose = document.getElementById('scanner-close')
+    if (scannerClose) scannerClose.onclick = () => this.stopScanner()
     const orderFilter = document.getElementById('order-state-filter')
     if (orderFilter) orderFilter.onchange = () => this.renderOrdersTable()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
@@ -107,6 +111,9 @@ let App = {
 
     document.getElementById('modal-overlay').onclick = e => {
       if (e.target === document.getElementById('modal-overlay')) this.closeModal()
+    }
+    document.getElementById('scanner-overlay').onclick = e => {
+      if (e.target === document.getElementById('scanner-overlay')) this.stopScanner()
     }
   },
 
@@ -406,6 +413,47 @@ let App = {
     el.textContent = message
     document.body.appendChild(el)
     setTimeout(() => { el.remove() }, 2000)
+  },
+
+  // === CAMERA SCANNER ===
+
+  startScanner() {
+    const overlay = document.getElementById('scanner-overlay')
+    const viewport = document.getElementById('scanner-viewport')
+    if (!overlay || !viewport) return
+    overlay.style.display = 'flex'
+
+    if (typeof Html5Qrcode === 'undefined') {
+      this.showBarcodeFeedback('Scanner library not loaded', 'error')
+      return
+    }
+
+    this._scanner = new Html5Qrcode('scanner-viewport')
+    this._scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 100 } },
+      (decodedText) => {
+        this.stopScanner()
+        const barcode = decodedText.trim()
+        const input = document.getElementById('pos-barcode')
+        if (input) { input.value = barcode }
+        this.handleBarcodeScan(barcode)
+      },
+      () => {}
+    ).catch(err => {
+      this.showBarcodeFeedback('Camera access denied', 'error')
+      this.stopScanner()
+    })
+  },
+
+  stopScanner() {
+    if (this._scanner) {
+      try { this._scanner.stop().catch(() => {}) } catch(e) {}
+      try { this._scanner.clear().catch(() => {}) } catch(e) {}
+      this._scanner = null
+    }
+    const overlay = document.getElementById('scanner-overlay')
+    if (overlay) overlay.style.display = 'none'
   },
 
   // === CART ===

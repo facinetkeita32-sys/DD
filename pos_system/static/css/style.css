@@ -256,6 +256,9 @@ tr:hover td { background: var(--hover); }
 .status-closed { background: #e2e8f0; color: #475569; }
 .text-right { text-align: right; }
 
+/* Scanner */
+#scanner-overlay .modal { padding: 16px; max-width: 500px; }
+
 /* Order detail */
 .order-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; padding: 16px; background: var(--bg); border-radius: var(--radius); }
 .order-detail-grid .label { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }

@@ -66,6 +66,7 @@
           <div class="pos-toolbar">
             <div class="pos-scan-row">
               <input type="text" id="pos-barcode" class="barcode-input" placeholder="Scan barcode..." data-i18n-placeholder="pos.barcode" autofocus>
+              <button id="pos-camera-scan" class="btn btn-sm btn-primary" title="Scan with camera">📷</button>
               <input type="text" id="pos-search" class="search-input" placeholder="Search products..." data-i18n-placeholder="pos.search">
             </div>
             <div id="pos-categories" class="pos-categories"></div>
@@ -293,10 +294,22 @@
   </div>
 </div>
 
+<div id="scanner-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:500px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 id="scanner-title" data-i18n="pos.scanner_title">Scan Barcode</h3>
+      <button id="scanner-close" class="btn btn-sm btn-secondary">✕</button>
+    </div>
+    <div id="scanner-viewport" style="width:100%;aspect-ratio:4/3;background:#000;border-radius:8px;overflow:hidden"></div>
+    <p id="scanner-hint" style="text-align:center;font-size:12px;color:var(--text-light);margin-top:6px" data-i18n="pos.scanner_hint">Point camera at a barcode</p>
+  </div>
+</div>
+
 <div id="modal-overlay" class="modal-overlay" style="display:none">
   <div class="modal" id="modal-content"></div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/app.js"></script>
 </body>

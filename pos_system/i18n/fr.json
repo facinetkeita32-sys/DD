@@ -40,6 +40,8 @@
   "pos.new_order": "Nouvelle Commande",
   "pos.barcode": "Scan code-barres...",
   "pos.added": "ajouté",
+  "pos.scanner_title": "Scanner Code-barres",
+  "pos.scanner_hint": "Pointez la caméra vers un code-barres",
 
   "payment.title": "Paiement",
   "payment.method": "Moyen de Paiement",

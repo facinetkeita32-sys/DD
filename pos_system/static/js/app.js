@@ -419,43 +419,61 @@ let App = {
 
   startScanner(onScan) {
     const overlay = document.getElementById('scanner-overlay')
-    const viewport = document.getElementById('scanner-viewport')
-    if (!overlay || !viewport) return
+    const video = document.getElementById('scanner-video')
+    const status = document.getElementById('scanner-status')
+    if (!overlay || !video) return
+
+    if (this._scannerStream) this.stopScanner()
     overlay.style.display = 'flex'
 
-    if (typeof Html5Qrcode === 'undefined') {
-      this.showBarcodeFeedback('Scanner library not loaded', 'error')
-      return
-    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } })
+      .then(stream => {
+        this._scannerStream = stream
+        video.srcObject = stream
+        video.play()
 
-    this._scanner = new Html5Qrcode('scanner-viewport')
-    this._scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 100 } },
-      (decodedText) => {
+        this._scanTimer = setInterval(() => {
+          if (video.readyState !== 4) return
+          const canvas = document.createElement('canvas')
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(video, 0, 0)
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+          if ('BarcodeDetector' in globalThis) {
+            const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code'] })
+            detector.detect(canvas).then(barcodes => {
+              if (barcodes.length > 0) {
+                this.stopScanner()
+                const code = barcodes[0].rawValue.trim()
+                if (onScan) { onScan(code) }
+                else {
+                  const input = document.getElementById('pos-barcode')
+                  if (input) input.value = code
+                  this.handleBarcodeScan(code)
+                }
+              }
+            }).catch(() => {})
+          } else {
+            if (status) status.textContent = 'Scanner not supported on this browser'
+          }
+        }, 500)
+      })
+      .catch(err => {
+        this.showBarcodeFeedback('Camera access denied: ' + err.message, 'error')
         this.stopScanner()
-        const barcode = decodedText.trim()
-        if (onScan) {
-          onScan(barcode)
-        } else {
-          const input = document.getElementById('pos-barcode')
-          if (input) { input.value = barcode }
-          this.handleBarcodeScan(barcode)
-        }
-      },
-      () => {}
-    ).catch(err => {
-      this.showBarcodeFeedback('Camera access denied', 'error')
-      this.stopScanner()
-    })
+      })
   },
 
   stopScanner() {
-    if (this._scanner) {
-      try { this._scanner.stop().catch(() => {}) } catch(e) {}
-      try { this._scanner.clear().catch(() => {}) } catch(e) {}
-      this._scanner = null
+    if (this._scanTimer) { clearInterval(this._scanTimer); this._scanTimer = null }
+    if (this._scannerStream) {
+      this._scannerStream.getTracks().forEach(t => t.stop())
+      this._scannerStream = null
     }
+    const video = document.getElementById('scanner-video')
+    if (video) video.srcObject = null
     const overlay = document.getElementById('scanner-overlay')
     if (overlay) overlay.style.display = 'none'
   },

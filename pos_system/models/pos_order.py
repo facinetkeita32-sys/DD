@@ -22,6 +22,7 @@ class PosOrder(Model):
     amount_change = Float(string='Change', digits=(16, 2), default=0.0)
     state = Selection([
         ('draft', 'Draft'),
+        ('pending', 'Pending Payment'),
         ('paid', 'Paid'),
         ('done', 'Done'),
         ('cancelled', 'Cancelled'),

@@ -78,6 +78,8 @@ let App = {
     }
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
+    const orderFilter = document.getElementById('order-state-filter')
+    if (orderFilter) orderFilter.onchange = () => this.renderOrdersTable()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
@@ -606,6 +608,7 @@ let App = {
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
+        <button class="btn btn-warning btn-lg btn-block" id="payment-pay-later" style="padding:12px 28px;font-size:15px;margin-top:6px">${I18n.t('payment.pay_later', 'Pay Later')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
       </div>`
 
@@ -619,14 +622,11 @@ let App = {
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
     document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
+    document.getElementById('payment-pay-later').onclick = () => this.payLaterOrder(total)
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
   },
 
-  async confirmPayment(total) {
-    const methodId = parseInt(document.getElementById('payment-method').value)
-    const tendered = parseFloat(document.getElementById('payment-tendered').value) || total
-    const change = Math.max(0, tendered - total)
-
+  async payLaterOrder(total) {
     const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
     const dzCost = dz ? dz.cost : 0
 
@@ -639,35 +639,24 @@ let App = {
       price_subtotal: (item.qty * item.price_unit) * (1 - (item.discount || 0) / 100),
     }))
 
-    const payments = [{
-      payment_method_id: methodId,
-      amount: total,
-      is_change: change,
-    }]
-
     const deliveryContactName = (document.getElementById('delivery-contact-name') || {}).value || ''
     const deliveryContactPhone = (document.getElementById('delivery-contact-phone') || {}).value || ''
 
     const orderData = {
       lines,
-      payments,
+      payments: [],
       partner_id: this.cartCustomer || false,
       amount_total: total,
       delivery_cost: dzCost,
       delivery_contact_name: deliveryContactName,
       delivery_contact_phone: deliveryContactPhone,
-      state: 'paid',
+      state: 'pending',
     }
     if (dz) orderData.delivery_zone_id = dz.id
 
     try {
       const res = await this.api('POST', '/orders', orderData)
       this.closeModal()
-      const orderId = res.data ? res.data.id : null
-      let changeMsg = ''
-      if (change > 0) {
-        changeMsg = `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
-      }
       this.clearCart()
       const prodRes = await this.api('GET', '/products')
       this.products = prodRes.data || []
@@ -675,16 +664,43 @@ let App = {
       this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
-
-      if (orderId) {
-        const msg = changeMsg ? changeMsg + '\n\n' : ''
-        if (confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
-          this.openPrintReceipt(orderId)
-        }
-      }
+      alert(`${I18n.t('payment.pending_saved', 'Order saved as pending payment')}. #${res.data ? res.data.id || res.data.name : ''}`)
     } catch(e) {
       alert('Error: ' + e.message)
     }
+  },
+
+  async validatePayment(orderId) {
+    if (!confirm(I18n.t('payment.confirm_validate', 'Validate payment for this order?'))) return
+    const paymentMethods = this.paymentMethods || []
+    let methodHtml = paymentMethods.map(pm =>
+      `<option value="${pm.id}">${pm.name}</option>`
+    ).join('')
+    let html = `<h3>${I18n.t('payment.validate_title', 'Validate Payment')}</h3>
+      <div class="form-group">
+        <label>${I18n.t('payment.method', 'Payment Method')}</label>
+        <select id="validate-payment-method">${methodHtml}</select>
+      </div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-success" id="validate-confirm">${I18n.t('common.confirm', 'Confirm')}</button>
+        <button class="btn btn-secondary" id="validate-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('validate-confirm').onclick = async () => {
+      const methodId = parseInt(document.getElementById('validate-payment-method').value)
+      try {
+        await this.api('POST', `/orders/${orderId}/validate-payment`, {
+          payment_method_id: methodId,
+        })
+        this.closeModal()
+        await this.renderOrdersTable()
+        this.renderDashboard()
+        alert(I18n.t('payment.validated', 'Payment validated'))
+      } catch(e) {
+        alert('Error: ' + e.message)
+      }
+    }
+    document.getElementById('validate-cancel').onclick = () => this.closeModal()
   },
 
   // === CUSTOMER SELECT ===
@@ -991,17 +1007,25 @@ let App = {
 
   async renderOrdersTable() {
     try {
-      const res = await this.api('GET', '/orders')
+      const filterEl = document.getElementById('order-state-filter')
+      const stateFilter = filterEl ? filterEl.value : ''
+      let url = '/orders'
+      if (stateFilter) url += `?status=${stateFilter}`
+      const res = await this.api('GET', url)
       const orders = res.data || []
       const tbody = document.getElementById('orders-tbody')
       if (!orders.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
         return
       }
       tbody.innerHTML = orders.map(o => {
         const items = (o.lines || []).map(l =>
           `${l.product_name || 'Product'} x${l.qty}`
         ).join(', ') || '-'
+        const isPending = o.state === 'pending'
+        const validateBtn = isPending
+          ? `<button class="btn btn-sm btn-success validate-payment" data-id="${o.id}">${I18n.t('order.validate', 'Validate')}</button>`
+          : ''
         return `<tr>
           <td>${o.name || o.id}</td>
           <td>${(o.date_order || '').substring(0, 19)}</td>
@@ -1010,11 +1034,15 @@ let App = {
           <td style="max-width:200px;white-space:normal">${items}</td>
           <td>${this.currencyFormat(o.amount_total)}</td>
           <td><span class="status-badge status-${o.state}">${o.state}</span></td>
+          <td>${validateBtn}</td>
           <td><button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button></td>
         </tr>`
       }).join('')
       tbody.querySelectorAll('.view-order').forEach(btn => {
         btn.onclick = () => this.showOrderDetail(parseInt(btn.dataset.id))
+      })
+      tbody.querySelectorAll('.validate-payment').forEach(btn => {
+        btn.onclick = () => this.validatePayment(parseInt(btn.dataset.id))
       })
     } catch(e) { console.error(e) }
   },

@@ -15,7 +15,6 @@ class PosCategory(Model):
 
     def _init_defaults(self):
         categories = [
-            {'name': 'All', 'sequence': 1, 'color': 1},
             {'name': 'Beverages', 'sequence': 10, 'color': 2},
             {'name': 'Food', 'sequence': 20, 'color': 3},
             {'name': 'Snacks', 'sequence': 30, 'color': 4},

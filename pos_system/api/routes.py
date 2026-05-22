@@ -594,6 +594,7 @@ def create_order():
     if session_id:
         data['session_id'] = session_id
     try:
+        order_state = data.pop('state', 'paid')
         order = PosOrder().create(data)
         total = 0
         for line_data in lines_data:
@@ -624,16 +625,52 @@ def create_order():
             pmt = PosPayment().create(pmt_data)
             paid_total += pmt.amount
 
-        order.write({
-            'amount_total': grand_total,
-            'delivery_cost': delivery_cost,
-            'amount_paid': paid_total,
-            'amount_change': max(0, paid_total - grand_total),
-            'state': 'paid',
-        })
+        if order_state == 'pending':
+            order.write({
+                'amount_total': grand_total,
+                'delivery_cost': delivery_cost,
+                'amount_paid': 0,
+                'amount_change': 0,
+                'state': 'pending',
+            })
+        else:
+            order.write({
+                'amount_total': grand_total,
+                'delivery_cost': delivery_cost,
+                'amount_paid': paid_total,
+                'amount_change': max(0, paid_total - grand_total),
+                'state': 'paid',
+            })
         return success_response(model_to_dict(order), 'Order created')
     except Exception as e:
         return error_response(str(e))
+
+
+@api_bp.route('/orders/<int:order_id>/validate-payment', methods=['POST'])
+@login_required
+@permission_required('order.write')
+def validate_payment(order_id):
+    orders = PosOrder().browse([order_id])
+    if not orders:
+        return error_response('Order not found', 404)
+    order = orders[0]
+    if order.state != 'pending':
+        return error_response('Order is not pending payment', 400)
+    data = request.get_json() or {}
+    payment_method_id = data.get('payment_method_id')
+    amount = float(data.get('amount', order.amount_total) or 0)
+    if payment_method_id:
+        PosPayment().create({
+            'order_id': order.id,
+            'payment_method_id': payment_method_id,
+            'amount': amount,
+        })
+    order.write({
+        'amount_paid': order.amount_paid + amount,
+        'amount_change': max(0, order.amount_paid + amount - order.amount_total),
+        'state': 'paid',
+    })
+    return success_response(model_to_dict(order), 'Payment validated')
 
 
 @api_bp.route('/orders/<int:order_id>/cancel', methods=['POST'])

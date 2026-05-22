@@ -134,6 +134,14 @@
     <div id="screen-orders" class="content-screen">
       <div class="screen-header">
         <h2 data-i18n="order.list">Orders List</h2>
+        <div class="btn-group">
+          <select id="order-state-filter" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+            <option value="">All</option>
+            <option value="pending">Pending Payment</option>
+            <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
       </div>
       <div class="table-container">
         <table id="orders-table">
@@ -145,6 +153,7 @@
             <th data-i18n="order.items">Items</th>
             <th data-i18n="order.total">Total</th>
             <th data-i18n="order.status">Status</th>
+            <th data-i18n="order.actions">Actions</th>
             <th data-i18n="order.details">Details</th>
           </tr></thead>
           <tbody id="orders-tbody"></tbody>

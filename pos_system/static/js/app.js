@@ -419,63 +419,78 @@ let App = {
 
   startScanner(onScan) {
     const overlay = document.getElementById('scanner-overlay')
-    const video = document.getElementById('scanner-video')
     const status = document.getElementById('scanner-status')
-    if (!overlay || !video) return
-    if (this._scannerStream) this.stopScanner()
+    const viewport = document.getElementById('scanner-viewport')
+    if (!overlay || !viewport) return
+    if (this._scannerActive) this.stopScanner()
 
     const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || '#666' } }
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus('Camera not available (requires HTTPS)', 'red')
-      return
-    }
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(stream => {
-        this._scannerStream = stream
-        video.style.width = '100%'
-        video.style.height = '300px'
-        overlay.style.display = 'flex'
-        video.srcObject = stream
-        video.onloadedmetadata = () => { video.play().catch(() => {}) }
-        setStatus('Camera active', 'green')
-        video.onloadedmetadata = () => {
-          video.play().catch(() => {})
+    if ('BarcodeDetector' in globalThis) {
+      overlay.style.display = 'flex'
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          this._scannerActive = true
+          const video = document.createElement('video')
+          video.setAttribute('playsinline', '')
+          video.style.width = '100%'
+          video.style.height = '100%'
+          video.style.objectFit = 'cover'
+          viewport.innerHTML = ''
+          viewport.appendChild(video)
+          video.srcObject = stream
+          video.onloadedmetadata = () => {
+            video.play().catch(() => {})
+            setStatus('Camera active', 'green')
+          }
+          this._scannerStream = stream
           this._scanTimer = setInterval(() => {
             if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return
             try {
               const c = document.createElement('canvas')
               c.width = Math.min(video.videoWidth, 640)
               c.height = Math.min(video.videoHeight, 480)
-              const ctx = c.getContext('2d')
-              if (!ctx) return
-              ctx.drawImage(video, 0, 0, c.width, c.height)
-              if ('BarcodeDetector' in globalThis) {
-                try {
-                  new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_e','itf','pdf417','aztec','data_matrix','code_93'] })
-                    .detect(c).then(b => {
-                      if (b && b.length > 0) {
-                        this.stopScanner()
-                        const code = b[0].rawValue.trim()
-                        if (onScan) onScan(code)
-                        else {
-                          const input = document.getElementById('pos-barcode')
-                          if (input) input.value = code
-                          this.handleBarcodeScan(code)
-                        }
-                      }
-                    }).catch(() => {})
-                } catch(e) { setStatus('Detector init error: ' + e.message, 'red') }
-              } else setStatus('Barcode detection requires iOS 16.4+', 'orange')
-            } catch(e) { setStatus('Scan error: ' + e.message, 'red') }
+              c.getContext('2d').drawImage(video, 0, 0, c.width, c.height)
+              new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_e','itf','pdf417','aztec','data_matrix','code_93'] })
+                .detect(c).then(b => {
+                  if (b && b.length > 0) {
+                    this.stopScanner()
+                    const code = b[0].rawValue.trim()
+                    if (onScan) onScan(code)
+                    else { document.getElementById('pos-barcode').value = code; this.handleBarcodeScan(code) }
+                  }
+                }).catch(() => {})
+            } catch(e) { setStatus('Error: ' + e.message, 'red') }
           }, 500)
-        }
+        })
+        .catch(err => {
+          setStatus('Camera denied: ' + err.message, 'red')
+          this.showBarcodeFeedback('Camera: ' + err.message, 'error')
+        })
+    } else if (typeof Quagga !== 'undefined') {
+      overlay.style.display = 'flex'
+      viewport.innerHTML = ''
+      setStatus('Starting scanner...')
+      Quagga.init({
+        inputStream: { name: 'Live', type: 'LiveStream', target: viewport,
+          constraints: { facingMode: 'environment', width: 640, height: 480 } },
+        decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader','i2of5_reader','qr_code_reader'] }
+      }, err => {
+        if (err) { setStatus('Init error: ' + (err.message || err), 'red'); return }
+        this._scannerActive = true
+        Quagga.start()
+        setStatus('Point camera at a barcode', 'green')
+        Quagga.onDetected(result => {
+          if (!result || !result.codeResult) return
+          this.stopScanner()
+          const code = result.codeResult.code.trim()
+          if (onScan) onScan(code)
+          else { document.getElementById('pos-barcode').value = code; this.handleBarcodeScan(code) }
+        })
       })
-      .catch(err => {
-        setStatus('Camera denied: ' + err.message, 'red')
-        this.showBarcodeFeedback('Camera: ' + err.message, 'error')
-      })
+    } else {
+      setStatus('No barcode scanner available', 'red')
+    }
   },
 
   stopScanner() {
@@ -484,8 +499,10 @@ let App = {
       this._scannerStream.getTracks().forEach(t => t.stop())
       this._scannerStream = null
     }
-    const video = document.getElementById('scanner-video')
-    if (video) { video.srcObject = null; video.onloadeddata = null }
+    try { Quagga.offDetected(); Quagga.stop() } catch(e) {}
+    this._scannerActive = false
+    const viewport = document.getElementById('scanner-viewport')
+    if (viewport) viewport.innerHTML = ''
     const overlay = document.getElementById('scanner-overlay')
     if (overlay) overlay.style.display = 'none'
   },

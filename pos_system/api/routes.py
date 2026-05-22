@@ -259,7 +259,7 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    return success_response(serialize_model(ProductProduct, products))
+    return success_response(model_to_dict(products))
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])

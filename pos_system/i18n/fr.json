@@ -91,6 +91,8 @@
   "product.no_products": "Aucun produit trouvé",
   "product.image": "Image",
   "product.upload_image": "Télécharger une Image",
+  "product.upload": "Galerie",
+  "product.camera": "Appareil Photo",
   "product.bulk_import": "Import en Masse",
   "product.import_csv": "Importer depuis CSV",
   "product.import_json": "Importer depuis JSON",

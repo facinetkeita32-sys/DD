@@ -884,8 +884,13 @@ let App = {
           <div id="image-upload-prompt">${I18n.t('product.upload_image', 'Upload Image')}</div>
           <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg ? 'data:image/png;base64,' + existingImg : ''}">
           <input type="file" id="image-file-input" accept="image/*" style="display:none">
+          <input type="file" id="image-camera-input" accept="image/*" capture="environment" style="display:none">
         </div>
-        ${existingImg ? `<button class="btn btn-sm btn-danger" id="remove-image-btn" style="margin-top:4px">${I18n.t('common.delete', 'Remove')}</button>` : ''}
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-sm btn-secondary" id="image-upload-btn">${I18n.t('product.upload', 'Gallery')}</button>
+          <button class="btn btn-sm btn-primary" id="image-camera-btn">📷 ${I18n.t('product.camera', 'Camera')}</button>
+          ${existingImg ? `<button class="btn btn-sm btn-danger" id="remove-image-btn">${I18n.t('common.delete', 'Remove')}</button>` : ''}
+        </div>
       </div>
       <div class="btn-group">
         <button class="btn btn-primary" id="prod-save">${I18n.t('common.save', 'Save')}</button>
@@ -894,9 +899,7 @@ let App = {
     this.showModal(html)
     let newImageBase64 = existingImg
 
-    document.getElementById('image-upload-area').onclick = () => document.getElementById('image-file-input').click()
-    document.getElementById('image-file-input').onchange = (e) => {
-      const file = e.target.files[0]
+    const readFile = (file) => {
       if (!file) return
       const reader = new FileReader()
       reader.onload = (ev) => {
@@ -909,6 +912,12 @@ let App = {
       }
       reader.readAsDataURL(file)
     }
+
+    document.getElementById('image-upload-btn').onclick = () => document.getElementById('image-file-input').click()
+    document.getElementById('image-file-input').onchange = (e) => readFile(e.target.files[0])
+
+    document.getElementById('image-camera-btn').onclick = () => document.getElementById('image-camera-input').click()
+    document.getElementById('image-camera-input').onchange = (e) => readFile(e.target.files[0])
 
     const removeBtn = document.getElementById('remove-image-btn')
     if (removeBtn) {

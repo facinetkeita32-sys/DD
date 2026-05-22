@@ -440,29 +440,37 @@ let App = {
         video.srcObject = stream
         video.onloadedmetadata = () => { video.play().catch(() => {}) }
         setStatus('Camera active', 'green')
-        this._scanTimer = setInterval(() => {
-          if (video.readyState < 2) return
-          try {
-            const c = document.createElement('canvas')
-            c.width = video.videoWidth || 640
-            c.height = video.videoHeight || 480
-            c.getContext('2d').drawImage(video, 0, 0)
-            if ('BarcodeDetector' in globalThis) {
-              new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf','qr_code'] })
-                .detect(c).then(b => {
-                  if (b && b.length > 0) {
-                    this.stopScanner()
-                    const code = b[0].rawValue.trim()
-                    if (onScan) onScan(code)
-                    else {
-                      document.getElementById('pos-barcode').value = code
-                      this.handleBarcodeScan(code)
-                    }
-                  }
-                }).catch(() => {})
-            } else setStatus('Barcode detection requires iOS 16.4+', 'orange')
-          } catch(e) {}
-        }, 800)
+        video.onloadedmetadata = () => {
+          video.play().catch(() => {})
+          this._scanTimer = setInterval(() => {
+            if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return
+            try {
+              const c = document.createElement('canvas')
+              c.width = Math.min(video.videoWidth, 640)
+              c.height = Math.min(video.videoHeight, 480)
+              const ctx = c.getContext('2d')
+              if (!ctx) return
+              ctx.drawImage(video, 0, 0, c.width, c.height)
+              if ('BarcodeDetector' in globalThis) {
+                try {
+                  new BarcodeDetector({ formats: ['qr_code','ean_13','ean_8','code_128','code_39','upc_e','itf','pdf417','aztec','data_matrix','code_93'] })
+                    .detect(c).then(b => {
+                      if (b && b.length > 0) {
+                        this.stopScanner()
+                        const code = b[0].rawValue.trim()
+                        if (onScan) onScan(code)
+                        else {
+                          const input = document.getElementById('pos-barcode')
+                          if (input) input.value = code
+                          this.handleBarcodeScan(code)
+                        }
+                      }
+                    }).catch(() => {})
+                } catch(e) { setStatus('Detector init error: ' + e.message, 'red') }
+              } else setStatus('Barcode detection requires iOS 16.4+', 'orange')
+            } catch(e) { setStatus('Scan error: ' + e.message, 'red') }
+          }, 500)
+        }
       })
       .catch(err => {
         setStatus('Camera denied: ' + err.message, 'red')

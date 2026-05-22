@@ -417,7 +417,7 @@ let App = {
 
   // === CAMERA SCANNER ===
 
-  startScanner() {
+  startScanner(onScan) {
     const overlay = document.getElementById('scanner-overlay')
     const viewport = document.getElementById('scanner-viewport')
     if (!overlay || !viewport) return
@@ -435,9 +435,13 @@ let App = {
       (decodedText) => {
         this.stopScanner()
         const barcode = decodedText.trim()
-        const input = document.getElementById('pos-barcode')
-        if (input) { input.value = barcode }
-        this.handleBarcodeScan(barcode)
+        if (onScan) {
+          onScan(barcode)
+        } else {
+          const input = document.getElementById('pos-barcode')
+          if (input) { input.value = barcode }
+          this.handleBarcodeScan(barcode)
+        }
       },
       () => {}
     ).catch(err => {
@@ -876,7 +880,12 @@ let App = {
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
-      <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" value="${product ? this._esc(product.barcode || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="product.barcode">Barcode</label>
+        <div style="display:flex;gap:6px">
+          <input id="prod-barcode" style="flex:1" value="${product ? this._esc(product.barcode || '') : ''}">
+          <button class="btn btn-sm btn-primary" id="prod-barcode-scan" title="Scan barcode">📷</button>
+        </div>
+      </div>
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
@@ -918,6 +927,15 @@ let App = {
 
     document.getElementById('image-camera-btn').onclick = () => document.getElementById('image-camera-input').click()
     document.getElementById('image-camera-input').onchange = (e) => readFile(e.target.files[0])
+
+    const barcodeScanBtn = document.getElementById('prod-barcode-scan')
+    if (barcodeScanBtn) {
+      barcodeScanBtn.onclick = () => {
+        this.startScanner((barcode) => {
+          document.getElementById('prod-barcode').value = barcode
+        })
+      }
+    }
 
     const removeBtn = document.getElementById('remove-image-btn')
     if (removeBtn) {

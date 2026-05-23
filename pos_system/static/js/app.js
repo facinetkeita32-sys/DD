@@ -491,8 +491,6 @@ let App = {
         Quagga.onDetected(result => {
           if (!result || !result.codeResult || !this._scannerActive) return
           const code = (result.codeResult.code || '').trim()
-          const conf = result.codeResult.confidence || 0
-          if (conf < 0.15) return
           const digits = code.replace(/\D/g, '')
           if (digits.length < 8 || digits.length > 14) return
           this._scannerActive = false

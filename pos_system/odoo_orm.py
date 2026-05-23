@@ -243,10 +243,12 @@ def _load_m2m(cls, obj_id, field_name):
 
 
 class Field:
-    def __init__(self, string=None, default=None, readonly=False, **kwargs):
+    def __init__(self, string=None, default=None, required=False, readonly=False, help=None):
         self.string = string
         self.default = default
+        self.required = required
         self.readonly = readonly
+        self.help = help
 
     def __set_name__(self, owner, name):
         self.name = name
@@ -254,7 +256,25 @@ class Field:
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
-        return obj._data.get(self.name)
+        import sys
+        _mod = sys.modules[__name__]
+        _env = _mod.env
+        val = obj._data.get(self.name, self._get_default())
+        if isinstance(self, Many2one) and val:
+            records = _env[self.comodel_name].browse(val)
+            return records[0] if records else False
+        if isinstance(self, One2many):
+            return _env[self.comodel_name].search([(self.inverse_field, '=', obj.id)])
+        if isinstance(self, Many2many):
+            return obj._get_m2m(self.name)
+        return val
+
+    def __set__(self, obj, value):
+        obj._data[self.name] = self.convert(value)
+
+    def _get_default(self):
+        d = self.default() if callable(self.default) else self.default
+        return d
 
     def convert(self, value):
         return value
@@ -269,16 +289,36 @@ class Boolean(Field):
         return False
 
 
-class Integer(Field): pass
+class Integer(Field):
+    def convert(self, value):
+        return int(value) if value is not None else value
 
 
-class Float(Field): pass
+class Float(Field):
+    def __init__(self, digits=None, **kwargs):
+        super().__init__(**kwargs)
+        self.digits = digits
+
+    def convert(self, value):
+        if value is not None:
+            return float(value)
+        return value
 
 
-class Char(Field): pass
+class Char(Field):
+    def __init__(self, size=None, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
+    def convert(self, value):
+        if value is not None:
+            return str(value)[:self.size] if self.size else str(value)
+        return value
 
 
-class Text(Field): pass
+class Text(Field):
+    def convert(self, value):
+        return str(value) if value is not None else value
 
 
 class Selection(Field):

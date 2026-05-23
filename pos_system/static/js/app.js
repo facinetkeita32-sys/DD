@@ -490,13 +490,13 @@ let App = {
       setStatus('Starting scanner...')
       Quagga.init({
         inputStream: { name: 'Live', type: 'LiveStream', target: viewport,
-          constraints: { facingMode: 'environment', width: 640, height: 480 },
-          area: { top: '0%', right: '0%', left: '0%', bottom: '0%' } },
+          constraints: { facingMode: 'environment', width: 320, height: 240 },
+          area: { top: '25%', bottom: '25%', left: '5%', right: '5%' } },
         decoder: { readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader','i2of5_reader'],
           locate: true },
         locate: true,
         numOfWorkers: 0,
-        locator: { patchSize: 'medium', halfSample: true }
+        locator: { patchSize: 'small', halfSample: true }
       }, err => {
         if (err) { setStatus('Init error: ' + (err.message || err), 'red'); return }
         this._scannerActive = true

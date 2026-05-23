@@ -490,10 +490,14 @@ let App = {
         setStatus('Point camera at a barcode', 'green')
         Quagga.onDetected(result => {
           if (!result || !result.codeResult || !this._scannerActive) return
+          const code = (result.codeResult.code || '').trim()
+          const conf = result.codeResult.confidence || 0
+          if (conf < 0.85) return
+          const digits = code.replace(/\D/g, '')
+          if (digits.length < 8 || digits.length > 14) return
           this._scannerActive = false
           if (navigator.vibrate) navigator.vibrate(200)
           this.stopScanner()
-          const code = result.codeResult.code.trim()
           if (onScan) onScan(code)
           else { document.getElementById('pos-barcode').value = code; this.handleBarcodeScan(code) }
         })

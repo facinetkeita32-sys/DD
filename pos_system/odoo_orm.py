@@ -321,6 +321,47 @@ class Text(Field):
         return str(value) if value is not None else value
 
 
+class Date(Field):
+    def convert(self, value):
+        if isinstance(value, str):
+            return value
+        return value.strftime('%Y-%m-%d') if value else None
+
+
+class DateTime(Field):
+    def convert(self, value):
+        if isinstance(value, str):
+            return value
+        return value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+
+
+class Many2one(Field):
+    def __init__(self, comodel_name, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+
+    def convert(self, value):
+        if value is None or value == 0:
+            return False
+        return int(value)
+
+
+class One2many(Field):
+    def __init__(self, comodel_name, inverse_field, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+        self.inverse_field = inverse_field
+
+
+class Many2many(Field):
+    def __init__(self, comodel_name, rel=None, column1=None, column2=None, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+        self.rel = rel
+        self.column1 = column1
+        self.column2 = column2
+
+
 class Selection(Field):
     def __init__(self, selection, **kwargs):
         super().__init__(**kwargs)

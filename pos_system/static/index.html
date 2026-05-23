@@ -73,6 +73,12 @@
           </div>
           <div id="pos-product-grid" class="product-grid"></div>
         </div>
+        <div id="cart-floating" class="cart-floating" onclick="document.querySelector('.pos-cart').scrollIntoView({behavior:'smooth',block:'start'})">
+          <span id="cart-floating-count">0</span>
+          <span id="cart-floating-label" data-i18n="pos.items">items</span>
+          <span id="cart-floating-total">0 FG</span>
+          <span class="cart-floating-arrow">▲</span>
+        </div>
         <div class="pos-cart">
           <div class="cart-header">
             <h3 data-i18n="pos.cart">Shopping Cart</h3>

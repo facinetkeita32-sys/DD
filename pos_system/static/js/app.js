@@ -598,11 +598,13 @@ let App = {
     }
     customerEl.onclick = () => this.showCustomerSelectModal()
 
+    const floatEl = document.getElementById('cart-floating')
     if (!this.cart.length) {
       container.innerHTML = `<div class="cart-empty">${I18n.t('pos.empty_cart', 'Cart is empty')}<br><span style="font-size:12px;color:var(--text-light)">${I18n.t('pos.search', 'Click products to add')}</span></div>`
       const totalEl2 = document.getElementById('cart-total-amount')
       if (totalEl2) totalEl2.innerHTML = `<span class="total-amount">${this.currencyFormat(0)}</span>`
       if (deliveryEl) deliveryEl.style.display = 'none'
+      if (floatEl) floatEl.style.display = 'none'
       return
     }
 
@@ -697,6 +699,15 @@ let App = {
         this.renderCart()
       }
     })
+    if (floatEl) {
+      const isMobile = window.innerWidth <= 768
+      if (isMobile) {
+        const count = this.cart.reduce((s, i) => s + i.qty, 0)
+        document.getElementById('cart-floating-count').textContent = count
+        document.getElementById('cart-floating-total').textContent = this.currencyFormat(grandTotal)
+        floatEl.style.display = 'flex'
+      }
+    }
   },
 
   // === PAYMENT MODAL ===

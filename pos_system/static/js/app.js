@@ -733,13 +733,16 @@ let App = {
     let cartSummary = this.cart.map(item => {
       const lineTotal = item.qty * item.price_unit
       const discounted = lineTotal * (1 - (item.discount || 0) / 100)
-      let label = `${item.product_name} × ${item.qty} — ${this.currencyFormat(discounted)}`
-      if (item.discount) label += ` <span class="cart-disc-badge">-${item.discount}%</span>`
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px">${label}</div>`
+      let badge = item.discount ? `<span class="cart-disc-badge">-${item.discount}%</span>` : ''
+      return `<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light)">
+        <div style="flex:1;font-size:13px;font-weight:500">${item.product_name}</div>
+        <div style="white-space:nowrap;font-size:12px;color:var(--text-secondary)">×${item.qty}</div>
+        <div style="white-space:nowrap;font-size:14px;font-weight:700">${this.currencyFormat(discounted)} ${badge}</div>
+      </div>`
     }).join('')
 
     let html = `<h3>${I18n.t('payment.title', 'Payment')}</h3>
-      <div style="margin-bottom:12px;max-height:200px;overflow-y:auto;border:1px solid var(--border-light);border-radius:6px;padding:0 10px;background:var(--bg)">${cartSummary}</div>
+      <div style="margin-bottom:12px;border:1px solid var(--border-light);border-radius:6px;padding:4px 10px;background:var(--bg)">${cartSummary}</div>
       <div style="text-align:center;font-size:36px;font-weight:800;margin:20px 0;letter-spacing:-0.5px;color:var(--primary)">${totalDisplay}</div>
       <div class="form-group">
         <label>${I18n.t('payment.method', 'Payment Method')}</label>

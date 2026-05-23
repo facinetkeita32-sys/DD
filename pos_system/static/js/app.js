@@ -384,14 +384,27 @@ let App = {
     })
   },
 
+  _normalizeBarcode(code) {
+    const c = code.trim()
+    if (c.length === 13 && c[0] === '0' && /^\d{13}$/.test(c)) return c.slice(1)
+    return c
+  },
+
   handleBarcodeScan(barcode) {
     const input = document.getElementById('pos-barcode')
     if (!barcode) return
-    const product = this.products.find(p => p.barcode && p.barcode.trim() === barcode)
+    const original = barcode.trim()
+    const normal = this._normalizeBarcode(barcode)
+    const variants = [original]
+    if (normal !== original) variants.push(normal)
+    let product = null
+    for (const v of variants) {
+      product = this.products.find(p => p.barcode && p.barcode.trim() === v)
+      if (product) break
+    }
     if (product) {
       this.addToCart(product.id)
       this.showBarcodeFeedback(`${product.name} ${I18n.t('pos.added', 'added')}!`, 'success')
-      // Scroll product card into view and highlight
       const card = document.querySelector(`.product-card[data-id="${product.id}"]`)
       if (card) {
         card.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -459,8 +472,9 @@ let App = {
                     if (navigator.vibrate) navigator.vibrate(200)
                     this.stopScanner()
                     const code = b[0].rawValue.trim()
-                    if (onScan) onScan(code)
-                    else { document.getElementById('pos-barcode').value = code; this.handleBarcodeScan(code) }
+                    const ncode = this._normalizeBarcode(code)
+                    if (onScan) onScan(ncode)
+                    else { document.getElementById('pos-barcode').value = ncode; this.handleBarcodeScan(ncode) }
                   }
                 }).catch(() => {})
             } catch(e) { setStatus('Error: ' + e.message, 'red') }
@@ -496,8 +510,9 @@ let App = {
           this._scannerActive = false
           if (navigator.vibrate) navigator.vibrate(200)
           this.stopScanner()
-          if (onScan) onScan(code)
-          else { document.getElementById('pos-barcode').value = code; this.handleBarcodeScan(code) }
+          const ncode = this._normalizeBarcode(code)
+          if (onScan) onScan(ncode)
+          else { document.getElementById('pos-barcode').value = ncode; this.handleBarcodeScan(ncode) }
         })
       })
     } else {

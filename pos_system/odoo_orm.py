@@ -243,12 +243,10 @@ def _load_m2m(cls, obj_id, field_name):
 
 
 class Field:
-    def __init__(self, string=None, default=None, required=False, readonly=False, help=None):
+    def __init__(self, string=None, default=None, readonly=False, **kwargs):
         self.string = string
         self.default = default
-        self.required = required
         self.readonly = readonly
-        self.help = help
 
     def __set_name__(self, owner, name):
         self.name = name
@@ -256,104 +254,31 @@ class Field:
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
-        import sys
-        _mod = sys.modules[__name__]
-        _env = _mod.env
-        val = obj._data.get(self.name, self._get_default())
-        if isinstance(self, Many2one) and val:
-            records = _env[self.comodel_name].browse(val)
-            return records[0] if records else False
-        if isinstance(self, One2many):
-            return _env[self.comodel_name].search([(self.inverse_field, '=', obj.id)])
-        if isinstance(self, Many2many):
-            return obj._get_m2m(self.name)
-        return val
-
-    def __set__(self, obj, value):
-        obj._data[self.name] = self.convert(value)
-
-    def _get_default(self):
-        d = self.default() if callable(self.default) else self.default
-        return d
+        return obj._data.get(self.name)
 
     def convert(self, value):
         return value
-
-
-class Char(Field):
-    def __init__(self, size=None, **kwargs):
-        super().__init__(**kwargs)
-        self.size = size
-
-    def convert(self, value):
-        if value is not None:
-            return str(value)[:self.size] if self.size else str(value)
-        return value
-
-
-class Text(Field):
-    def convert(self, value):
-        return str(value) if value is not None else value
-
-
-class Integer(Field):
-    def convert(self, value):
-        return int(value) if value is not None else value
-
-
-class Float(Field):
-    def __init__(self, digits=None, **kwargs):
-        super().__init__(**kwargs)
-        self.digits = digits
-
-    def convert(self, value):
-        return float(value) if value is not None else 0.0
 
 
 class Boolean(Field):
     def convert(self, value):
-        return bool(value) if value is not None else False
-
-
-class Date(Field):
-    def convert(self, value):
-        if isinstance(value, str):
+        if isinstance(value, bool):
             return value
-        return value.strftime('%Y-%m-%d') if value else None
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return False
 
 
-class DateTime(Field):
-    def convert(self, value):
-        if isinstance(value, str):
-            return value
-        return value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+class Integer(Field): pass
 
 
-class Many2one(Field):
-    def __init__(self, comodel_name, **kwargs):
-        super().__init__(**kwargs)
-        self.comodel_name = comodel_name
-
-    def convert(self, value):
-        if value is None or value == 0:
-            return False
-        return int(value)
+class Float(Field): pass
 
 
-class One2many(Field):
-    def __init__(self, comodel_name, inverse_field, **kwargs):
-        super().__init__(**kwargs)
-        self.comodel_name = comodel_name
-        self.inverse_field = inverse_field
+class Char(Field): pass
 
 
-class Many2many(Field):
-    def __init__(self, comodel_name, rel=None, column1=None, column2=None, **kwargs):
-        super().__init__(**kwargs)
-        self.comodel_name = comodel_name
-        self.rel = rel
-        self.column1 = column1
-        self.column2 = column2
+class Text(Field): pass
 
 
 class Selection(Field):

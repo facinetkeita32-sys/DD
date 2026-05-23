@@ -730,7 +730,16 @@ let App = {
         <span style="font-size:32px;font-weight:700">${this.currencyFormat(total)}</span>`
     }
 
+    let cartSummary = this.cart.map(item => {
+      const lineTotal = item.qty * item.price_unit
+      const discounted = lineTotal * (1 - (item.discount || 0) / 100)
+      let label = `${item.product_name} × ${item.qty} — ${this.currencyFormat(discounted)}`
+      if (item.discount) label += ` <span class="cart-disc-badge">-${item.discount}%</span>`
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px">${label}</div>`
+    }).join('')
+
     let html = `<h3>${I18n.t('payment.title', 'Payment')}</h3>
+      <div style="margin-bottom:12px;max-height:200px;overflow-y:auto;border:1px solid var(--border-light);border-radius:6px;padding:0 10px;background:var(--bg)">${cartSummary}</div>
       <div style="text-align:center;font-size:36px;font-weight:800;margin:20px 0;letter-spacing:-0.5px;color:var(--primary)">${totalDisplay}</div>
       <div class="form-group">
         <label>${I18n.t('payment.method', 'Payment Method')}</label>

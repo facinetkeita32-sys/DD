@@ -103,6 +103,7 @@
   "product.import_updated": "Mis à Jour",
   "product.import_errors": "Erreurs",
   "product.download_template": "Télécharger le Modèle CSV",
+  "product.export_csv": "Exporter CSV",
 
   "customer.title": "Clients",
   "customer.name": "Nom",

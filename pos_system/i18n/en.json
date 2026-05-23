@@ -103,6 +103,7 @@
   "product.import_updated": "Updated",
   "product.import_errors": "Errors",
   "product.download_template": "Download CSV Template",
+  "product.export_csv": "Export CSV",
 
   "customer.title": "Customers",
   "customer.name": "Name",

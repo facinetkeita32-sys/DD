@@ -85,6 +85,7 @@ let App = {
     const orderFilter = document.getElementById('order-state-filter')
     if (orderFilter) orderFilter.onchange = () => this.renderOrdersTable()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
+    document.getElementById('export-products-csv-btn').onclick = () => this.exportProductsCsv()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
@@ -1452,6 +1453,34 @@ let App = {
           }).join('')}
         </tbody></table></div>`
     } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  exportProductsCsv() {
+    const rows = [['Name','Price','Cost','Quantity','Category','Barcode','Expiration Date']]
+    this.products.forEach(p => {
+      rows.push([
+        p.name || '',
+        p.list_price || 0,
+        p.cost_price || 0,
+        p.available_qty || 0,
+        (p.categ_id && p.categ_id.name) || '',
+        p.barcode || '',
+        (p.expiration_date || '').substring(0, 10),
+      ])
+    })
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+    }).join(',')).join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventory_${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   },
 
   async exportReportCsv() {

@@ -830,7 +830,7 @@ let App = {
     }))
     const orderData = {
       lines,
-      payments: [{ method_id: methodId, amount: total }],
+      payments: [{ payment_method_id: methodId, amount: total }],
       partner_id: this.cartCustomer || false,
       amount_total: total,
       delivery_cost: dzCost,

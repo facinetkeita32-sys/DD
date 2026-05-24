@@ -850,8 +850,8 @@ let App = {
       this.renderOrdersTable()
       this.renderDashboard()
       const orderId = res.data ? res.data.id : null
-      alert(`Payment confirmed. Order #${res.data ? res.data.id || res.data.name : ''}`)
-      if (orderId && confirm(I18n.t('receipt.print_prompt', 'Print receipt now?'))) {
+      const ref = res.data ? res.data.id || res.data.name : ''
+      if (orderId && confirm(`Order #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
         this.openPrintReceipt(orderId)
       }
     } catch(e) {
@@ -894,8 +894,8 @@ let App = {
       this.renderOrdersTable()
       this.renderDashboard()
       const orderId = res.data ? res.data.id : null
-      alert(`${I18n.t('payment.pending_saved', 'Order saved as pending payment')}. #${res.data ? res.data.id || res.data.name : ''}`)
-      if (orderId && confirm(I18n.t('receipt.print_prompt', 'Print receipt now?'))) {
+      const ref = res.data ? res.data.id || res.data.name : ''
+      if (orderId && confirm(`${I18n.t('payment.pending_saved', 'Order saved as pending payment')} #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
         this.openPrintReceipt(orderId)
       }
     } catch(e) {

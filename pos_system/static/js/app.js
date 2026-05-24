@@ -588,8 +588,6 @@ let App = {
     const container = document.getElementById('cart-items')
     const totalEl = document.getElementById('cart-total-amount')
     const customerEl = document.getElementById('cart-customer')
-    const deliveryEl = document.getElementById('cart-delivery')
-    const dzSelect = document.getElementById('delivery-zone-select')
 
     if (this.cartCustomer) {
       const c = this.customers.find(x => x.id === this.cartCustomer)
@@ -604,7 +602,6 @@ let App = {
       container.innerHTML = `<div class="cart-empty">${I18n.t('pos.empty_cart', 'Cart is empty')}<br><span style="font-size:12px;color:var(--text-light)">${I18n.t('pos.search', 'Click products to add')}</span></div>`
       const totalEl2 = document.getElementById('cart-total-amount')
       if (totalEl2) totalEl2.innerHTML = `<span class="total-amount">${this.currencyFormat(0)}</span>`
-      if (deliveryEl) deliveryEl.style.display = 'none'
       if (floatEl) floatEl.style.display = 'none'
       return
     }
@@ -641,36 +638,7 @@ let App = {
       `
     }).join('')
 
-    // Delivery zones
     const zones = this.deliveryZones || []
-    if (zones.length && deliveryEl) {
-      deliveryEl.style.display = 'block'
-      // Save contact field values before re-render
-      const prevContactName = (document.getElementById('delivery-contact-name') || {}).value || ''
-      const prevContactPhone = (document.getElementById('delivery-contact-phone') || {}).value || ''
-      const currentVal = dzSelect.value
-      dzSelect.innerHTML = `<option value="">${I18n.t('delivery.none', 'No delivery')}</option>` +
-        zones.map(z => `<option value="${z.id}" data-cost="${z.cost}">${z.name} - ${this.currencyFormat(z.cost)}</option>`).join('')
-      if (currentVal) dzSelect.value = currentVal
-      dzSelect.onchange = () => {
-        this.selectedDeliveryZone = dzSelect.value ? parseInt(dzSelect.value) : null
-        this.renderCart()
-      }
-      // Show/hide contact fields based on selection
-      const contactFields = document.getElementById('delivery-contact-fields')
-      if (contactFields) {
-        contactFields.style.display = dzSelect.value ? 'block' : 'none'
-        if (dzSelect.value) {
-          document.getElementById('delivery-contact-name').placeholder = I18n.t('delivery.contact_name', 'Contact Name')
-          document.getElementById('delivery-contact-phone').placeholder = I18n.t('delivery.contact_phone', 'Contact Phone')
-          document.getElementById('delivery-contact-name').value = prevContactName
-          document.getElementById('delivery-contact-phone').value = prevContactPhone
-        }
-      }
-    } else if (deliveryEl) {
-      deliveryEl.style.display = 'none'
-    }
-
     const dzCost = this.selectedDeliveryZone && zones.length
       ? (zones.find(z => z.id === this.selectedDeliveryZone) || {}).cost || 0
       : 0
@@ -719,16 +687,6 @@ let App = {
       const lineTotal = item.qty * item.price_unit
       return sum + lineTotal - (lineTotal * (item.discount || 0) / 100)
     }, 0)
-    const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
-    const dzCost = dz ? dz.cost : 0
-    const total = subtotal + dzCost
-
-    let totalDisplay = `${this.currencyFormat(total)}`
-    if (dzCost > 0) {
-      totalDisplay = `${I18n.t('pos.subtotal', 'Subtotal')}: ${this.currencyFormat(subtotal)}<br>
-        <span style="font-size:14px;color:var(--text-light)">${I18n.t('delivery.cost', 'Delivery')}: ${this.currencyFormat(dzCost)}</span><br>
-        <span style="font-size:32px;font-weight:700">${this.currencyFormat(total)}</span>`
-    }
 
     let cartSummary = this.cart.map(item => {
       const lineTotal = item.qty * item.price_unit
@@ -741,9 +699,28 @@ let App = {
       </div>`
     }).join('')
 
+    const customerName = this.cartCustomer ? (this.customers.find(c => c.id === this.cartCustomer) || {}).name || '' : ''
+
+    // Delivery section inside modal
+    const zones = this.deliveryZones || []
+    let deliveryHtml = ''
+    if (zones.length) {
+      zoneOpts = zones.map(z => `<option value="${z.id}" data-cost="${z.cost}">${z.name} — ${this.currencyFormat(z.cost)}</option>`).join('')
+      const prevDz = this.selectedDeliveryZone || ''
+      deliveryHtml = `<div class="form-group">
+        <label>${I18n.t('delivery.zone', 'Delivery Zone')}</label>
+        <select id="modal-delivery-zone"><option value="">${I18n.t('delivery.none', 'No delivery')}</option>${zoneOpts}</select>
+        <div id="modal-delivery-contact" style="display:none;margin-top:6px">
+          <input type="text" id="modal-contact-name" placeholder="${I18n.t('delivery.contact_name', 'Contact Name')}" style="width:100%;padding:8px;margin-bottom:4px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;box-sizing:border-box">
+          <input type="text" id="modal-contact-phone" placeholder="${I18n.t('delivery.contact_phone', 'Contact Phone')}" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;box-sizing:border-box">
+        </div>
+      </div>`
+    }
+
     let html = `<h3>${I18n.t('payment.title', 'Payment')}</h3>
       <div style="margin-bottom:12px;border:1px solid var(--border-light);border-radius:6px;padding:4px 10px;background:var(--bg)">${cartSummary}</div>
-      <div style="text-align:center;font-size:36px;font-weight:800;margin:20px 0;letter-spacing:-0.5px;color:var(--primary)">${totalDisplay}</div>
+      ${deliveryHtml}
+      <div style="text-align:center;font-size:36px;font-weight:800;margin:20px 0;letter-spacing:-0.5px;color:var(--primary)" id="modal-total-display">${this.currencyFormat(subtotal)}</div>
       <div class="form-group">
         <label>${I18n.t('payment.method', 'Payment Method')}</label>
         <select id="payment-method">`
@@ -753,7 +730,7 @@ let App = {
     html += `</select></div>
       <div class="form-group">
         <label>${I18n.t('payment.tendered', 'Amount Tendered')}</label>
-        <input type="number" id="payment-tendered" value="${total}" step="100">
+        <input type="number" id="payment-tendered" value="${subtotal}" step="100">
       </div>
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
       <div class="btn-group" style="margin-top:20px">
@@ -763,23 +740,124 @@ let App = {
       </div>`
 
     this.showModal(html)
+
+    // Wire up delivery zone in modal
+    const dzSelect = document.getElementById('modal-delivery-zone')
+    if (dzSelect) {
+      if (this.selectedDeliveryZone) dzSelect.value = this.selectedDeliveryZone
+      const contactDiv = document.getElementById('modal-delivery-contact')
+      if (dzSelect.value) contactDiv.style.display = 'block'
+      dzSelect.onchange = () => {
+        const sel = dzSelect.value ? parseInt(dzSelect.value) : null
+        if (contactDiv) contactDiv.style.display = sel ? 'block' : 'none'
+        this.selectedDeliveryZone = sel
+        this._updateModalTotal()
+      }
+    }
+
     document.getElementById('payment-tendered').oninput = () => {
-      const tendered = parseFloat(document.getElementById('payment-tendered').value) || 0
-      const change = tendered - total
-      document.getElementById('payment-change').textContent = change >= 0
-        ? `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
-        : `${this.currencyFormat(Math.abs(change))} ${I18n.t('common.remaining', 'remaining')}`
+      this._updateModalChange()
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
-    document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
-    document.getElementById('payment-pay-later').onclick = () => this.payLaterOrder(total)
+    document.getElementById('payment-confirm').onclick = () => this.confirmPayment()
+    document.getElementById('payment-pay-later').onclick = () => this.payLaterOrder()
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
   },
 
-  async payLaterOrder(total) {
+  _updateModalTotal() {
+    const subtotal = this.cart.reduce((sum, item) => {
+      const lineTotal = item.qty * item.price_unit
+      return sum + lineTotal - (lineTotal * (item.discount || 0) / 100)
+    }, 0)
     const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
     const dzCost = dz ? dz.cost : 0
+    const total = subtotal + dzCost
+    const el = document.getElementById('modal-total-display')
+    if (dzCost > 0) {
+      el.innerHTML = `${I18n.t('pos.subtotal', 'Subtotal')}: ${this.currencyFormat(subtotal)}<br>
+        <span style="font-size:14px;color:var(--text-light)">${I18n.t('delivery.cost', 'Delivery')}: ${this.currencyFormat(dzCost)}</span><br>
+        <span style="font-size:32px;font-weight:700">${this.currencyFormat(total)}</span>`
+    } else {
+      el.textContent = this.currencyFormat(total)
+    }
+    const te = document.getElementById('payment-tendered')
+    if (te) { te.value = total; te.dispatchEvent(new Event('input')) }
+  },
 
+  _updateModalChange() {
+    const subtotal = this.cart.reduce((sum, item) => {
+      const lineTotal = item.qty * item.price_unit
+      return sum + lineTotal - (lineTotal * (item.discount || 0) / 100)
+    }, 0)
+    const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
+    const total = subtotal + (dz ? dz.cost : 0)
+    const tendered = parseFloat(document.getElementById('payment-tendered').value) || 0
+    const change = tendered - total
+    document.getElementById('payment-change').textContent = change >= 0
+      ? `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
+      : `${this.currencyFormat(Math.abs(change))} ${I18n.t('common.remaining', 'remaining')}`
+  },
+
+  _getModalTotal() {
+    const subtotal = this.cart.reduce((sum, item) => {
+      const lineTotal = item.qty * item.price_unit
+      return sum + lineTotal - (lineTotal * (item.discount || 0) / 100)
+    }, 0)
+    const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
+    return subtotal + (dz ? dz.cost : 0)
+  },
+
+  _getModalDeliveryInfo() {
+    const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
+    const dzCost = dz ? dz.cost : 0
+    const contactName = (document.getElementById('modal-contact-name') || {}).value || ''
+    const contactPhone = (document.getElementById('modal-contact-phone') || {}).value || ''
+    return { dz, dzCost, contactName, contactPhone }
+  },
+
+  async confirmPayment() {
+    const total = this._getModalTotal()
+    const methodId = parseInt(document.getElementById('payment-method').value)
+    const tendered = parseFloat(document.getElementById('payment-tendered').value) || total
+    const { dz, dzCost, contactName, contactPhone } = this._getModalDeliveryInfo()
+    const lines = this.cart.map(item => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      qty: item.qty,
+      price_unit: item.price_unit,
+      discount: item.discount || 0,
+      price_subtotal: (item.qty * item.price_unit) * (1 - (item.discount || 0) / 100),
+    }))
+    const orderData = {
+      lines,
+      payments: [{ method_id: methodId, amount: total }],
+      partner_id: this.cartCustomer || false,
+      amount_total: total,
+      delivery_cost: dzCost,
+      delivery_contact_name: contactName,
+      delivery_contact_phone: contactPhone,
+      state: 'paid',
+    }
+    if (dz) orderData.delivery_zone_id = dz.id
+    try {
+      const res = await this.api('POST', '/orders', orderData)
+      this.closeModal()
+      this.clearCart()
+      const prodRes = await this.api('GET', '/products')
+      this.products = prodRes.data || []
+      this.renderProducts()
+      this.renderProductsTable()
+      this.renderOrdersTable()
+      this.renderDashboard()
+      alert(`Payment confirmed. Order #${res.data ? res.data.id || res.data.name : ''}`)
+    } catch(e) {
+      alert('Error: ' + e.message)
+    }
+  },
+
+  async payLaterOrder() {
+    const total = this._getModalTotal()
+    const { dz, dzCost, contactName, contactPhone } = this._getModalDeliveryInfo()
     const lines = this.cart.map(item => ({
       product_id: item.product_id,
       product_name: item.product_name,
@@ -789,17 +867,14 @@ let App = {
       price_subtotal: (item.qty * item.price_unit) * (1 - (item.discount || 0) / 100),
     }))
 
-    const deliveryContactName = (document.getElementById('delivery-contact-name') || {}).value || ''
-    const deliveryContactPhone = (document.getElementById('delivery-contact-phone') || {}).value || ''
-
     const orderData = {
       lines,
       payments: [],
       partner_id: this.cartCustomer || false,
       amount_total: total,
       delivery_cost: dzCost,
-      delivery_contact_name: deliveryContactName,
-      delivery_contact_phone: deliveryContactPhone,
+      delivery_contact_name: contactName,
+      delivery_contact_phone: contactPhone,
       state: 'pending',
     }
     if (dz) orderData.delivery_zone_id = dz.id

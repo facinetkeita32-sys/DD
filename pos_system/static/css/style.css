@@ -294,8 +294,8 @@ tr:hover td { background: var(--hover); }
 @media (max-width: 768px) {
   .pos-layout { flex-direction: column; height: auto; }
   .pos-products { flex: none; }
-  .pos-cart { width: 100%; height: auto; max-height: 65vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-  .cart-items { max-height: 45vh; }
+  .pos-cart { width: 100%; height: auto; max-height: 70vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .cart-items { max-height: none; flex: 1; }
   .product-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
   .dashboard-cards { grid-template-columns: repeat(2, 1fr); }
   .modal { min-width: unset; width: 95vw; padding: 20px; max-height: 92vh; }

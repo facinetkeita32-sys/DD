@@ -17,9 +17,18 @@ let App = {
   company: null,
 
   async init() {
-    await I18n.init('en')
-    this.bindEvents()
-    this.checkLogin()
+      await I18n.init('en')
+      this.bindEvents()
+      this.loadLoginLogo()
+      this.checkLogin()
+    },
+
+  async loadLoginLogo() {
+    try {
+      const res = await this.api('GET', '/company')
+      const logo = res && res.data ? res.data.logo : null
+      this.displayLogo(logo)
+    } catch(e) { /* not critical */ }
   },
 
   bindEvents() {

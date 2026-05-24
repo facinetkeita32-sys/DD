@@ -212,6 +212,7 @@
   "receipt.phone": "Tél",
   "receipt.generated_by": "Généré par Shop With DD POS",
   "receipt.no_print": "Éléments non imprimables masqués",
+  "receipt.print_prompt": "Imprimer le reçu maintenant?",
 
   "delivery.zone": "Zone de Livraison",
   "delivery.cost": "Frais de Livraison",

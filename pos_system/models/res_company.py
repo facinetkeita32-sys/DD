@@ -22,13 +22,22 @@ class ResCompany(Model):
     receipt_footer = Char(string='Receipt Footer', default='Have a great day!')
 
     def _init_defaults(self):
-        existing = self.search([('name', '=', 'My Company')])
-        if not existing:
-            from .res_currency import ResCurrency
-            gnf = ResCurrency().search([('iso_code', '=', 'GNF')], limit=1)
+        existing = self.search([], limit=1)
+        from .res_currency import ResCurrency
+        gnf = ResCurrency().search([('iso_code', '=', 'GNF')], limit=1)
+        if existing:
+            existing[0].write({
+                'name': 'Shop With DD',
+                'street': '',
+                'city': '',
+                'state': '',
+                'zip_code': '',
+                'country': '',
+                'currency_id': gnf[0].id if gnf else False,
+            })
+        else:
             self.create({
-                'name': 'My Company',
-                'country': 'Guinea',
+                'name': 'Shop With DD',
                 'currency_id': gnf[0].id if gnf else False,
                 'receipt_header': 'Thank you for your purchase! - Shop With DD POS',
                 'receipt_footer': 'Have a great day! - Merci!',

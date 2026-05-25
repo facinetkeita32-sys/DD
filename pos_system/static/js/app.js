@@ -361,28 +361,12 @@ let App = {
       const badge = isOut ? `<span class="stock-badge out">${I18n.t('product.out_of_stock', 'Out')}</span>`
         : isLow ? `<span class="stock-badge low">${I18n.t('product.low_stock', 'Low')}</span>`
         : qty > 0 ? `<span class="stock-badge ok">${I18n.t('product.in_stock', 'In Stock')}</span>` : ''
-      const expDate = p.nearest_expiry || ''
-      let expWarn = ''
-      if (expDate) {
-        const now = new Date()
-        const exp = new Date(expDate.substring(0, 10) + 'T00:00:00')
-        const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24))
-        if (diffDays < 0) {
-          expWarn = `<div class="prod-exp-badge expired">${I18n.t('product.expired', 'Expired')}</div>`
-          if (!cls.includes('out-of-stock')) cls += ' expired'
-        } else if (diffDays <= 90) {
-          expWarn = `<div class="prod-exp-badge expiring">${I18n.t('product.expires_in', 'Expires')} ${diffDays}d</div>`
-          cls += ' expiring-soon'
-        }
-      }
       const catName = p.categ_id ? p.categ_id.name || '' : ''
       const imgHtml = p.image
         ? `<img class="prod-img" src="data:image/png;base64,${p.image}" alt="${p.name}" loading="lazy">`
         : `<div class="prod-img-placeholder">📦</div>`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
-        ${badge}
-        ${expWarn}
         <div class="prod-name">${p.name || ''}</div>
         <div class="prod-category">${catName ? this._esc(catName) : ''}</div>
         <div class="prod-price">${this.currencyFormat(p.list_price)}</div>

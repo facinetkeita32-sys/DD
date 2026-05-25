@@ -1004,7 +1004,7 @@ let App = {
         if (diffDays < 0) {
           expHtml = `<span class="stock-badge out" style="font-weight:700">${I18n.t('product.expired', 'Expired')}</span>`
           expCls = ' row-expired'
-        } else if (diffDays <= 180) {
+        } else if (diffDays <= 90) {
           expHtml = `<span class="stock-badge low">${expDate.substring(0, 10)} (${diffDays}d)</span>`
           expCls = ' row-expiring'
         } else {
@@ -1155,7 +1155,7 @@ let App = {
           const diffDays = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
           let batchCls = 'lot-batch-id'
           if (diffDays < 0) batchCls += ' lot-expired'
-          else if (diffDays <= 180) batchCls += ' lot-expiring'
+          else if (diffDays <= 90) batchCls += ' lot-expiring'
           return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:13px">
             <span class="${batchCls}">${this._esc(l.name || '')}</span>
             <span style="flex:1;color:var(--text-light)">${I18n.t('product.expires', 'Exp')}: ${exp}</span>

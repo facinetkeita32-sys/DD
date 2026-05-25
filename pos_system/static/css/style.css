@@ -139,6 +139,11 @@ tr.row-expiring td { background: #fffbeb; }
 .product-card.expired { opacity: 0.75; border-color: var(--danger); }
 .product-card.expiring-soon { border-color: var(--warning); }
 
+/* Batch/Lot ID highlighting */
+.lot-batch-id { flex: 2; font-weight: 700; font-size: 13px; color: var(--text); padding: 2px 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+.lot-batch-id.lot-expired { background: var(--danger-light); color: #991b1b; border-color: var(--danger); }
+.lot-batch-id.lot-expiring { background: var(--warning-light); color: #92400e; border-color: #f59e0b; }
+
 .prod-table-img { width: 40px; height: 40px; object-fit: contain; border-radius: var(--radius-sm); background: var(--bg); }
 .prod-table-img-placeholder { width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-light); }
 

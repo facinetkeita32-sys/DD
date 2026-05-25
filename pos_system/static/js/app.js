@@ -370,7 +370,7 @@ let App = {
         if (diffDays < 0) {
           expWarn = `<div class="prod-exp-badge expired">${I18n.t('product.expired', 'Expired')}</div>`
           if (!cls.includes('out-of-stock')) cls += ' expired'
-        } else if (diffDays <= 30) {
+        } else if (diffDays <= 90) {
           expWarn = `<div class="prod-exp-badge expiring">${I18n.t('product.expires_in', 'Expires')} ${diffDays}d</div>`
           cls += ' expiring-soon'
         }
@@ -1020,7 +1020,7 @@ let App = {
         if (diffDays < 0) {
           expHtml = `<span class="stock-badge out" style="font-weight:700">${I18n.t('product.expired', 'Expired')}</span>`
           expCls = ' row-expired'
-        } else if (diffDays <= 30) {
+        } else if (diffDays <= 90) {
           expHtml = `<span class="stock-badge low">${expDate.substring(0, 10)} (${diffDays}d)</span>`
           expCls = ' row-expiring'
         } else {
@@ -1166,8 +1166,14 @@ let App = {
         }
         container.innerHTML = lots.map(l => {
           const exp = l.expiration_date ? l.expiration_date.substring(0, 10) : '-'
+          const now = new Date()
+          const expDate = new Date(exp + 'T00:00:00')
+          const diffDays = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
+          let batchCls = 'lot-batch-id'
+          if (diffDays < 0) batchCls += ' lot-expired'
+          else if (diffDays <= 90) batchCls += ' lot-expiring'
           return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:13px">
-            <span style="flex:2;font-weight:600">${this._esc(l.name || '')}</span>
+            <span class="${batchCls}">${this._esc(l.name || '')}</span>
             <span style="flex:1;color:var(--text-light)">${I18n.t('product.expires', 'Exp')}: ${exp}</span>
             <span style="flex:1;font-weight:600;text-align:right">${l.available_qty || 0}</span>
             <button class="btn btn-sm btn-outline edit-lot-btn" data-id="${l.id}" style="padding:2px 8px">✏️</button>

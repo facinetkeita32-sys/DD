@@ -549,7 +549,13 @@ let App = {
   addToCart(productId) {
     const product = this.products.find(p => p.id === productId)
     if (!product) return
+    const maxQty = product.available_qty || 0
     const existing = this.cart.find(c => c.product_id === productId)
+    const currentQty = existing ? existing.qty : 0
+    if (maxQty <= 0 || currentQty >= maxQty) {
+      alert(I18n.t('pos.out_of_stock', 'Out of stock') + ': ' + product.name)
+      return
+    }
     if (existing) {
       existing.qty += 1
     } else {

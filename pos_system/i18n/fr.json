@@ -42,6 +42,7 @@
   "pos.added": "ajouté",
   "pos.scanner_title": "Scanner Code-barres",
   "pos.scanner_hint": "Pointez la caméra vers un code-barres",
+  "pos.out_of_stock": "Rupture de stock",
 
   "payment.title": "Paiement",
   "payment.method": "Moyen de Paiement",

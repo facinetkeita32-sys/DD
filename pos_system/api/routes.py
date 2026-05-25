@@ -263,7 +263,21 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    return success_response(model_to_dict(products))
+    result = model_to_dict(products)
+    if isinstance(result, list):
+        for r in result:
+            pid = r.get('id')
+            if pid:
+                lots = StockLot().search([('product_id', '=', pid)])
+                dates = []
+                for lot in lots:
+                    exp = lot._data.get('expiration_date', '') or ''
+                    if exp:
+                        dates.append(exp)
+                r['nearest_expiry'] = min(dates) if dates else ''
+            else:
+                r['nearest_expiry'] = ''
+    return success_response(result)
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])

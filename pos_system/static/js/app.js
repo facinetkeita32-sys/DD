@@ -361,7 +361,7 @@ let App = {
       const badge = isOut ? `<span class="stock-badge out">${I18n.t('product.out_of_stock', 'Out')}</span>`
         : isLow ? `<span class="stock-badge low">${I18n.t('product.low_stock', 'Low')}</span>`
         : qty > 0 ? `<span class="stock-badge ok">${I18n.t('product.in_stock', 'In Stock')}</span>` : ''
-      const expDate = p.expiration_date || ''
+      const expDate = p.nearest_expiry || ''
       let expWarn = ''
       if (expDate) {
         const now = new Date()
@@ -1010,12 +1010,12 @@ let App = {
       else if (isLow) stockHtml = `<span class="stock-badge low">${I18n.t('product.low_stock', 'Low')}</span>`
       else stockHtml = `<span class="stock-badge ok">${I18n.t('product.in_stock', 'In Stock')}</span>`
       const rowCls = isOut ? 'row-out-of-stock' : isLow ? 'row-low-stock' : ''
-      const expDate = p.expiration_date || ''
+      const expDate = p.nearest_expiry || ''
       let expHtml = '-'
       let expCls = ''
       if (expDate) {
         const now = new Date()
-        const exp = new Date(expDate + 'T00:00:00')
+        const exp = new Date(expDate.substring(0, 10) + 'T00:00:00')
         const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24))
         if (diffDays < 0) {
           expHtml = `<span class="stock-badge out" style="font-weight:700">${I18n.t('product.expired', 'Expired')}</span>`
@@ -1664,7 +1664,7 @@ let App = {
         p.available_qty || 0,
         (p.categ_id && p.categ_id.name) || '',
         p.barcode || '',
-        (p.expiration_date || '').substring(0, 10),
+        (p.nearest_expiry || '').substring(0, 10),
       ])
     })
     const csv = rows.map(r => r.map(v => {

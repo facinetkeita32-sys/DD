@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
@@ -20,6 +21,7 @@ from ..models.pos_tax import PosTax
 from ..models.pos_payment import PosPayment
 from ..models.res_company import ResCompany
 from ..models.delivery_zone import DeliveryZone
+from ..models.stock_lot import StockLot
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -114,8 +116,10 @@ def auth_login():
     password = data.get('password', '')
     users = ResUsers().search([('login', '=', login), ('password', '=', password)])
     if users:
+        now = time.time()
         session['user_id'] = users[0].id
         session['lang'] = users[0].lang
+        session['last_activity'] = now
         return success_response(model_to_dict(users[0]))
     return error_response('Invalid credentials', 401)
 
@@ -397,6 +401,58 @@ def bulk_import_products():
 
 
 
+# === LOTS / BATCHES ===
+
+@api_bp.route('/products/<int:product_id>/lots', methods=['GET'])
+@login_required
+def get_product_lots(product_id):
+    lots = StockLot().search([('product_id', '=', product_id)])
+    return success_response(model_to_dict(lots))
+
+
+@api_bp.route('/products/<int:product_id>/lots', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def create_product_lot(product_id):
+    data = request.get_json() or {}
+    data['product_id'] = product_id
+    if not data.get('name'):
+        from datetime import datetime
+        products = ProductProduct().browse([product_id])
+        pname = products[0]._data.get('name', 'Product') if products else 'Product'
+        data['name'] = '%s-%s' % (pname.replace(' ', ''), datetime.now().strftime('%Y%m%d%H%M%S'))
+    lot = StockLot().create(data)
+    StockLot._recompute_product_qty(product_id)
+    return success_response(model_to_dict(lot), 'Lot created')
+
+
+@api_bp.route('/lots/<int:lot_id>', methods=['PUT'])
+@login_required
+@permission_required('product.write')
+def update_lot(lot_id):
+    lots = StockLot().browse([lot_id])
+    if not lots:
+        return error_response('Lot not found', 404)
+    data = request.get_json() or {}
+    lots[0].write(data)
+    StockLot._recompute_product_qty(lots[0]._data.get('product_id'))
+    return success_response(model_to_dict(lots[0]), 'Lot updated')
+
+
+@api_bp.route('/lots/<int:lot_id>', methods=['DELETE'])
+@login_required
+@permission_required('product.write')
+def delete_lot(lot_id):
+    lots = StockLot().browse([lot_id])
+    if not lots:
+        return error_response('Lot not found', 404)
+    pid = lots[0]._data.get('product_id')
+    lots[0].unlink()
+    if pid:
+        StockLot._recompute_product_qty(pid)
+    return success_response(message='Lot deleted')
+
+
 # === PRODUCT CATEGORIES ===
 
 @api_bp.route('/product-categories', methods=['GET'])
@@ -594,6 +650,21 @@ def create_order():
     if session_id:
         data['session_id'] = session_id
     try:
+        # Server-side stock validation
+        for line_data in lines_data:
+            prod_id = line_data.get('product_id')
+            qty = float(line_data.get('qty', 0) or 0)
+            if prod_id and qty:
+                products = ProductProduct().browse([prod_id])
+                if products:
+                    product = products[0]
+                    current_qty = product._data.get('available_qty', 0) or 0
+                    if current_qty < qty:
+                        return error_response(
+                            f"Insufficient stock for '{product.name}': "
+                            f"requested {qty}, only {current_qty} available"
+                        )
+
         order_state = data.pop('state', 'paid')
         order = PosOrder().create(data)
         total = 0
@@ -609,12 +680,7 @@ def create_order():
             prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
             qty = line._data.get('qty', 0) or 0
             if prod_id and qty:
-                products = ProductProduct().browse([prod_id])
-                if products:
-                    product = products[0]
-                    current_qty = product._data.get('available_qty', 0) or 0
-                    new_qty = current_qty - qty
-                    product.write({'available_qty': max(0, new_qty)})
+                StockLot.deduct_fefo(prod_id, qty)
 
         delivery_cost = float(data.get('delivery_cost', 0) or 0)
         grand_total = total + delivery_cost
@@ -688,11 +754,7 @@ def cancel_order(order_id):
         prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
         qty = line._data.get('qty', 0) or 0
         if prod_id and qty:
-            products = ProductProduct().browse([prod_id])
-            if products:
-                product = products[0]
-                current_qty = product._data.get('available_qty', 0) or 0
-                product.write({'available_qty': current_qty + qty})
+            StockLot.restore_qty(prod_id, qty)
     orders[0].action_cancel()
     return success_response(message='Order cancelled')
 

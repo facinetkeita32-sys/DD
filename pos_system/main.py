@@ -1,13 +1,16 @@
 import os
 import sys
+import time
 from flask import Flask, send_from_directory, request, g, session
 from .api.routes import api_bp
 from .i18n import translator
 from .init_data import load_demo_data
 from .odoo_orm import _load_cache, _db_cache
+from .models.stock_lot import StockLot
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production')
+SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', 7200))
 
 app.register_blueprint(api_bp)
 
@@ -15,6 +18,13 @@ app.register_blueprint(api_bp)
 @app.before_request
 def before_request():
     _load_cache()
+    # Session inactivity timeout
+    if 'user_id' in session:
+        last = session.get('last_activity', 0)
+        if time.time() - last > SESSION_TIMEOUT:
+            session.clear()
+        else:
+            session['last_activity'] = time.time()
     lang = session.get('lang', request.args.get('lang', 'en'))
     translator.set_language(lang)
 
@@ -45,6 +55,7 @@ def create_app():
             break
     if not has_data:
         load_demo_data()
+    StockLot()._init_defaults()
     return app
 
 

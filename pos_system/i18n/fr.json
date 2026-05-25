@@ -223,5 +223,14 @@
   "delivery.edit_zone": "Modifier la Zone",
   "delivery.no_zones": "Aucune zone configurée",
   "delivery.contact_name": "Nom du Contact",
-  "delivery.contact_phone": "Téléphone du Contact"
+  "delivery.contact_phone": "Téléphone du Contact",
+
+  "product.stock_batches": "Lots de Stock",
+  "product.add_batch": "Ajouter un Lot",
+  "product.edit_batch": "Modifier le Lot",
+  "product.batch_name": "Numéro de Lot",
+  "product.batch_name_required": "Le numéro de lot est requis",
+  "product.no_batches": "Aucun lot pour le moment",
+  "product.expires": "Exp",
+  "product.confirm_delete_batch": "Supprimer ce lot ?"
 }

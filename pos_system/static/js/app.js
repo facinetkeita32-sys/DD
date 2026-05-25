@@ -1075,14 +1075,17 @@ let App = {
       </div>
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
-      <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.barcode">Barcode</label>
         <div style="display:flex;gap:6px">
           <input id="prod-barcode" style="flex:1" value="${product ? this._esc(product.barcode || '') : ''}">
           <button class="btn btn-sm btn-primary" id="prod-barcode-scan" title="Scan barcode">📷</button>
         </div>
       </div>
-      <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
+      <div class="form-group">
+        <label>${I18n.t('product.stock_batches', 'Stock Batches')} <span id="prod-total-stock" style="font-weight:bold;color:var(--primary)">(${product ? product.available_qty || 0 : 0})</span></label>
+        <div id="prod-lots-container" style="margin-bottom:8px"></div>
+        <button class="btn btn-sm btn-primary" id="prod-add-lot-btn">+ ${I18n.t('product.add_batch', 'Add Batch')}</button>
+      </div>
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
         <div class="image-upload-area ${existingImg ? 'has-image' : ''}" id="image-upload-area">
@@ -1147,15 +1150,63 @@ let App = {
 
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
+    document.getElementById('prod-add-lot-btn').onclick = () => this.showLotModal(product ? product.id : null)
+
+    const renderLots = async () => {
+      const container = document.getElementById('prod-lots-container')
+      const totalSpan = document.getElementById('prod-total-stock')
+      if (!product || !product.id) { container.innerHTML = ''; return }
+      try {
+        const res = await this.api('GET', `/products/${product.id}/lots`)
+        const lots = res.data || []
+        totalSpan.textContent = '(' + (lots.reduce((s, l) => s + (l.available_qty || 0), 0)) + ')'
+        if (!lots.length) {
+          container.innerHTML = `<div style="color:var(--text-light);font-size:13px;padding:8px 0">${I18n.t('product.no_batches', 'No batches yet')}</div>`
+          return
+        }
+        container.innerHTML = lots.map(l => {
+          const exp = l.expiration_date ? l.expiration_date.substring(0, 10) : '-'
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:13px">
+            <span style="flex:2;font-weight:600">${this._esc(l.name || '')}</span>
+            <span style="flex:1;color:var(--text-light)">${I18n.t('product.expires', 'Exp')}: ${exp}</span>
+            <span style="flex:1;font-weight:600;text-align:right">${l.available_qty || 0}</span>
+            <button class="btn btn-sm btn-outline edit-lot-btn" data-id="${l.id}" style="padding:2px 8px">✏️</button>
+            <button class="btn btn-sm btn-outline delete-lot-btn" data-id="${l.id}" style="padding:2px 8px;color:var(--danger)">🗑️</button>
+          </div>`
+        }).join('')
+        container.querySelectorAll('.edit-lot-btn').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation()
+            const lotId = parseInt(btn.dataset.id)
+            const lot = lots.find(l => l.id === lotId)
+            if (lot) this.showLotModal(product.id, lot)
+          }
+        })
+        container.querySelectorAll('.delete-lot-btn').forEach(btn => {
+          btn.onclick = async (e) => {
+            e.stopPropagation()
+            const lotId = parseInt(btn.dataset.id)
+            if (!confirm(I18n.t('product.confirm_delete_batch', 'Delete this batch?'))) return
+            try {
+              await this.api('DELETE', `/lots/${lotId}`)
+              renderLots()
+              const prodRes = await this.api('GET', '/products')
+              this.products = prodRes.data || []
+              this.renderAll()
+            } catch(e) { alert('Error: ' + e.message) }
+          }
+        })
+      } catch(e) { container.innerHTML = `<div style="color:var(--danger);font-size:13px">Error loading batches</div>` }
+    }
+    renderLots()
+
     document.getElementById('prod-save').onclick = async () => {
       const catVal = document.getElementById('prod-category').value
       const data = {
         name: document.getElementById('prod-name').value,
         list_price: parseFloat(document.getElementById('prod-price').value) || 0,
         cost_price: parseFloat(document.getElementById('prod-cost').value) || 0,
-        available_qty: parseFloat(document.getElementById('prod-qty').value) || 0,
         barcode: document.getElementById('prod-barcode').value,
-        expiration_date: document.getElementById('prod-expiration').value || false,
       }
       if (catVal) data.categ_id = parseInt(catVal)
       if (newImageBase64 !== undefined) {
@@ -1165,7 +1216,10 @@ let App = {
         if (product) {
           await this.api('PUT', `/products/${product.id}`, data)
         } else {
-          await this.api('POST', '/products', data)
+          const createRes = await this.api('POST', '/products', data)
+          if (createRes.data && createRes.data.id) {
+            this.showLotModal(createRes.data.id)
+          }
         }
         this.closeModal()
         const res = await this.api('GET', '/products')
@@ -1174,6 +1228,41 @@ let App = {
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('prod-cancel').onclick = () => this.closeModal()
+  },
+
+  showLotModal(productId, lot) {
+    const isEdit = !!lot
+    const title = isEdit ? I18n.t('product.edit_batch', 'Edit Batch') : I18n.t('product.add_batch', 'Add Stock Batch')
+    const html = `<h3>${title}</h3>
+      <div class="form-group"><label>${I18n.t('product.batch_name', 'Batch/Lot Number')}</label><input id="lot-name" value="${lot ? this._esc(lot.name || '') : ''}"></div>
+      <div class="form-group"><label>${I18n.t('product.qty', 'Quantity')}</label><input id="lot-qty" type="number" step="1" value="${lot ? lot.available_qty || 0 : 0}"></div>
+      <div class="form-group"><label>${I18n.t('product.expiration', 'Expiration Date')}</label><input id="lot-expiration" type="date" value="${lot && lot.expiration_date ? lot.expiration_date.substring(0, 10) : ''}"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="lot-save">${I18n.t('common.save', 'Save')}</button>
+        <button class="btn btn-secondary" id="lot-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('lot-save').onclick = async () => {
+      const data = {
+        name: document.getElementById('lot-name').value,
+        available_qty: parseFloat(document.getElementById('lot-qty').value) || 0,
+        expiration_date: document.getElementById('lot-expiration').value || false,
+      }
+      if (!data.name) { alert(I18n.t('product.batch_name_required', 'Batch number is required')); return }
+      try {
+        if (isEdit) {
+          await this.api('PUT', `/lots/${lot.id}`, data)
+        } else {
+          await this.api('POST', `/products/${productId}/lots`, data)
+        }
+        this.closeModal()
+        this.showProductModal(productId)
+        const prodRes = await this.api('GET', '/products')
+        this.products = prodRes.data || []
+        this.renderAll()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('lot-cancel').onclick = () => this.closeModal()
   },
 
   _esc(str) {

@@ -10,6 +10,7 @@ from .models.pos_payment_method import PosPaymentMethod
 from .models.pos_tax import PosTax
 from .models.pos_config import PosConfig
 from .models.delivery_zone import DeliveryZone
+from .models.stock_lot import StockLot
 
 
 def load_demo_data():
@@ -25,3 +26,4 @@ def load_demo_data():
     ResUsers()._init_defaults()
     PosConfig()._init_defaults()
     DeliveryZone()._init_defaults()
+    StockLot()._init_defaults()

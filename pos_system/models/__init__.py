@@ -14,3 +14,4 @@ from . import pos_order
 from . import pos_order_line
 from . import pos_config
 from . import delivery_zone
+from . import stock_lot

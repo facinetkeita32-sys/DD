@@ -97,6 +97,7 @@ let App = {
     document.getElementById('export-products-csv-btn').onclick = () => this.exportProductsCsv()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
+    document.getElementById('products-search').oninput = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
@@ -978,14 +979,23 @@ let App = {
 
   renderProductsTable() {
     const tbody = document.getElementById('products-tbody')
-    if (!this.products.length) {
+    const search = (document.getElementById('products-search').value || '').toLowerCase()
+    let filtered = this.products
+    if (search) {
+      filtered = this.products.filter(p =>
+        (p.name || '').toLowerCase().includes(search) ||
+        (p.barcode || '').toLowerCase().includes(search) ||
+        (p.default_code || '').toLowerCase().includes(search)
+      )
+    }
+    if (!filtered.length) {
       tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
       return
     }
     const threshold = this.lowStockThreshold || 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
-    tbody.innerHTML = this.products.map(p => {
+    tbody.innerHTML = filtered.map(p => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
       const isOut = qty <= 0

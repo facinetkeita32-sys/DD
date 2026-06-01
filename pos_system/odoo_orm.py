@@ -91,9 +91,14 @@ def _ensure_table(model_class):
         cols.append('"write_uid" INTEGER')
 
         cur = conn.cursor()
-        cur.execute('CREATE TABLE IF NOT EXISTS "{}" ({})'.format(table, ', '.join(cols)))
-        cur.close()
-        conn.commit()
+        try:
+            cur.execute('CREATE TABLE IF NOT EXISTS "{}" ({})'.format(table, ', '.join(cols)))
+            conn.commit()
+        except psycopg2.errors.UniqueViolation:
+            conn.rollback()
+            _migrate_table(conn, model_class)
+        finally:
+            cur.close()
 
         for fname, field in model_class._fields.items():
             if isinstance(field, Many2many):
@@ -101,9 +106,13 @@ def _ensure_table(model_class):
                 col1 = field.column1 or '{}_id'.format(table)
                 col2 = field.column2 or '{}_id'.format(field.comodel_name)
                 cur = conn.cursor()
-                cur.execute('CREATE TABLE IF NOT EXISTS "{}" ("{}" INTEGER, "{}" INTEGER, PRIMARY KEY ("{}", "{}"))'.format(rel, col1, col2, col1, col2))
-                cur.close()
-                conn.commit()
+                try:
+                    cur.execute('CREATE TABLE IF NOT EXISTS "{}" ("{}" INTEGER, "{}" INTEGER, PRIMARY KEY ("{}", "{}"))'.format(rel, col1, col2, col1, col2))
+                    conn.commit()
+                except psycopg2.errors.UniqueViolation:
+                    conn.rollback()
+                finally:
+                    cur.close()
     finally:
         put_conn(conn)
 

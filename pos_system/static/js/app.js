@@ -2080,3 +2080,8 @@ let App = {
 }
 
 document.addEventListener('DOMContentLoaded', () => App.init())
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+}

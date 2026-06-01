@@ -995,10 +995,12 @@ let App = {
     const threshold = this.lowStockThreshold || 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
+    this._selectedProductIds = this._selectedProductIds || []
     tbody.innerHTML = filtered.map(p => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
       const isOut = qty <= 0
+      const checked = this._selectedProductIds.includes(p.id) ? 'checked' : ''
       let stockHtml = ''
       if (isOut) stockHtml = `<span class="stock-badge out">${I18n.t('product.out_of_stock', 'Out')}</span>`
       else if (isLow) stockHtml = `<span class="stock-badge low">${I18n.t('product.low_stock', 'Low')}</span>`
@@ -1022,6 +1024,7 @@ let App = {
         }
       }
       return `<tr class="${rowCls + expCls}">
+        <td><input type="checkbox" class="bulk-item-cb" data-id="${p.id}" ${checked}></td>
         <td>${p.image ? `<img class="prod-table-img" src="data:image/png;base64,${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
@@ -1041,6 +1044,24 @@ let App = {
     tbody.querySelectorAll('.delete-product').forEach(btn => {
       btn.onclick = () => this.deleteProduct(parseInt(btn.dataset.id))
     })
+    this._selectedProductIds = this._selectedProductIds || []
+    tbody.querySelectorAll('.bulk-item-cb').forEach(cb => {
+      cb.onchange = () => {
+        const pid = parseInt(cb.dataset.id)
+        if (cb.checked) { if (!this._selectedProductIds.includes(pid)) this._selectedProductIds.push(pid) }
+        else { this._selectedProductIds = this._selectedProductIds.filter(i => i !== pid) }
+        this._updateBulkBar()
+      }
+    })
+    const selectAll = document.getElementById('bulk-select-all')
+    if (selectAll) {
+      selectAll.onchange = () => {
+        document.querySelectorAll('.bulk-item-cb').forEach(cb => { cb.checked = selectAll.checked; cb.onchange() })
+      }
+    }
+    document.getElementById('bulk-clear-btn').onclick = () => { this._selectedProductIds = []; this.renderProductsTable() }
+    document.getElementById('bulk-update-btn').onclick = () => this.showBulkUpdateModal()
+    this._updateBulkBar()
     const headerActions = document.querySelector('#screen-products .screen-header .btn-group')
     if (headerActions) {
       headerActions.querySelectorAll('button').forEach(b => b.style.display = '')
@@ -1053,6 +1074,60 @@ let App = {
         if (addBtn) addBtn.style.display = 'none'
       }
     }
+  },
+
+  _updateBulkBar() {
+    const bar = document.getElementById('bulk-bar')
+    const count = document.getElementById('bulk-count')
+    if (!bar || !count) return
+    const n = this._selectedProductIds ? this._selectedProductIds.length : 0
+    if (n > 0) { bar.style.display = 'flex'; count.textContent = n + ' selected' }
+    else { bar.style.display = 'none' }
+  },
+
+  showBulkUpdateModal() {
+    const ids = this._selectedProductIds || []
+    if (!ids.length) return
+    const cats = this.productCategories || []
+    const catOpts = cats.map(c => `<option value="${c.id}">${this._esc(c.name)}</option>`).join('')
+    const html = `<h3>${I18n.t('product.bulk_update', 'Bulk Update')} (${ids.length} products)</h3>
+      <div class="form-group"><label>${I18n.t('product.field', 'Field')}</label>
+        <select id="bulk-field">
+          <option value="list_price">${I18n.t('product.price', 'Price')}</option>
+          <option value="cost_price">${I18n.t('product.cost', 'Cost')}</option>
+          <option value="available_qty">${I18n.t('product.qty', 'Quantity')}</option>
+          <option value="categ_id">${I18n.t('product.category', 'Category')}</option>
+        </select>
+      </div>
+      <div class="form-group"><label>${I18n.t('product.new_value', 'New Value')}</label>
+        <input id="bulk-value" type="text" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+        <select id="bulk-cat-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;display:none;margin-top:4px"><option value="">${I18n.t('common.none', 'None')}</option>${catOpts}</select>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="bulk-update-confirm">${I18n.t('common.save', 'Save')}</button>
+        <button class="btn btn-secondary" id="bulk-update-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('bulk-field').onchange = () => {
+      const field = document.getElementById('bulk-field').value
+      document.getElementById('bulk-value').style.display = field === 'categ_id' ? 'none' : ''
+      document.getElementById('bulk-cat-select').style.display = field === 'categ_id' ? '' : 'none'
+    }
+    document.getElementById('bulk-update-confirm').onclick = async () => {
+      const field = document.getElementById('bulk-field').value
+      let value = document.getElementById('bulk-value').value
+      if (field === 'categ_id') value = document.getElementById('bulk-cat-select').value
+      if (field !== 'categ_id' && !value && value !== '0') { alert(I18n.t('product.value_required', 'Value is required')); return }
+      try {
+        await this.api('POST', '/products/bulk-update', { ids, field, value })
+        this.closeModal()
+        this._selectedProductIds = []
+        const res = await this.api('GET', '/products')
+        this.products = res.data || []
+        this.renderAll()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('bulk-update-cancel').onclick = () => this.closeModal()
   },
 
   showProductModal(id) {

@@ -115,9 +115,15 @@
           <button id="add-product-btn" class="btn btn-primary" data-i18n="product.add">Add Product</button>
         </div>
       </div>
+      <div id="bulk-bar" style="display:none;padding:8px 0;gap:8px;align-items:center">
+        <span id="bulk-count" style="font-size:14px;font-weight:600"></span>
+        <button id="bulk-update-btn" class="btn btn-sm btn-primary" data-i18n="product.bulk_update">Bulk Update</button>
+        <button id="bulk-clear-btn" class="btn btn-sm btn-secondary">Clear</button>
+      </div>
       <div class="table-container">
         <table id="products-table">
           <thead><tr>
+            <th style="width:36px"><input type="checkbox" id="bulk-select-all"></th>
             <th style="width:50px">Img</th>
             <th data-i18n="product.name">Name</th>
             <th data-i18n="product.price">Price</th>

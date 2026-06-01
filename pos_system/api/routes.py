@@ -312,6 +312,30 @@ def update_product(product_id):
     return success_response(model_to_dict(products[0]), 'Product updated')
 
 
+@api_bp.route('/products/bulk-update', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def bulk_update_products():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    field = data.get('field')
+    value = data.get('value')
+    if not ids or not field:
+        return error_response('ids and field are required')
+    count = 0
+    for pid in ids:
+        products = ProductProduct().browse([pid])
+        if products:
+            if field == 'categ_id':
+                products[0].write({field: int(value) if value else False})
+            elif field in ('list_price', 'cost_price', 'available_qty'):
+                products[0].write({field: float(value) if value else 0.0})
+            else:
+                products[0].write({field: value})
+            count += 1
+    return success_response({'updated': count}, f'{count} products updated')
+
+
 @api_bp.route('/products/<int:product_id>', methods=['DELETE'])
 @login_required
 @permission_required('product.delete')

@@ -105,6 +105,10 @@
   "product.import_errors": "Errors",
   "product.download_template": "Download CSV Template",
   "product.export_csv": "Export CSV",
+  "product.bulk_update": "Bulk Update",
+  "product.field": "Field",
+  "product.new_value": "New Value",
+  "product.value_required": "Value is required",
 
   "customer.title": "Customers",
   "customer.name": "Name",

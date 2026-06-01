@@ -105,6 +105,10 @@
   "product.import_errors": "Erreurs",
   "product.download_template": "Télécharger le Modèle CSV",
   "product.export_csv": "Exporter CSV",
+  "product.bulk_update": "Mise à Jour en Masse",
+  "product.field": "Champ",
+  "product.new_value": "Nouvelle Valeur",
+  "product.value_required": "La valeur est requise",
 
   "customer.title": "Clients",
   "customer.name": "Nom",

@@ -135,6 +135,9 @@
   "report.total_sales": "Total Sales",
   "report.total_orders": "Total Orders",
   "report.avg_order": "Average Order",
+  "report.custom": "Custom Range",
+  "report.date_from": "From",
+  "report.date_to": "To",
   "report.generate": "Generate Report",
   "report.export_csv": "Export CSV",
 

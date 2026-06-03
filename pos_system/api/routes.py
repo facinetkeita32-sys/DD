@@ -1045,10 +1045,22 @@ def get_dashboard():
 @permission_required('report.read')
 def export_sales_report_csv():
     period = request.args.get('period', 'daily')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
     fmt = request.args.get('format', 'csv')
     now = datetime.now()
 
-    if period == 'daily':
+    if date_from or date_to:
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        orders = []
+        for o in all_orders:
+            d = o._data.get('date_order', '')[:10]
+            if date_from and d < date_from:
+                continue
+            if date_to and d > date_to:
+                continue
+            orders.append(o)
+    elif period == 'daily':
         date_str = now.strftime('%Y-%m-%d')
         orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
     elif period == 'weekly':
@@ -1115,9 +1127,21 @@ def export_sales_report_csv():
 @login_required
 def get_sales_report():
     period = request.args.get('period', 'daily')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
     now = datetime.now()
 
-    if period == 'daily':
+    if date_from or date_to:
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        orders = []
+        for o in all_orders:
+            d = o._data.get('date_order', '')[:10]
+            if date_from and d < date_from:
+                continue
+            if date_to and d > date_to:
+                continue
+            orders.append(o)
+    elif period == 'daily':
         date_str = now.strftime('%Y-%m-%d')
         orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
     elif period == 'weekly':

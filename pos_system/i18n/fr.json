@@ -135,6 +135,9 @@
   "report.total_sales": "Ventes Totales",
   "report.total_orders": "Total Commandes",
   "report.avg_order": "Moyenne par Commande",
+  "report.custom": "Période Personnalisée",
+  "report.date_from": "Du",
+  "report.date_to": "Au",
   "report.generate": "Générer le Rapport",
   "report.export_csv": "Exporter CSV",
 

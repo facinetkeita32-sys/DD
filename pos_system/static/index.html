@@ -228,7 +228,14 @@
               <option value="biweekly" data-i18n="report.biweekly">Last 2 Weeks</option>
               <option value="monthly" data-i18n="report.monthly">Monthly</option>
               <option value="annual" data-i18n="report.annual">Annual</option>
+              <option value="custom" data-i18n="report.custom">Custom</option>
             </select>
+            <span id="report-date-range" class="date-range" style="display:none">
+              <label data-i18n="report.date_from">From</label>
+              <input type="date" id="report-date-from">
+              <label data-i18n="report.date_to">To</label>
+              <input type="date" id="report-date-to">
+            </span>
           <button id="generate-report-btn" class="btn btn-primary" data-i18n="report.generate">Generate</button>
           <button id="export-csv-btn" class="btn btn-success" data-i18n="report.export_csv">Export CSV</button>
         </div>

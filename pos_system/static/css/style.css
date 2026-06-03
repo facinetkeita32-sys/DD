@@ -236,6 +236,9 @@ tr:hover td { background: var(--hover); }
 .report-controls { display: flex; gap: 10px; align-items: center; }
 .report-controls select { padding: 9px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: #fff; cursor: pointer; }
 .report-controls select:focus { outline: none; border-color: var(--primary); }
+.report-controls .date-range { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.report-controls .date-range label { font-size: 12px; color: var(--text-light); }
+.report-controls .date-range input[type=date] { padding: 6px 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; }
 .report-results { background: var(--bg-card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
 .report-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
 .report-stat { text-align: center; padding: 20px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border-light); }
@@ -313,7 +316,8 @@ tr:hover td { background: var(--hover); }
   .barcode-input { flex: 1; }
   .order-detail-grid { grid-template-columns: 1fr; }
   .report-controls { flex-direction: column; align-items: stretch; }
-  .report-controls select, .report-controls .btn { width: 100%; }
+  .report-controls select, .report-controls .btn, .report-controls .date-range { width: 100%; }
+  .report-controls .date-range { flex-wrap: wrap; }
   .report-summary { grid-template-columns: 1fr; }
   .report-results { padding: 16px; }
   .settings-form { max-width: 100%; padding: 20px; }

@@ -102,6 +102,10 @@ let App = {
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
+    document.getElementById('report-period').onchange = () => {
+      const show = document.getElementById('report-period').value === 'custom'
+      document.getElementById('report-date-range').style.display = show ? 'inline' : 'none'
+    }
     document.getElementById('settings-save-btn').onclick = () => this.saveSettings()
     document.getElementById('add-user-btn').onclick = () => this.showUserModal()
     document.getElementById('add-delivery-zone-btn').onclick = () => this.showDeliveryZoneModal()
@@ -1709,8 +1713,15 @@ let App = {
 
   async generateReport() {
     const period = document.getElementById('report-period').value
+    let url = `/reports/sales?period=${period}`
+    if (period === 'custom') {
+      const df = document.getElementById('report-date-from').value
+      const dt = document.getElementById('report-date-to').value
+      if (df) url += `&date_from=${df}`
+      if (dt) url += `&date_to=${dt}`
+    }
     try {
-      const res = await this.api('GET', `/reports/sales?period=${period}`)
+      const res = await this.api('GET', url)
       const r = res.data
       const container = document.getElementById('report-results')
       container.innerHTML = `
@@ -1759,8 +1770,15 @@ let App = {
 
   async exportReportCsv() {
     const period = document.getElementById('report-period').value
+    let url = `/api/reports/sales/export?period=${period}`
+    if (period === 'custom') {
+      const df = document.getElementById('report-date-from').value
+      const dt = document.getElementById('report-date-to').value
+      if (df) url += `&date_from=${df}`
+      if (dt) url += `&date_to=${dt}`
+    }
     try {
-      const res = await fetch(`/api/reports/sales/export?period=${period}`, { credentials: 'same-origin' })
+      const res = await fetch(url, { credentials: 'same-origin' })
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)

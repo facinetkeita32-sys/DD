@@ -11,7 +11,7 @@ PERMISSIONS = {
                     'bulk.import'],
     },
     'manager': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'activity'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write',
                     'order.create', 'order.write', 'order.cancel',
@@ -20,7 +20,7 @@ PERMISSIONS = {
                     'bulk.import'],
     },
     'cashier': {
-        'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard', 'activity'],
+        'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard'],
         'actions': ['customer.create',
                     'order.create', 'order.write',
                     'session.open', 'session.close',

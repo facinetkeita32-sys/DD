@@ -11,6 +11,7 @@
   "nav.users": "Utilisateurs",
   "nav.sessions": "Sessions",
   "nav.dashboard": "Tableau de Bord",
+  "nav.activity": "Activité",
   "nav.logout": "Déconnexion",
   "nav.login": "Connexion",
 
@@ -188,6 +189,16 @@
   "dashboard.session_closed": "Fermée",
   "dashboard.session_opened": "Ouverte",
   "dashboard.inventory_value": "Valeur du Stock",
+
+  "activity.title": "Journal d'Activité",
+  "activity.no_logs": "Aucune activité enregistrée.",
+  "activity.user": "Utilisateur",
+  "activity.action": "Action",
+  "activity.timestamp": "Date/Heure",
+  "activity.ip": "Adresse IP",
+  "activity.login": "Connexion",
+  "activity.logout": "Déconnexion",
+  "activity.error": "Erreur lors du chargement du journal",
 
   "user.title": "Utilisateurs",
   "user.add": "Ajouter Utilisateur",

@@ -11,6 +11,7 @@
   "nav.users": "Users",
   "nav.sessions": "Sessions",
   "nav.dashboard": "Dashboard",
+  "nav.activity": "Activity",
   "nav.logout": "Logout",
   "nav.login": "Login",
 
@@ -188,6 +189,16 @@
   "dashboard.session_closed": "Closed",
   "dashboard.session_opened": "Open",
   "dashboard.inventory_value": "Inventory Value",
+
+  "activity.title": "Activity Log",
+  "activity.no_logs": "No activity recorded yet.",
+  "activity.user": "User",
+  "activity.action": "Action",
+  "activity.timestamp": "Timestamp",
+  "activity.ip": "IP Address",
+  "activity.login": "Login",
+  "activity.logout": "Logout",
+  "activity.error": "Error loading activity log",
 
   "user.title": "Users",
   "user.add": "Add User",

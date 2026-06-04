@@ -252,6 +252,7 @@ let App = {
     this.renderCustomersTable()
     this.renderSessionsTable()
     this.renderDashboard()
+    this.renderActivity()
     this.renderSettings()
     this.renderUsersTable()
   },
@@ -286,6 +287,7 @@ let App = {
     if (name === 'customers') this.renderCustomersTable()
     if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
+    if (name === 'activity') this.renderActivity()
     if (name === 'reports') this.generateReport()
     if (name === 'users') this.renderUsersTable()
   },
@@ -1792,6 +1794,34 @@ let App = {
     } catch(e) {
       alert('Export error: ' + e.message)
     }
+  },
+
+  async renderActivity() {
+    const container = document.getElementById('activity-log-container')
+    try {
+      const res = await this.api('GET', '/activity-log?limit=100')
+      const logs = res.data || []
+      if (!logs.length) {
+        container.innerHTML = `<p style="color:var(--text-light);padding:20px">${I18n.t('activity.no_logs', 'No activity recorded yet.')}</p>`
+        return
+      }
+      container.innerHTML = `<div style="max-height:500px;overflow-y:auto"><table><thead><tr>
+        <th>${I18n.t('activity.user', 'User')}</th>
+        <th>${I18n.t('activity.action', 'Action')}</th>
+        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
+        <th>${I18n.t('activity.ip', 'IP')}</th>
+      </tr></thead><tbody>${logs.map(l => {
+        const isLogin = l.action === 'login'
+        const badgeCls = isLogin ? 'badge badge-success' : 'badge badge-secondary'
+        const label = isLogin ? I18n.t('activity.login', 'Login') : I18n.t('activity.logout', 'Logout')
+        return `<tr>
+          <td>${this._esc(l.user_name || '')}</td>
+          <td><span class="${badgeCls}">${label}</span></td>
+          <td>${(l.timestamp || '').substring(0, 19)}</td>
+          <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
+        </tr>`
+      }).join('')}</tbody></table></div>`
+    } catch(e) { container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}</p>` }
   },
 
   // === SETTINGS ===

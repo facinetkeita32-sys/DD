@@ -1,6 +1,6 @@
 PERMISSIONS = {
     'admin': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write', 'customer.delete',
                     'order.create', 'order.write', 'order.cancel',
@@ -11,7 +11,7 @@ PERMISSIONS = {
                     'bulk.import'],
     },
     'manager': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'activity'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write',
                     'order.create', 'order.write', 'order.cancel',
@@ -20,7 +20,7 @@ PERMISSIONS = {
                     'bulk.import'],
     },
     'cashier': {
-        'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard'],
+        'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard', 'activity'],
         'actions': ['customer.create',
                     'order.create', 'order.write',
                     'session.open', 'session.close',

@@ -22,6 +22,7 @@ from ..models.pos_payment import PosPayment
 from ..models.res_company import ResCompany
 from ..models.delivery_zone import DeliveryZone
 from ..models.stock_lot import StockLot
+from ..models.login_log import LoginLog
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -120,6 +121,11 @@ def auth_login():
         session['user_id'] = users[0].id
         session['lang'] = users[0].lang
         session['last_activity'] = now
+        LoginLog().create({
+            'user_id': users[0].id,
+            'action': 'login',
+            'ip_address': request.remote_addr or '',
+        })
         return success_response(model_to_dict(users[0]))
     return error_response('Invalid credentials', 401)
 
@@ -127,6 +133,12 @@ def auth_login():
 @api_bp.route('/auth/logout', methods=['POST'])
 @login_required
 def auth_logout():
+    uid = session.get('user_id')
+    LoginLog().create({
+        'user_id': uid,
+        'action': 'logout',
+        'ip_address': request.remote_addr or '',
+    })
     session.clear()
     return success_response(message='Logged out')
 
@@ -1195,6 +1207,25 @@ def get_sales_report():
         'orders': order_list,
     })
 
+
+
+# === ACTIVITY LOG ===
+
+@api_bp.route('/activity-log', methods=['GET'])
+@login_required
+def get_activity_log():
+    limit = request.args.get('limit', 50, type=int)
+    logs = LoginLog().search([], order='timestamp desc', limit=limit)
+    result = []
+    for log in logs:
+        d = model_to_dict(log)
+        uid = log._data.get('user_id', 0) or 0
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                d['user_name'] = user[0]._data.get('name', '')
+        result.append(d)
+    return success_response(result)
 
 
 # === COMPANY ===

@@ -1,17 +1,24 @@
 const I18n = {
-  translations: {},
+  _allTranslations: {},
   currentLang: 'en',
 
   async init(lang) {
     this.currentLang = lang || 'en'
-    try {
-      const res = await fetch(`/api/translations/${this.currentLang}`)
-      const json = await res.json()
-      if (json.success) this.translations = json.data || {}
-    } catch(e) {
-      console.warn('i18n init error', e)
-    }
+    this._allTranslations = {}
+    const langs = ['en', 'fr']
+    await Promise.all(langs.map(code => this._loadLang(code)))
     this.apply()
+  },
+
+  async _loadLang(code) {
+    if (this._allTranslations[code]) return
+    try {
+      const res = await fetch(`/api/translations/${code}`)
+      const json = await res.json()
+      if (json.success) this._allTranslations[code] = json.data || {}
+    } catch(e) {
+      console.warn('i18n load error', code, e)
+    }
   },
 
   setLang(lang) {
@@ -21,11 +28,12 @@ const I18n = {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({lang})
     }).catch(() => {})
-    this.init(lang)
+    this.apply()
   },
 
   t(key, def) {
-    return this.translations[key] || def || key
+    const langData = this._allTranslations[this.currentLang] || {}
+    return langData[key] || def || key
   },
 
   apply() {

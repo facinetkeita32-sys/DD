@@ -74,7 +74,7 @@ def model_to_dict(obj, fields_list=None):
     for fname in fnames:
         field = obj._fields.get(fname)
         val = obj._data.get(fname)
-        if val is None and fname in HEAVY_COLS and hasattr(obj, 'id') and obj.id:
+        if (val is None or val == '') and fname in HEAVY_COLS and hasattr(obj, 'id') and obj.id:
             val = _load_heavy(obj.__class__, obj.id, fname)
             if val is not None:
                 obj._data[fname] = val

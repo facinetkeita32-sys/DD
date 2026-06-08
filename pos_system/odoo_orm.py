@@ -9,6 +9,8 @@ from flask import g
 
 _db_cache = {}
 _db_lock = threading.Lock()
+_cache_ver = -1
+_version_table_ensured = False
 
 DB_HOST = os.environ.get('PGHOST', 'localhost')
 DB_PORT = int(os.environ.get('PGPORT', 5432))
@@ -58,6 +60,38 @@ def put_conn(conn):
         get_pool().putconn(conn)
     except Exception:
         pass
+
+
+def _ensure_version_table(conn):
+    global _version_table_ensured
+    if _version_table_ensured:
+        return
+    cur = conn.cursor()
+    try:
+        cur.execute("CREATE TABLE IF NOT EXISTS _db_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL DEFAULT 0)")
+        cur.execute("INSERT INTO _db_version (id, version) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
+        conn.commit()
+    finally:
+        cur.close()
+    _version_table_ensured = True
+
+
+def _get_db_version(conn):
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT version FROM _db_version WHERE id = 1")
+        row = cur.fetchone()
+        return row[0] if row else 0
+    finally:
+        cur.close()
+
+
+def _bump_db_version(conn):
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE _db_version SET version = version + 1 WHERE id = 1")
+    finally:
+        cur.close()
 
 
 FIELD_TO_SQLITE = {
@@ -153,9 +187,13 @@ def _migrate_table(conn, model_class):
 HEAVY_COLS = {'logo'}
 
 def _load_cache():
-    global _db_cache
+    global _db_cache, _cache_ver
     conn = get_conn()
     try:
+        _ensure_version_table(conn)
+        db_ver = _get_db_version(conn)
+        if db_ver == _cache_ver:
+            return
         cur = conn.cursor()
         cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
         tables = [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence']
@@ -185,6 +223,7 @@ def _load_cache():
         for table in list(_db_cache.keys()):
             if table not in seen and table != 'sqlite_sequence':
                 del _db_cache[table]
+        _cache_ver = db_ver
     finally:
         put_conn(conn)
 
@@ -202,6 +241,7 @@ def _load_heavy(cls, obj_id, col_name):
 
 
 def _persist_write(cls, obj_id):
+    global _cache_ver
     table = cls._name
     data = dict(_db_cache[table]['_data'][obj_id])
     conn = get_conn()
@@ -228,8 +268,10 @@ def _persist_write(cls, obj_id):
             table, all_cols, all_ph, update_set)
         cur = conn.cursor()
         cur.execute(sql, [obj_id] + vals)
+        _bump_db_version(conn)
         cur.close()
         conn.commit()
+        _cache_ver = _get_db_version(conn)
     except Exception as e:
         import traceback
         print('SQL ERROR ({}): {}'.format(table, e))
@@ -240,13 +282,16 @@ def _persist_write(cls, obj_id):
 
 
 def _persist_delete(cls, obj_id):
+    global _cache_ver
     table = cls._name
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute('DELETE FROM "{}" WHERE id=%s'.format(table), (obj_id,))
+        _bump_db_version(conn)
         cur.close()
         conn.commit()
+        _cache_ver = _get_db_version(conn)
     finally:
         put_conn(conn)
 

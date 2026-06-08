@@ -456,8 +456,13 @@ def bulk_import_products():
 @api_bp.route('/products/<int:product_id>/lots', methods=['GET'])
 @login_required
 def get_product_lots(product_id):
-    lots = StockLot().search([('product_id', '=', product_id)])
-    return success_response(model_to_dict(lots))
+    import traceback
+    try:
+        lots = StockLot().search([('product_id', '=', product_id)])
+        return success_response(model_to_dict(lots))
+    except Exception as e:
+        traceback.print_exc()
+        return error_response('Failed to load lots: %s' % str(e), 500)
 
 
 @api_bp.route('/products/<int:product_id>/lots', methods=['POST'])

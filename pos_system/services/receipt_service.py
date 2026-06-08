@@ -242,14 +242,12 @@ def generate_receipt_html(order_id, lang='en'):
   {logo_html}
   <h2>{company.get('name', '')}</h2>
   <div class="company-info">
-    {company.get('street', '') and company['street'] + '<br>'}
-    {company.get('city', '') and company['city']}
-    {company.get('state', '') and ', ' + company['state']}
-    {company.get('zip_code', '') and ' ' + company['zip_code']}
-    {company.get('country', '') and '<br>' + company['country']}
-    {company.get('phone', '') and '<br>' + _('tel', lang) + ': ' + company['phone']}
-    {company.get('email', '') and '<br>' + company['email']}
-    {company.get('vat', '') and '<br>' + _('tax_id', lang) + ': ' + company['vat']}
+    {company.get('street') and company['street'] + '<br>' or ''}
+    {company.get('city') and company['city'] or ''}{company.get('state') and ', ' + company['state'] or ''}{company.get('zip_code') and ' ' + company['zip_code'] or ''}
+    {company.get('country') and '<br>' + company['country'] or ''}
+    {company.get('phone') and '<br>' + _('tel', lang) + ': ' + company['phone'] or ''}
+    {company.get('email') and '<br>' + company['email'] or ''}
+    {company.get('vat') and '<br>' + _('tax_id', lang) + ': ' + company['vat'] or ''}
   </div>
 
   <div class="divider"></div>

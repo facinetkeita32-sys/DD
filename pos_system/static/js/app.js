@@ -1542,12 +1542,14 @@ let App = {
   },
 
   openPrintReceipt(id) {
-    window.open(`/api/receipt/${id}/html`, '_blank', 'width=500,height=700,menubar=no,toolbar=no,scrollbars=yes')
+    const lang = I18n.currentLang || 'en'
+    window.open(`/api/receipt/${id}/html?lang=${lang}`, '_blank', 'width=500,height=700,menubar=no,toolbar=no,scrollbars=yes')
   },
 
   downloadReceiptPdf(id) {
+    const lang = I18n.currentLang || 'en'
     const a = document.createElement('a')
-    a.href = `/api/receipt/${id}/pdf`
+    a.href = `/api/receipt/${id}/pdf?lang=${lang}`
     a.download = ''
     document.body.appendChild(a)
     a.click()

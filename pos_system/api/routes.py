@@ -852,7 +852,7 @@ def cancel_order(order_id):
 @api_bp.route('/receipt/<int:order_id>/html', methods=['GET'])
 def get_receipt_html(order_id):
     from ..services.receipt_service import generate_receipt_html
-    lang = session.get('lang', request.args.get('lang', 'en'))
+    lang = request.args.get('lang') or session.get('lang', 'en')
     if lang not in ('en', 'fr'):
         lang = 'en'
     html = generate_receipt_html(order_id, lang=lang)
@@ -864,7 +864,7 @@ def get_receipt_html(order_id):
 @api_bp.route('/receipt/<int:order_id>/pdf', methods=['GET'])
 def get_receipt_pdf(order_id):
     from ..services.receipt_service import generate_receipt_pdf
-    lang = session.get('lang', request.args.get('lang', 'en'))
+    lang = request.args.get('lang') or session.get('lang', 'en')
     if lang not in ('en', 'fr'):
         lang = 'en'
     pdf_bytes = generate_receipt_pdf(order_id, lang=lang)

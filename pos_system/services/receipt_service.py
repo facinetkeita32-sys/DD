@@ -75,6 +75,11 @@ def get_order_data(order_id):
     company = ResCompany().search([], limit=1)
     d['company'] = company[0]._data if company else {}
     if company:
+        if 'logo' not in d['company'] or d['company'].get('logo') is None:
+            from ..odoo_orm import _load_heavy
+            logo = _load_heavy(ResCompany, company[0].id, 'logo')
+            if logo is not None:
+                d['company']['logo'] = logo
         cur_id = company[0]._data.get('currency_id', 0) or 0
         if cur_id:
             cur = ResCurrency().browse([cur_id])

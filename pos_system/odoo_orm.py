@@ -23,8 +23,8 @@ def get_pool():
     global _pool
     if _pool is None:
         _pool = pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,
+            minconn=1,
+            maxconn=5,
             host=DB_HOST,
             port=DB_PORT,
             dbname=DB_NAME,
@@ -35,10 +35,25 @@ def get_pool():
 
 
 def get_conn():
-    return get_pool().getconn()
+    try:
+        if '_db_conn' in g:
+            return g._db_conn
+    except Exception:
+        pass
+    conn = get_pool().getconn()
+    try:
+        g._db_conn = conn
+    except Exception:
+        pass
+    return conn
 
 
 def put_conn(conn):
+    try:
+        if getattr(g, '_db_conn', None) is conn:
+            return
+    except Exception:
+        pass
     try:
         get_pool().putconn(conn)
     except Exception:
@@ -135,7 +150,7 @@ def _migrate_table(conn, model_class):
         conn.commit()
 
 
-HEAVY_COLS = {'image'}
+HEAVY_COLS = {'image', 'logo'}
 
 def _load_cache():
     global _db_cache

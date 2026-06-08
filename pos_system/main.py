@@ -17,7 +17,9 @@ app.register_blueprint(api_bp)
 
 @app.before_request
 def before_request():
-    _load_cache()
+    # Only load DB cache for API requests
+    if request.path.startswith('/api/'):
+        _load_cache()
     # Session inactivity timeout
     if 'user_id' in session:
         last = session.get('last_activity', 0)
@@ -27,6 +29,17 @@ def before_request():
             session['last_activity'] = time.time()
     lang = session.get('lang', request.args.get('lang', 'en'))
     translator.set_language(lang)
+
+
+@app.teardown_appcontext
+def teardown(exception):
+    try:
+        conn = g.pop('_db_conn', None)
+        if conn:
+            from .odoo_orm import get_pool
+            get_pool().putconn(conn)
+    except Exception:
+        pass
 
 
 @app.route('/')

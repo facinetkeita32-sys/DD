@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db, _load_heavy
+from ..odoo_orm import env, _db_cache as _db, _load_heavy, HEAVY_COLS
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -74,10 +74,10 @@ def model_to_dict(obj, fields_list=None):
     for fname in fnames:
         field = obj._fields.get(fname)
         val = obj._data.get(fname)
-        if fname == 'image' and val is None and hasattr(obj, 'id') and obj.id:
-            val = _load_heavy(obj.__class__, obj.id, 'image')
+        if val is None and fname in HEAVY_COLS and hasattr(obj, 'id') and obj.id:
+            val = _load_heavy(obj.__class__, obj.id, fname)
             if val is not None:
-                obj._data['image'] = val
+                obj._data[fname] = val
         if isinstance(field, type(None)) and fname == 'id':
             continue
         if isinstance(field, type(None)):

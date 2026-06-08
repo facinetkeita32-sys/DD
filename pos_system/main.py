@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-from flask import Flask, send_from_directory, request, g, session
+from flask import Flask, send_from_directory, request, g, session, jsonify
 from .api.routes import api_bp
 from .i18n import translator
 from .init_data import load_demo_data
@@ -39,9 +39,20 @@ def static_files(path):
     return send_from_directory(app.static_folder, path)
 
 
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Endpoint not found'}), 404
+    return send_from_directory(app.static_folder, 'index.html') if request.method == 'GET' else ('Not Found', 404)
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Method not allowed'}), 405
+    return ('Method Not Allowed', 405)
+
 @app.route('/api/translations/<lang>')
 def get_translations(lang):
-    from flask import jsonify
     translations = translator.get_translations(lang)
     return jsonify({'success': True, 'data': translations})
 

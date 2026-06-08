@@ -279,27 +279,10 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    result = model_to_dict(products, ['id', 'name', 'barcode', 'list_price', 'cost_price', 'available_qty', 'categ_id', 'pos_categ_ids', 'description', 'active'])
+    result = model_to_dict(products)
     if isinstance(result, list):
-        pids = [r['id'] for r in result if r.get('id')]
-        img_map = {}
-        if pids:
-            conn = None
-            try:
-                from ..odoo_orm import get_conn, put_conn
-                conn = get_conn()
-                cur = conn.cursor()
-                cur.execute('SELECT id, "image" FROM "product.product" WHERE id IN ({})'.format(','.join(['%s'] * len(pids))), pids)
-                for row in cur.fetchall():
-                    img_map[row[0]] = row[1]
-                cur.close()
-            finally:
-                if conn:
-                    put_conn(conn)
         for r in result:
             pid = r.get('id')
-            r['image'] = img_map.get(pid) if pid else None
-            r['nearest_expiry'] = ''
             if pid:
                 lots = StockLot().search([('product_id', '=', pid)])
                 dates = []
@@ -308,6 +291,8 @@ def get_products():
                     if exp:
                         dates.append(exp)
                 r['nearest_expiry'] = min(dates) if dates else ''
+            else:
+                r['nearest_expiry'] = ''
     return success_response(result)
 
 

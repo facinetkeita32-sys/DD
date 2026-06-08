@@ -150,7 +150,7 @@ def _migrate_table(conn, model_class):
         conn.commit()
 
 
-HEAVY_COLS = {'image', 'logo'}
+HEAVY_COLS = {'logo'}
 
 def _load_cache():
     global _db_cache

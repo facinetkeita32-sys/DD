@@ -1159,7 +1159,7 @@ let App = {
       <div class="form-group">
         <label>${I18n.t('product.stock_batches', 'Stock Batches')} <span id="prod-total-stock" style="font-weight:bold;color:var(--primary)">(${product ? product.available_qty || 0 : 0})</span></label>
         <div id="prod-lots-container" style="margin-bottom:8px"></div>
-        <button class="btn btn-sm btn-primary" id="prod-add-lot-btn">+ ${I18n.t('product.add_batch', 'Add Batch')}</button>
+        ${product ? `<button class="btn btn-sm btn-primary" id="prod-add-lot-btn">+ ${I18n.t('product.add_batch', 'Add Batch')}</button>` : `<div style="font-size:12px;color:var(--text-light)">${I18n.t('product.save_first', 'Save the product first to add stock batches.')}</div>`}
       </div>
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
@@ -1225,7 +1225,8 @@ let App = {
 
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
-    document.getElementById('prod-add-lot-btn').onclick = () => this.showLotModal(product ? product.id : null)
+    const addLotBtn = document.getElementById('prod-add-lot-btn')
+    if (addLotBtn) addLotBtn.onclick = () => this.showLotModal(product ? product.id : null)
 
     const renderLots = async () => {
       const container = document.getElementById('prod-lots-container')

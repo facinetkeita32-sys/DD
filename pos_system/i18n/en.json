@@ -249,6 +249,7 @@
   "product.batch_name": "Batch/Lot Number",
   "product.batch_name_required": "Batch number is required",
   "product.no_batches": "No batches yet",
+  "product.save_first": "Save the product first to add stock batches.",
   "product.expires": "Exp",
   "product.confirm_delete_batch": "Delete this batch?"
 }

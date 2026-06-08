@@ -249,6 +249,7 @@
   "product.batch_name": "Numéro de Lot",
   "product.batch_name_required": "Le numéro de lot est requis",
   "product.no_batches": "Aucun lot pour le moment",
+  "product.save_first": "Enregistrez d'abord le produit pour ajouter des lots.",
   "product.expires": "Exp",
   "product.confirm_delete_batch": "Supprimer ce lot ?"
 }

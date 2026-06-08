@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--access-logfile", "-", "pos_system.main:create_app()"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--access-logfile", "-", "--max-requests", "200", "--max-requests-jitter", "50", "pos_system.main:create_app()"]

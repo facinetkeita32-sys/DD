@@ -135,6 +135,8 @@ def _migrate_table(conn, model_class):
         conn.commit()
 
 
+HEAVY_COLS = {'image'}
+
 def _load_cache():
     global _db_cache
     conn = get_conn()
@@ -151,10 +153,15 @@ def _load_cache():
             tbl['_seq'] = 0
             tbl['_data'].clear()
             cur = conn.cursor()
-            cur.execute('SELECT * FROM "{}" ORDER BY id'.format(table))
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (table,))
+            all_cols = [row[0] for row in cur.fetchall()]
+            cur.close()
+            light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+            col_list = ','.join('"{}"'.format(c) for c in light_cols)
+            cur = conn.cursor()
+            cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
             for row in cur.fetchall():
-                col_names = [desc[0] for desc in cur.description]
-                data = dict(zip(col_names, row))
+                data = dict(zip(light_cols, row))
                 rid = data.pop('id')
                 tbl['_data'][rid] = data
                 if rid > tbl['_seq']:
@@ -163,6 +170,18 @@ def _load_cache():
         for table in list(_db_cache.keys()):
             if table not in seen and table != 'sqlite_sequence':
                 del _db_cache[table]
+    finally:
+        put_conn(conn)
+
+
+def _load_heavy(cls, obj_id, col_name):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT "{}" FROM "{}" WHERE id=%s'.format(col_name, cls._name), (obj_id,))
+        row = cur.fetchone()
+        cur.close()
+        return row[0] if row else None
     finally:
         put_conn(conn)
 

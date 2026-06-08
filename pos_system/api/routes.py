@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db
+from ..odoo_orm import env, _db_cache as _db, _load_heavy
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -74,6 +74,10 @@ def model_to_dict(obj, fields_list=None):
     for fname in fnames:
         field = obj._fields.get(fname)
         val = obj._data.get(fname)
+        if fname == 'image' and val is None and hasattr(obj, 'id') and obj.id:
+            val = _load_heavy(obj.__class__, obj.id, 'image')
+            if val is not None:
+                obj._data['image'] = val
         if isinstance(field, type(None)) and fname == 'id':
             continue
         if isinstance(field, type(None)):
@@ -275,20 +279,33 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    result = model_to_dict(products)
+    result = model_to_dict(products, ['id', 'name', 'barcode', 'list_price', 'cost_price', 'available_qty', 'categ_id', 'pos_categ_ids', 'description', 'active'])
     if isinstance(result, list):
-        for r in result:
-            pid = r.get('id')
-            if pid:
-                lots = StockLot().search([('product_id', '=', pid)])
-                dates = []
-                for lot in lots:
-                    exp = lot._data.get('expiration_date', '') or ''
-                    if exp:
-                        dates.append(exp)
-                r['nearest_expiry'] = min(dates) if dates else ''
-            else:
-                r['nearest_expiry'] = ''
+        pids = [r['id'] for r in result if r.get('id')]
+        if pids:
+            conn = None
+            try:
+                from ..odoo_orm import get_conn, put_conn
+                conn = get_conn()
+                cur = conn.cursor()
+                cur.execute('SELECT id, "image" FROM "product.product" WHERE id = ANY(%s)', (pids,))
+                img_map = {row[0]: row[1] for row in cur.fetchall()}
+                cur.close()
+                for r in result:
+                    pid = r.get('id')
+                    if pid and pid in img_map:
+                        r['image'] = img_map[pid]
+                    r['nearest_expiry'] = ''
+                    lots = StockLot().search([('product_id', '=', pid)])
+                    dates = []
+                    for lot in lots:
+                        exp = lot._data.get('expiration_date', '') or ''
+                        if exp:
+                            dates.append(exp)
+                    r['nearest_expiry'] = min(dates) if dates else ''
+            finally:
+                if conn:
+                    put_conn(conn)
     return success_response(result)
 
 

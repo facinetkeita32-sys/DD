@@ -42,14 +42,22 @@ def static_files(path):
 @app.errorhandler(404)
 def not_found(e):
     if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Endpoint not found'}), 404
+        return jsonify({'success': False, 'error': 'Endpoint not found: %s' % request.path}), 404
     return send_from_directory(app.static_folder, 'index.html') if request.method == 'GET' else ('Not Found', 404)
 
 @app.errorhandler(405)
 def method_not_allowed(e):
     if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Method not allowed'}), 405
+        return jsonify({'success': False, 'error': 'Method not allowed: %s %s' % (request.method, request.path)}), 405
     return ('Method Not Allowed', 405)
+
+@app.errorhandler(500)
+def server_error(e):
+    if request.path.startswith('/api/'):
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': 'Internal server error: %s' % str(e)}), 500
+    return ('Server Error', 500)
 
 @app.route('/api/translations/<lang>')
 def get_translations(lang):

@@ -464,43 +464,58 @@ def get_product_lots(product_id):
 @login_required
 @permission_required('product.write')
 def create_product_lot(product_id):
+    import traceback
     data = request.get_json() or {}
     data['product_id'] = product_id
-    if not data.get('name'):
-        from datetime import datetime
-        products = ProductProduct().browse([product_id])
-        pname = products[0]._data.get('name', 'Product') if products else 'Product'
-        data['name'] = '%s-%s' % (pname.replace(' ', ''), datetime.now().strftime('%Y%m%d%H%M%S'))
-    lot = StockLot().create(data)
-    StockLot._recompute_product_qty(product_id)
-    return success_response(model_to_dict(lot), 'Lot created')
+    try:
+        if not data.get('name'):
+            from datetime import datetime
+            products = ProductProduct().browse([product_id])
+            pname = products[0]._data.get('name', 'Product') if products else 'Product'
+            data['name'] = '%s-%s' % (pname.replace(' ', ''), datetime.now().strftime('%Y%m%d%H%M%S'))
+        lot = StockLot().create(data)
+        StockLot._recompute_product_qty(product_id)
+        return success_response(model_to_dict(lot), 'Lot created')
+    except Exception as e:
+        traceback.print_exc()
+        return error_response('Failed to create lot: %s' % str(e), 500)
 
 
 @api_bp.route('/lots/<int:lot_id>', methods=['PUT'])
 @login_required
 @permission_required('product.write')
 def update_lot(lot_id):
-    lots = StockLot().browse([lot_id])
-    if not lots:
-        return error_response('Lot not found', 404)
-    data = request.get_json() or {}
-    lots[0].write(data)
-    StockLot._recompute_product_qty(lots[0]._data.get('product_id'))
-    return success_response(model_to_dict(lots[0]), 'Lot updated')
+    import traceback
+    try:
+        lots = StockLot().browse([lot_id])
+        if not lots:
+            return error_response('Lot not found', 404)
+        data = request.get_json() or {}
+        lots[0].write(data)
+        StockLot._recompute_product_qty(lots[0]._data.get('product_id'))
+        return success_response(model_to_dict(lots[0]), 'Lot updated')
+    except Exception as e:
+        traceback.print_exc()
+        return error_response('Failed to update lot: %s' % str(e), 500)
 
 
 @api_bp.route('/lots/<int:lot_id>', methods=['DELETE'])
 @login_required
 @permission_required('product.write')
 def delete_lot(lot_id):
-    lots = StockLot().browse([lot_id])
-    if not lots:
-        return error_response('Lot not found', 404)
-    pid = lots[0]._data.get('product_id')
-    lots[0].unlink()
-    if pid:
-        StockLot._recompute_product_qty(pid)
-    return success_response(message='Lot deleted')
+    import traceback
+    try:
+        lots = StockLot().browse([lot_id])
+        if not lots:
+            return error_response('Lot not found', 404)
+        pid = lots[0]._data.get('product_id')
+        lots[0].unlink()
+        if pid:
+            StockLot._recompute_product_qty(pid)
+        return success_response(message='Lot deleted')
+    except Exception as e:
+        traceback.print_exc()
+        return error_response('Failed to delete lot: %s' % str(e), 500)
 
 
 # === PRODUCT CATEGORIES ===

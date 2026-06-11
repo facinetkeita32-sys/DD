@@ -614,13 +614,18 @@ def get_customers():
     customers = ResPartner().search(domain, limit=100)
     orders_data = _db_cache.get('pos.order', {}).get('_data', {})
     spent = {}
+    due = {}
     for oid, odata in orders_data.items():
         pid = odata.get('partner_id', 0) or 0
         if pid:
-            spent[pid] = spent.get(pid, 0) + float(odata.get('amount_total', 0) or 0)
+            amt = float(odata.get('amount_total', 0) or 0)
+            spent[pid] = spent.get(pid, 0) + amt
+            if odata.get('state') == 'pending':
+                due[pid] = due.get(pid, 0) + amt
     result = serialize_model(ResPartner, customers)
     for c in result:
         c['total_spent'] = round(spent.get(c['id'], 0), 2)
+        c['total_due'] = round(due.get(c['id'], 0), 2)
     return success_response(result)
 
 

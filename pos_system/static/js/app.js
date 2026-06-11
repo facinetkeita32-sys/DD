@@ -98,6 +98,8 @@ let App = {
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
     document.getElementById('products-search').oninput = () => this.renderProductsTable()
+    document.getElementById('products-category-filter').onchange = () => this.renderProductsTable()
+    document.getElementById('products-stock-filter').onchange = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
@@ -989,13 +991,41 @@ let App = {
   renderProductsTable() {
     const tbody = document.getElementById('products-tbody')
     const search = (document.getElementById('products-search').value || '').toLowerCase()
+    const catFilter = document.getElementById('products-category-filter')
+    const stockFilter = document.getElementById('products-stock-filter')
+    const selectedCat = catFilter ? catFilter.value : ''
+    const selectedStock = stockFilter ? stockFilter.value : ''
+    const threshold = this.lowStockThreshold || 5
+
+    // Populate category filter dropdown
+    if (catFilter && catFilter.options.length <= 1 && this.productCategories) {
+      this.productCategories.forEach(c => {
+        const opt = document.createElement('option')
+        opt.value = c.id
+        opt.textContent = c.name
+        catFilter.appendChild(opt)
+      })
+    }
+
     let filtered = this.products
     if (search) {
-      filtered = this.products.filter(p =>
+      filtered = filtered.filter(p =>
         (p.name || '').toLowerCase().includes(search) ||
         (p.barcode || '').toLowerCase().includes(search) ||
         (p.default_code || '').toLowerCase().includes(search)
       )
+    }
+    if (selectedCat) {
+      filtered = filtered.filter(p => String(p.categ_id && p.categ_id.id) === selectedCat)
+    }
+    if (selectedStock) {
+      filtered = filtered.filter(p => {
+        const qty = p.available_qty || 0
+        if (selectedStock === 'in') return qty > threshold
+        if (selectedStock === 'low') return qty > 0 && qty <= threshold
+        if (selectedStock === 'out') return qty <= 0
+        return true
+      })
     }
     if (!filtered.length) {
       tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
@@ -1814,18 +1844,28 @@ let App = {
         container.innerHTML = `<p style="color:var(--text-light);padding:20px">${I18n.t('activity.no_logs', 'No activity recorded yet.')}</p>`
         return
       }
+      const actionLabels = {
+        'login': { label: 'Login', cls: 'badge badge-success' },
+        'logout': { label: 'Logout', cls: 'badge badge-secondary' },
+        'create': { label: 'Create', cls: 'badge badge-primary' },
+        'update': { label: 'Update', cls: 'badge badge-info' },
+        'delete': { label: 'Delete', cls: 'badge badge-danger' },
+        'cancel': { label: 'Cancel', cls: 'badge badge-warning' },
+        'validate_payment': { label: 'Payment', cls: 'badge badge-success' },
+        'bulk_update': { label: 'Bulk Update', cls: 'badge badge-info' },
+      }
       container.innerHTML = `<div style="max-height:500px;overflow-y:auto"><table><thead><tr>
         <th>${I18n.t('activity.user', 'User')}</th>
         <th>${I18n.t('activity.action', 'Action')}</th>
+        <th>${I18n.t('activity.details', 'Details')}</th>
         <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
         <th>${I18n.t('activity.ip', 'IP')}</th>
       </tr></thead><tbody>${logs.map(l => {
-        const isLogin = l.action === 'login'
-        const badgeCls = isLogin ? 'badge badge-success' : 'badge badge-secondary'
-        const label = isLogin ? I18n.t('activity.login', 'Login') : I18n.t('activity.logout', 'Logout')
+        const al = actionLabels[l.action] || { label: l.action, cls: 'badge badge-secondary' }
         return `<tr>
           <td>${this._esc(l.user_name || '')}</td>
-          <td><span class="${badgeCls}">${label}</span></td>
+          <td><span class="${al.cls}">${al.label}</span></td>
+          <td style="font-size:13px;color:var(--text-light)">${this._esc(l.details || '-')}</td>
           <td>${(l.timestamp || '').substring(0, 19)}</td>
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`

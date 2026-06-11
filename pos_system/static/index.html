@@ -112,8 +112,17 @@
     <div id="screen-products" class="content-screen">
       <div class="screen-header">
         <h2 data-i18n="product.title">Products</h2>
-        <div class="btn-group" style="margin-bottom:8px;width:100%">
+        <div class="btn-group" style="margin-bottom:8px;width:100%;gap:6px">
           <input id="products-search" type="text" placeholder="Search products..." style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px">
+          <select id="products-category-filter" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--card-bg);color:var(--text)">
+            <option value="">All Categories</option>
+          </select>
+          <select id="products-stock-filter" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--card-bg);color:var(--text)">
+            <option value="">All Stock</option>
+            <option value="in">In Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
         </div>
         <div class="btn-group">
           <button id="bulk-import-btn" class="btn btn-warning" data-i18n="product.bulk_import">Bulk Import</button>

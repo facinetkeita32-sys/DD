@@ -1566,7 +1566,7 @@ let App = {
   renderCustomersTable() {
     const tbody = document.getElementById('customers-tbody')
     if (!this.customers.length) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('customer.title', 'No customers')}</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('customer.title', 'No customers')}</td></tr>`
       return
     }
     tbody.innerHTML = this.customers.map(c => `
@@ -1574,6 +1574,7 @@ let App = {
         <td>${c.name || ''}</td>
         <td>${c.phone || '-'}</td>
         <td>${c.email || '-'}</td>
+        <td style="font-weight:600;color:var(--primary)">${this.currencyFormat(c.total_spent || 0)}</td>
         <td>${this.currencyFormat(c.total_due || 0)}</td>
         <td><button class="btn btn-sm btn-primary edit-customer" data-id="${c.id}">${I18n.t('common.edit', 'Edit')}</button></td>
       </tr>

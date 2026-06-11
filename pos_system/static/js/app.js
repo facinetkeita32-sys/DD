@@ -316,8 +316,9 @@ let App = {
 
   renderCategories() {
     const container = document.getElementById('pos-categories')
+    const cats = this.productCategories || []
     let html = `<button class="pos-cat-btn ${!this.currentCategory ? 'active' : ''}" data-cat-id="">${I18n.t('pos.category_all', 'All')}</button>`
-    this.categories.forEach(c => {
+    cats.forEach(c => {
       html += `<button class="pos-cat-btn ${this.currentCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${c.name}</button>`
     })
     container.innerHTML = html
@@ -343,8 +344,7 @@ let App = {
     const search = (document.getElementById('pos-search').value || '').toLowerCase()
     let filtered = this.products.filter(p => {
       if (this.currentCategory) {
-        const cats = p.pos_categ_ids || []
-        if (!cats.includes(this.currentCategory)) return false
+        if (!p.categ_id || p.categ_id.id !== this.currentCategory) return false
       }
       if (search) {
         return (p.name || '').toLowerCase().includes(search) ||

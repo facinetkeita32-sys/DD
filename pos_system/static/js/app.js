@@ -358,10 +358,12 @@ let App = {
       return
     }
     const threshold = this.lowStockThreshold || 5
+    const barMax = Math.max(threshold * 3, 1)
     grid.innerHTML = filtered.map((p, idx) => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
       const isOut = qty <= 0
+      const barWidth = isOut ? 0 : Math.min(qty / barMax * 100, 100)
       let cls = 'product-card'
       if (isOut) cls += ' out-of-stock'
       else if (isLow) cls += ' low-stock'
@@ -378,7 +380,7 @@ let App = {
         <div class="prod-category">${catName ? this._esc(catName) : ''}</div>
         <div class="prod-price">${this.currencyFormat(p.list_price)}</div>
         <div class="prod-qty">${qty > 0 ? `${qty} ${I18n.t('product.qty', 'in stock')}` : I18n.t('product.out_of_stock', 'Out of stock')}</div>
-        <div class="prod-barcode">${p.barcode ? this._esc(p.barcode) : ''}</div>
+        <div class="stock-bar-wrap"><div class="stock-bar" style="width:${barWidth}%;background:${isOut ? 'var(--danger)' : isLow ? 'var(--warning)' : 'var(--success)'}"></div></div>
       </div>`
     }).join('')
     grid.querySelectorAll('.product-card').forEach(card => {

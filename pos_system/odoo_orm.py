@@ -621,6 +621,11 @@ class Model(metaclass=BaseModel):
             if order.startswith('-'):
                 reverse = True
                 order_field = order[1:]
+            # handle 'field desc' syntax
+            parts = order_field.rsplit(None, 1)
+            if len(parts) == 2 and parts[1].lower() == 'desc':
+                reverse = True
+                order_field = parts[0]
             results.sort(key=lambda x: x._data.get(order_field, ''), reverse=reverse)
         if offset:
             results = results[offset:]

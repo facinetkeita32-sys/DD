@@ -1031,7 +1031,6 @@ let App = {
       tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
       return
     }
-    const threshold = this.lowStockThreshold || 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
     this._selectedProductIds = this._selectedProductIds || []

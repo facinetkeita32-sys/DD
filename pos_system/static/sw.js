@@ -1,4 +1,4 @@
-const CACHE = 'dd-pos-v4'
+const CACHE = 'dd-pos-v5'
 
 self.addEventListener('install', e => {
   e.waitUntil(

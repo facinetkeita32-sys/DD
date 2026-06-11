@@ -116,6 +116,7 @@ a { text-decoration: none; color: var(--primary); cursor: pointer; }
 .product-card .prod-category { font-size: 10px; color: var(--text-light); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .product-card .prod-price { color: var(--primary); font-weight: 800; font-size: 17px; letter-spacing: -0.3px; }
 .product-card .prod-qty { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.product-card .prod-barcode { font-size: 9px; color: var(--text-light); font-family: monospace; opacity: 0.7; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .product-card.low-stock { border-color: var(--warning); background: linear-gradient(135deg, #fffbeb, #fff); }
 .product-card.low-stock .prod-price { color: var(--warning); }
 .product-card.out-of-stock { border-color: var(--danger); background: linear-gradient(135deg, #fef2f2, #fff); opacity: 0.75; }

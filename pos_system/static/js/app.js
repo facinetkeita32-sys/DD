@@ -378,6 +378,7 @@ let App = {
         <div class="prod-category">${catName ? this._esc(catName) : ''}</div>
         <div class="prod-price">${this.currencyFormat(p.list_price)}</div>
         <div class="prod-qty">${qty > 0 ? `${qty} ${I18n.t('product.qty', 'in stock')}` : I18n.t('product.out_of_stock', 'Out of stock')}</div>
+        <div class="prod-barcode">${p.barcode ? this._esc(p.barcode) : ''}</div>
       </div>`
     }).join('')
     grid.querySelectorAll('.product-card').forEach(card => {

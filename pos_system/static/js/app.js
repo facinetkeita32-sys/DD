@@ -1032,13 +1032,15 @@ let App = {
           expHtml = expDate.substring(0, 10)
         }
       }
+      const barMaxTbl = Math.max(threshold * 3, 1)
+      const barWidthTbl = isOut ? 0 : Math.min(qty / barMaxTbl * 100, 100)
       return `<tr class="${rowCls + expCls}">
         <td><input type="checkbox" class="bulk-item-cb" data-id="${p.id}" ${checked}></td>
         <td>${p.image ? `<img class="prod-table-img" src="data:image/png;base64,${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>
-        <td>${qty}</td>
+        <td><div style="display:flex;align-items:center;gap:6px"><span>${qty}</span><div class="stock-bar-wrap" style="flex:1;max-width:60px"><div class="stock-bar" style="width:${barWidthTbl}%;background:${isOut ? 'var(--danger)' : isLow ? 'var(--warning)' : 'var(--success)'}"></div></div></div></td>
         <td>${stockHtml}</td>
         <td>${expHtml}</td>
         <td>${p.categ_id ? (p.categ_id.name || '') : ''}</td>

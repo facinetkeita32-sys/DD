@@ -1,4 +1,4 @@
-const CACHE = 'dd-pos-v5'
+const CACHE = 'dd-pos-assets'
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -7,9 +7,7 @@ self.addEventListener('install', e => {
       '/manifest.json',
       '/icon-192.png',
       '/icon-512.png',
-      'css/style.css',
-      'js/app.js',
-      'js/i18n.js'
+      'css/style.css'
     ]))
   )
   self.skipWaiting()
@@ -28,12 +26,17 @@ self.addEventListener('fetch', e => {
   const { method, url } = e.request
   const u = new URL(url)
 
-  // API and non-GET requests go straight to network
+  // API and non-GET go straight to network
   if (u.pathname.startsWith('/api/') || method !== 'GET') {
     return e.respondWith(fetch(e.request))
   }
 
-  // Static assets: cache-first
+  // JS files: always network-first (never cache — avoids stale JS on deploy)
+  if (u.pathname.endsWith('.js')) {
+    return e.respondWith(fetch(e.request).catch(() => caches.match(e.request)))
+  }
+
+  // Everything else: cache-first
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       const clone = res.clone()

@@ -280,5 +280,10 @@
   "inventory.bulk_update": "Bulk Update",
   "inventory.field": "Field",
   "inventory.new_value": "New Value",
-  "inventory.value_required": "Value is required"
+  "inventory.value_required": "Value is required",
+  "inventory.download_template": "Download CSV Template",
+  "inventory.import_result": "Import Result",
+  "inventory.import_created": "Created",
+  "inventory.import_updated": "Updated",
+  "inventory.import_errors": "Errors"
 }

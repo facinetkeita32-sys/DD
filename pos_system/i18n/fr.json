@@ -280,5 +280,10 @@
   "inventory.bulk_update": "Mise à Jour en Masse",
   "inventory.field": "Champ",
   "inventory.new_value": "Nouvelle Valeur",
-  "inventory.value_required": "La valeur est requise"
+  "inventory.value_required": "La valeur est requise",
+  "inventory.download_template": "Télécharger le Modèle CSV",
+  "inventory.import_result": "Résultat de l'Import",
+  "inventory.import_created": "Créés",
+  "inventory.import_updated": "Mis à Jour",
+  "inventory.import_errors": "Erreurs"
 }

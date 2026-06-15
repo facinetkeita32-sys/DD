@@ -1897,13 +1897,16 @@ let App = {
         <div id="csv-upload-prompt">${I18n.t('inventory.import_csv', 'Import from CSV')}</div>
         <input type="file" id="csv-file-input" accept=".csv" style="display:none">
       </div>
+      <div style="margin-bottom:10px"><button class="btn btn-sm btn-secondary" id="inv-download-template">${I18n.t('inventory.download_template', 'Download CSV Template')}</button></div>
       <textarea id="inv-import-json" rows="6" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-family:monospace;font-size:12px" placeholder='[{"name":"Product A","barcode":"123","quantity":10}]'></textarea>
+      <div id="inv-import-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;font-size:13px"></div>
       <div class="btn-group" style="margin-top:12px">
         <button class="btn btn-primary" id="inv-import-btn">${I18n.t('common.import', 'Import')}</button>
         <button class="btn btn-secondary" id="inv-import-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
       </div>`
     this.showModal(html)
     document.getElementById('csv-upload-area').onclick = () => document.getElementById('csv-file-input').click()
+    document.getElementById('inv-download-template').onclick = () => this.downloadInventoryTemplate()
     document.getElementById('csv-file-input').onchange = async (e) => {
       const file = e.target.files[0]
       if (!file) return
@@ -1914,9 +1917,7 @@ let App = {
         const fetchRes = await fetch('/api/inventory/import', { method: 'POST', body: formData })
         const json = await fetchRes.json()
         if (!fetchRes.ok) throw new Error(json.error || 'Import failed')
-        alert(json.message || 'Import complete')
-        this.closeModal()
-        await this.renderInventory()
+        this._showImportResult(json)
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('inv-import-btn').onclick = async () => {
@@ -1925,12 +1926,49 @@ let App = {
       try {
         const jsonData = JSON.parse(jsonText)
         const res = await this.api('POST', '/inventory/import', jsonData)
-        alert(res.message || 'Import complete')
-        this.closeModal()
-        await this.renderInventory()
+        this._showImportResult(res)
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('inv-import-cancel').onclick = () => this.closeModal()
+  },
+
+  _showImportResult(res) {
+    const resultDiv = document.getElementById('inv-import-result')
+    if (!resultDiv) return
+    const data = res.data || {}
+    const created = data.created || 0
+    const updated = data.updated || 0
+    const errors = data.errors || []
+    let html = `<div style="font-weight:600;margin-bottom:6px">${I18n.t('inventory.import_result', 'Import Result')}</div>
+      <div>${I18n.t('inventory.import_created', 'Created')}: ${created}</div>
+      <div>${I18n.t('inventory.import_updated', 'Updated')}: ${updated}</div>`
+    if (errors.length) {
+      html += `<div style="margin-top:6px;font-weight:600;color:var(--danger)">${I18n.t('inventory.import_errors', 'Errors')} (${errors.length}):</div>
+        <div style="max-height:120px;overflow-y:auto;font-size:12px;color:var(--danger)">${errors.map(e => `<div>• ${this._esc(e)}</div>`).join('')}</div>`
+    }
+    resultDiv.innerHTML = html
+    resultDiv.style.display = 'block'
+    resultDiv.style.background = errors.length ? 'var(--danger-light, #fef2f2)' : 'var(--success-light, #f0fdf4)'
+    resultDiv.style.color = errors.length ? '#991b1b' : '#065f46'
+    this.renderInventory()
+  },
+
+  downloadInventoryTemplate() {
+    const headers = ['Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']
+    const example = ['Example Product','1234567890','10','5.00','8.00','Category Name','draft','Optional notes']
+    const csv = [headers, example].map(r => r.map(v => {
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+    }).join(',')).join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'inventory_template.csv'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   },
 
   // === SESSIONS ===

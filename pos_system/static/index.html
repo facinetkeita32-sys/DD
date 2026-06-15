@@ -234,15 +234,33 @@
     <div id="screen-inventory" class="content-screen">
       <div class="screen-header">
         <h2 data-i18n="inventory.title">Inventory</h2>
+        <div class="btn-group" style="margin-bottom:8px;width:100%;gap:6px">
+          <input id="inventory-search" type="text" placeholder="Search..." style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px">
+          <select id="inventory-status-filter" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--card-bg);color:var(--text)">
+            <option value="">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="verified">Verified</option>
+          </select>
+          <select id="inventory-category-filter" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--card-bg);color:var(--text)">
+            <option value="">All Categories</option>
+          </select>
+        </div>
         <div class="btn-group">
           <button id="inventory-export-csv-btn" class="btn btn-success" data-i18n="inventory.export_csv">Export CSV</button>
           <button id="inventory-import-btn" class="btn btn-warning" data-i18n="inventory.import_csv">Import CSV</button>
           <button id="add-inventory-btn" class="btn btn-primary" data-i18n="inventory.add">Add Item</button>
         </div>
       </div>
+      <div id="inventory-bulk-bar" style="display:none;padding:8px 0;gap:8px;align-items:center">
+        <span id="inventory-bulk-count" style="font-size:14px;font-weight:600"></span>
+        <button id="inventory-bulk-update-btn" class="btn btn-sm btn-primary" data-i18n="inventory.bulk_update">Bulk Update</button>
+        <button id="inventory-bulk-clear-btn" class="btn btn-sm btn-secondary">Clear</button>
+      </div>
       <div class="table-container">
         <table id="inventory-table">
           <thead><tr>
+            <th style="width:36px"><input type="checkbox" id="inventory-bulk-select-all"></th>
+            <th data-i18n="inventory.date">Date</th>
             <th data-i18n="inventory.name">Name</th>
             <th data-i18n="inventory.barcode">Barcode</th>
             <th data-i18n="inventory.quantity">Qty</th>

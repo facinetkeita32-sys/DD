@@ -275,5 +275,10 @@
   "inventory.import_hint": "Upload a CSV file or paste JSON below.",
   "inventory.file_chosen": "File chosen",
   "inventory.no_data": "No data to import",
-  "inventory.name_required": "Name is required"
+  "inventory.name_required": "Name is required",
+  "inventory.date": "Date",
+  "inventory.bulk_update": "Bulk Update",
+  "inventory.field": "Field",
+  "inventory.new_value": "New Value",
+  "inventory.value_required": "Value is required"
 }

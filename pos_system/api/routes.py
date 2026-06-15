@@ -1302,7 +1302,10 @@ def get_inventory():
     if args.get('search'):
         domain.append(('name', 'ilike', args['search']))
     items = InventoryItem().search(domain, limit=500)
-    return success_response(serialize_model(InventoryItem, items))
+    result = serialize_model(InventoryItem, items)
+    for r, obj in zip(result, items):
+        r['create_date'] = obj._data.get('create_date', '')
+    return success_response(result)
 
 
 @api_bp.route('/inventory', methods=['POST'])
@@ -1397,6 +1400,31 @@ def import_inventory():
             results['errors'].append(str(e))
     log_activity('import', 'Inventory: %s created, %s updated' % (results['created'], results['updated']))
     return success_response(results, 'Imported: %s created, %s updated, %s errors' % (results['created'], results['updated'], len(results['errors'])))
+
+
+@api_bp.route('/inventory/bulk-update', methods=['POST'])
+@login_required
+@permission_required('inventory.write')
+def bulk_update_inventory():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    field = data.get('field')
+    value = data.get('value')
+    if not ids or not field:
+        return error_response('ids and field are required')
+    count = 0
+    for iid in ids:
+        items = InventoryItem().browse([iid])
+        if items:
+            if field in ('quantity', 'cost_price', 'selling_price'):
+                items[0].write({field: float(value) if value else 0.0})
+            elif field == 'status':
+                items[0].write({field: value})
+            else:
+                items[0].write({field: value})
+            count += 1
+    log_activity('bulk_update', '%s inventory items %s=%s' % (count, field, value))
+    return success_response({'updated': count}, '%s items updated' % count)
 
 
 # === COMPANY ===

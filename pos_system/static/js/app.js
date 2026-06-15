@@ -104,6 +104,9 @@ let App = {
     document.getElementById('add-inventory-btn').onclick = () => this.showInventoryModal()
     document.getElementById('inventory-export-csv-btn').onclick = () => this.exportInventoryCsv()
     document.getElementById('inventory-import-btn').onclick = () => this.showInventoryImportModal()
+    document.getElementById('inventory-search').oninput = () => this.renderInventory()
+    document.getElementById('inventory-status-filter').onchange = () => this.renderInventory()
+    document.getElementById('inventory-category-filter').onchange = () => this.renderInventory()
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
@@ -1654,6 +1657,7 @@ let App = {
   // === INVENTORY ===
 
   inventoryItems: [],
+  _selectedInventoryIds: [],
 
   async renderInventory() {
     const tbody = document.getElementById('inventory-tbody')
@@ -1662,17 +1666,54 @@ let App = {
       const res = await this.api('GET', '/inventory?limit=500')
       this.inventoryItems = res.data || []
     } catch(e) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--danger)">${I18n.t('common.error', 'Error loading')}</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--danger)">${I18n.t('common.error', 'Error loading')}</td></tr>`
       return
     }
-    if (!this.inventoryItems.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('inventory.empty', 'No inventory items')}</td></tr>`
+
+    const search = (document.getElementById('inventory-search').value || '').toLowerCase()
+    const statusFilter = document.getElementById('inventory-status-filter')
+    const catFilter = document.getElementById('inventory-category-filter')
+    const selectedStatus = statusFilter ? statusFilter.value : ''
+    const selectedCat = catFilter ? catFilter.value : ''
+
+    // populate category filter
+    if (catFilter && catFilter.options.length <= 1) {
+      const cats = [...new Set(this.inventoryItems.map(i => i.category).filter(Boolean))]
+      cats.sort().forEach(c => {
+        const opt = document.createElement('option')
+        opt.value = c
+        opt.textContent = c
+        catFilter.appendChild(opt)
+      })
+    }
+
+    let filtered = this.inventoryItems
+    if (search) {
+      filtered = filtered.filter(i =>
+        (i.name || '').toLowerCase().includes(search) ||
+        (i.barcode || '').toLowerCase().includes(search)
+      )
+    }
+    if (selectedStatus) {
+      filtered = filtered.filter(i => i.status === selectedStatus)
+    }
+    if (selectedCat) {
+      filtered = filtered.filter(i => i.category === selectedCat)
+    }
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('inventory.empty', 'No inventory items')}</td></tr>`
       return
     }
     const canWrite = this.hasAction('inventory.write')
     const canDelete = this.hasAction('inventory.delete')
-    tbody.innerHTML = this.inventoryItems.map(item => `
-      <tr>
+    this._selectedInventoryIds = this._selectedInventoryIds || []
+    tbody.innerHTML = filtered.map(item => {
+      const checked = this._selectedInventoryIds.includes(item.id) ? 'checked' : ''
+      const dateStr = (item.create_date || '').substring(0, 10)
+      return `<tr>
+        <td><input type="checkbox" class="inv-bulk-cb" data-id="${item.id}" ${checked}></td>
+        <td style="font-size:13px;color:var(--text-light)">${dateStr || '-'}</td>
         <td>${this._esc(item.name || '')}</td>
         <td>${this._esc(item.barcode || '-')}</td>
         <td>${item.quantity || 0}</td>
@@ -1682,17 +1723,89 @@ let App = {
         <td><span class="status-badge" style="background:${item.status === 'verified' ? 'var(--success-light)' : 'var(--warning-light)'};color:${item.status === 'verified' ? '#065f46' : '#92400e'}">${item.status || 'draft'}</span></td>
         <td>${canWrite ? `<button class="btn btn-sm btn-primary edit-inv" data-id="${item.id}">${I18n.t('common.edit', 'Edit')}</button>` : '-'}</td>
         <td>${canDelete ? `<button class="btn btn-sm btn-danger delete-inv" data-id="${item.id}">${I18n.t('common.delete', 'Delete')}</button>` : '-'}</td>
-      </tr>
-    `).join('')
+      </tr>`
+    }).join('')
     tbody.querySelectorAll('.edit-inv').forEach(btn => {
       btn.onclick = () => this.showInventoryModal(parseInt(btn.dataset.id))
     })
     tbody.querySelectorAll('.delete-inv').forEach(btn => {
       btn.onclick = () => this.deleteInventoryItem(parseInt(btn.dataset.id))
     })
+    this._selectedInventoryIds = this._selectedInventoryIds || []
+    tbody.querySelectorAll('.inv-bulk-cb').forEach(cb => {
+      cb.onchange = () => {
+        const iid = parseInt(cb.dataset.id)
+        if (cb.checked) { if (!this._selectedInventoryIds.includes(iid)) this._selectedInventoryIds.push(iid) }
+        else { this._selectedInventoryIds = this._selectedInventoryIds.filter(i => i !== iid) }
+        this._updateInventoryBulkBar()
+      }
+    })
+    const selectAll = document.getElementById('inventory-bulk-select-all')
+    if (selectAll) {
+      selectAll.onchange = () => {
+        document.querySelectorAll('.inv-bulk-cb').forEach(cb => { cb.checked = selectAll.checked; cb.onchange() })
+      }
+    }
+    document.getElementById('inventory-bulk-clear-btn').onclick = () => { this._selectedInventoryIds = []; this.renderInventory() }
+    document.getElementById('inventory-bulk-update-btn').onclick = () => this.showInventoryBulkUpdateModal()
+    this._updateInventoryBulkBar()
     // show/hide action buttons
     document.getElementById('add-inventory-btn').style.display = this.hasAction('inventory.create') ? '' : 'none'
     document.getElementById('inventory-import-btn').style.display = this.hasAction('inventory.import') ? '' : 'none'
+  },
+
+  _updateInventoryBulkBar() {
+    const bar = document.getElementById('inventory-bulk-bar')
+    const count = document.getElementById('inventory-bulk-count')
+    if (!bar || !count) return
+    const n = this._selectedInventoryIds ? this._selectedInventoryIds.length : 0
+    if (n > 0) { bar.style.display = 'flex'; count.textContent = n + ' selected' }
+    else { bar.style.display = 'none' }
+  },
+
+  showInventoryBulkUpdateModal() {
+    const ids = this._selectedInventoryIds || []
+    if (!ids.length) return
+    const html = `<h3>${I18n.t('inventory.bulk_update', 'Bulk Update')} (${ids.length} items)</h3>
+      <div class="form-group"><label>${I18n.t('inventory.field', 'Field')}</label>
+        <select id="inv-bulk-field">
+          <option value="quantity">${I18n.t('inventory.quantity', 'Qty')}</option>
+          <option value="cost_price">${I18n.t('inventory.cost_price', 'Cost')}</option>
+          <option value="selling_price">${I18n.t('inventory.selling_price', 'Price')}</option>
+          <option value="status">${I18n.t('inventory.status', 'Status')}</option>
+          <option value="category">${I18n.t('inventory.category', 'Category')}</option>
+        </select>
+      </div>
+      <div class="form-group"><label>${I18n.t('inventory.new_value', 'New Value')}</label>
+        <input id="inv-bulk-value" type="text" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+        <select id="inv-bulk-status-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;display:none;margin-top:4px">
+          <option value="draft">Draft</option>
+          <option value="verified">Verified</option>
+        </select>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="inv-bulk-update-confirm">${I18n.t('common.save', 'Save')}</button>
+        <button class="btn btn-secondary" id="inv-bulk-update-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('inv-bulk-field').onchange = () => {
+      const field = document.getElementById('inv-bulk-field').value
+      document.getElementById('inv-bulk-value').style.display = field === 'status' ? 'none' : ''
+      document.getElementById('inv-bulk-status-select').style.display = field === 'status' ? '' : 'none'
+    }
+    document.getElementById('inv-bulk-update-confirm').onclick = async () => {
+      const field = document.getElementById('inv-bulk-field').value
+      let value = document.getElementById('inv-bulk-value').value
+      if (field === 'status') value = document.getElementById('inv-bulk-status-select').value
+      if (field !== 'status' && !value && value !== '0') { alert(I18n.t('inventory.value_required', 'Value is required')); return }
+      try {
+        await this.api('POST', '/inventory/bulk-update', { ids, field, value })
+        this.closeModal()
+        this._selectedInventoryIds = []
+        await this.renderInventory()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('inv-bulk-update-cancel').onclick = () => this.closeModal()
   },
 
   showInventoryModal(id) {
@@ -1744,9 +1857,10 @@ let App = {
   },
 
   exportInventoryCsv() {
-    const rows = [['Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']]
+    const rows = [['Date','Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']]
     this.inventoryItems.forEach(item => {
       rows.push([
+        (item.create_date || '').substring(0, 10),
         item.name || '',
         item.barcode || '',
         item.quantity || 0,

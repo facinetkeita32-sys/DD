@@ -275,5 +275,10 @@
   "inventory.import_hint": "Téléchargez un fichier CSV ou collez du JSON ci-dessous.",
   "inventory.file_chosen": "Fichier choisi",
   "inventory.no_data": "Aucune donnée à importer",
-  "inventory.name_required": "Le nom est requis"
+  "inventory.name_required": "Le nom est requis",
+  "inventory.date": "Date",
+  "inventory.bulk_update": "Mise à Jour en Masse",
+  "inventory.field": "Champ",
+  "inventory.new_value": "Nouvelle Valeur",
+  "inventory.value_required": "La valeur est requise"
 }

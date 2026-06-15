@@ -1747,6 +1747,7 @@ let App = {
     }
     document.getElementById('inventory-bulk-clear-btn').onclick = () => { this._selectedInventoryIds = []; this.renderInventory() }
     document.getElementById('inventory-bulk-update-btn').onclick = () => this.showInventoryBulkUpdateModal()
+    document.getElementById('inventory-bulk-delete-btn').onclick = () => this.bulkDeleteInventory()
     this._updateInventoryBulkBar()
     // show/hide action buttons
     document.getElementById('add-inventory-btn').style.display = this.hasAction('inventory.create') ? '' : 'none'
@@ -1810,6 +1811,17 @@ let App = {
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('inv-bulk-update-cancel').onclick = () => this.closeModal()
+  },
+
+  async bulkDeleteInventory() {
+    const ids = this._selectedInventoryIds || []
+    if (!ids.length) return
+    if (!confirm(I18n.t('inventory.confirm_bulk_delete', 'Delete selected items?'))) return
+    try {
+      await this.api('POST', '/inventory/bulk-delete', { ids })
+      this._selectedInventoryIds = []
+      await this.renderInventory()
+    } catch(e) { alert('Error: ' + e.message) }
   },
 
   showInventoryModal(id) {

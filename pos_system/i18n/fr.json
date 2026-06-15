@@ -285,5 +285,7 @@
   "inventory.import_result": "Résultat de l'Import",
   "inventory.import_created": "Créés",
   "inventory.import_updated": "Mis à Jour",
-  "inventory.import_errors": "Erreurs"
+  "inventory.import_errors": "Erreurs",
+  "inventory.bulk_delete": "Supprimer la Sélection",
+  "inventory.confirm_bulk_delete": "Supprimer les articles sélectionnés ?"
 }

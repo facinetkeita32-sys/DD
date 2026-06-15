@@ -285,5 +285,7 @@
   "inventory.import_result": "Import Result",
   "inventory.import_created": "Created",
   "inventory.import_updated": "Updated",
-  "inventory.import_errors": "Errors"
+  "inventory.import_errors": "Errors",
+  "inventory.bulk_delete": "Delete Selected",
+  "inventory.confirm_bulk_delete": "Delete selected items?"
 }

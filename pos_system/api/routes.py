@@ -1427,6 +1427,24 @@ def bulk_update_inventory():
     return success_response({'updated': count}, '%s items updated' % count)
 
 
+@api_bp.route('/inventory/bulk-delete', methods=['POST'])
+@login_required
+@permission_required('inventory.delete')
+def bulk_delete_inventory():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return error_response('ids are required')
+    count = 0
+    for iid in ids:
+        items = InventoryItem().browse([iid])
+        if items:
+            items[0].unlink()
+            count += 1
+    log_activity('delete', '%s inventory items bulk deleted' % count)
+    return success_response({'deleted': count}, '%s items deleted' % count)
+
+
 # === COMPANY ===
 
 @api_bp.route('/company', methods=['GET'])

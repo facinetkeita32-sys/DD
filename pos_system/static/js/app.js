@@ -104,6 +104,7 @@ let App = {
     document.getElementById('add-inventory-btn').onclick = () => this.showInventoryModal()
     document.getElementById('inventory-export-csv-btn').onclick = () => this.exportInventoryCsv()
     document.getElementById('inventory-import-btn').onclick = () => this.showInventoryImportModal()
+    document.getElementById('inv-download-template-btn').onclick = () => this.downloadInventoryTemplate()
     document.getElementById('inventory-search').oninput = () => this.renderInventory()
     document.getElementById('inventory-status-filter').onchange = () => this.renderInventory()
     document.getElementById('inventory-category-filter').onchange = () => this.renderInventory()
@@ -1752,6 +1753,7 @@ let App = {
     // show/hide action buttons
     document.getElementById('add-inventory-btn').style.display = this.hasAction('inventory.create') ? '' : 'none'
     document.getElementById('inventory-import-btn').style.display = this.hasAction('inventory.import') ? '' : 'none'
+    document.getElementById('inv-download-template-btn').style.display = this.hasAction('inventory.import') ? '' : 'none'
   },
 
   _updateInventoryBulkBar() {

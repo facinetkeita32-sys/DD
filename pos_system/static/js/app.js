@@ -1676,13 +1676,12 @@ let App = {
     const selectedStatus = statusFilter ? statusFilter.value : ''
     const selectedCat = catFilter ? catFilter.value : ''
 
-    // populate category filter
-    if (catFilter && catFilter.options.length <= 1) {
-      const cats = [...new Set(this.inventoryItems.map(i => i.category).filter(Boolean))]
-      cats.sort().forEach(c => {
+    // populate category filter from product categories
+    if (catFilter && catFilter.options.length <= 1 && this.productCategories) {
+      this.productCategories.forEach(c => {
         const opt = document.createElement('option')
-        opt.value = c
-        opt.textContent = c
+        opt.value = c.name
+        opt.textContent = c.name
         catFilter.appendChild(opt)
       })
     }
@@ -1782,6 +1781,9 @@ let App = {
           <option value="draft">Draft</option>
           <option value="verified">Verified</option>
         </select>
+        <select id="inv-bulk-cat-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;display:none;margin-top:4px">
+          <option value="">${I18n.t('common.none', 'None')}</option>${(this.productCategories || []).map(c => `<option value="${this._esc(c.name)}">${this._esc(c.name)}</option>`).join('')}
+        </select>
       </div>
       <div class="btn-group">
         <button class="btn btn-primary" id="inv-bulk-update-confirm">${I18n.t('common.save', 'Save')}</button>
@@ -1790,14 +1792,16 @@ let App = {
     this.showModal(html)
     document.getElementById('inv-bulk-field').onchange = () => {
       const field = document.getElementById('inv-bulk-field').value
-      document.getElementById('inv-bulk-value').style.display = field === 'status' ? 'none' : ''
+      document.getElementById('inv-bulk-value').style.display = (field === 'status' || field === 'category') ? 'none' : ''
       document.getElementById('inv-bulk-status-select').style.display = field === 'status' ? '' : 'none'
+      document.getElementById('inv-bulk-cat-select').style.display = field === 'category' ? '' : 'none'
     }
     document.getElementById('inv-bulk-update-confirm').onclick = async () => {
       const field = document.getElementById('inv-bulk-field').value
       let value = document.getElementById('inv-bulk-value').value
       if (field === 'status') value = document.getElementById('inv-bulk-status-select').value
-      if (field !== 'status' && !value && value !== '0') { alert(I18n.t('inventory.value_required', 'Value is required')); return }
+      else if (field === 'category') value = document.getElementById('inv-bulk-cat-select').value
+      if (field !== 'status' && field !== 'category' && !value && value !== '0') { alert(I18n.t('inventory.value_required', 'Value is required')); return }
       try {
         await this.api('POST', '/inventory/bulk-update', { ids, field, value })
         this.closeModal()
@@ -1817,7 +1821,7 @@ let App = {
       <div class="form-group"><label data-i18n="inventory.quantity">Quantity</label><input type="number" step="any" id="inv-qty" value="${item ? item.quantity || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="inventory.cost_price">Cost Price</label><input type="number" step="any" id="inv-cost" value="${item ? item.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="inventory.selling_price">Selling Price</label><input type="number" step="any" id="inv-price" value="${item ? item.selling_price || 0 : 0}"></div>
-      <div class="form-group"><label data-i18n="inventory.category">Category</label><input id="inv-category" value="${item ? this._esc(item.category || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="inventory.category">Category</label><select id="inv-category"><option value="">${I18n.t('common.none', 'None')}</option>${(this.productCategories || []).map(c => `<option value="${this._esc(c.name)}" ${item && item.category === c.name ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')}</select></div>
       <div class="form-group"><label data-i18n="inventory.status">Status</label><select id="inv-status"><option value="draft" ${item && item.status === 'draft' ? 'selected' : ''}>Draft</option><option value="verified" ${item && item.status === 'verified' ? 'selected' : ''}>Verified</option></select></div>
       <div class="btn-group">
         <button class="btn btn-primary" id="inv-save">${I18n.t('common.save', 'Save')}</button>

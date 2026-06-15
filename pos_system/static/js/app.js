@@ -1774,12 +1774,14 @@ let App = {
           <option value="quantity">${I18n.t('inventory.quantity', 'Qty')}</option>
           <option value="cost_price">${I18n.t('inventory.cost_price', 'Cost')}</option>
           <option value="selling_price">${I18n.t('inventory.selling_price', 'Price')}</option>
+          <option value="date">${I18n.t('inventory.date', 'Date')}</option>
           <option value="status">${I18n.t('inventory.status', 'Status')}</option>
           <option value="category">${I18n.t('inventory.category', 'Category')}</option>
         </select>
       </div>
       <div class="form-group"><label>${I18n.t('inventory.new_value', 'New Value')}</label>
         <input id="inv-bulk-value" type="text" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+        <input id="inv-bulk-date-input" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;display:none;margin-top:4px">
         <select id="inv-bulk-status-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;display:none;margin-top:4px">
           <option value="draft">Draft</option>
           <option value="verified">Verified</option>
@@ -1795,7 +1797,8 @@ let App = {
     this.showModal(html)
     document.getElementById('inv-bulk-field').onchange = () => {
       const field = document.getElementById('inv-bulk-field').value
-      document.getElementById('inv-bulk-value').style.display = (field === 'status' || field === 'category') ? 'none' : ''
+      document.getElementById('inv-bulk-value').style.display = (field === 'status' || field === 'category' || field === 'date') ? 'none' : ''
+      document.getElementById('inv-bulk-date-input').style.display = field === 'date' ? '' : 'none'
       document.getElementById('inv-bulk-status-select').style.display = field === 'status' ? '' : 'none'
       document.getElementById('inv-bulk-cat-select').style.display = field === 'category' ? '' : 'none'
     }
@@ -1804,7 +1807,8 @@ let App = {
       let value = document.getElementById('inv-bulk-value').value
       if (field === 'status') value = document.getElementById('inv-bulk-status-select').value
       else if (field === 'category') value = document.getElementById('inv-bulk-cat-select').value
-      if (field !== 'status' && field !== 'category' && !value && value !== '0') { alert(I18n.t('inventory.value_required', 'Value is required')); return }
+      else if (field === 'date') value = document.getElementById('inv-bulk-date-input').value
+      if (field !== 'status' && field !== 'category' && field !== 'date' && !value && value !== '0') { alert(I18n.t('inventory.value_required', 'Value is required')); return }
       try {
         await this.api('POST', '/inventory/bulk-update', { ids, field, value })
         this.closeModal()

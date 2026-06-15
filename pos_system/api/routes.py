@@ -1416,10 +1416,11 @@ def bulk_update_inventory():
     for iid in ids:
         items = InventoryItem().browse([iid])
         if items:
-            if field in ('quantity', 'cost_price', 'selling_price'):
+            if field == 'date':
+                items[0]._data['create_date'] = (value or '')[:10] + ' 00:00:00'
+                items[0]._save()
+            elif field in ('quantity', 'cost_price', 'selling_price'):
                 items[0].write({field: float(value) if value else 0.0})
-            elif field == 'status':
-                items[0].write({field: value})
             else:
                 items[0].write({field: value})
             count += 1

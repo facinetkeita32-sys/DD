@@ -1355,7 +1355,7 @@ def import_inventory():
         if 'file' not in request.files:
             return error_response('No file provided')
         file = request.files['file']
-        content = file.read().decode('utf-8')
+        content = file.read().decode('utf-8-sig')
         import csv, io
         reader = csv.DictReader(io.StringIO(content))
         items_data = list(reader)

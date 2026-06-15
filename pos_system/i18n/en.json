@@ -171,6 +171,9 @@
   "common.close": "Close",
   "common.or": "- or -",
   "common.name": "Name",
+  "common.import": "Import",
+  "common.error": "Error",
+  "common.confirm_delete": "Delete this item?",
 
   "currency.gnf": "FG",
   "currency.gnf_label": "Guinean Franc (GNF)",
@@ -251,5 +254,26 @@
   "product.no_batches": "No batches yet",
   "product.save_first": "Save the product first to add stock batches.",
   "product.expires": "Exp",
-  "product.confirm_delete_batch": "Delete this batch?"
+  "product.confirm_delete_batch": "Delete this batch?",
+
+  "nav.inventory": "Inventory",
+
+  "inventory.title": "Inventory",
+  "inventory.name": "Name",
+  "inventory.barcode": "Barcode",
+  "inventory.quantity": "Qty",
+  "inventory.cost_price": "Cost",
+  "inventory.selling_price": "Price",
+  "inventory.category": "Category",
+  "inventory.status": "Status",
+  "inventory.add": "Add Item",
+  "inventory.edit": "Edit Inventory Item",
+  "inventory.empty": "No inventory items",
+  "inventory.export_csv": "Export CSV",
+  "inventory.import_csv": "Import CSV",
+  "inventory.import_title": "Import Inventory CSV",
+  "inventory.import_hint": "Upload a CSV file or paste JSON below.",
+  "inventory.file_chosen": "File chosen",
+  "inventory.no_data": "No data to import",
+  "inventory.name_required": "Name is required"
 }

@@ -1,6 +1,6 @@
 PERMISSIONS = {
     'admin': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity', 'inventory'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write', 'customer.delete',
                     'order.create', 'order.write', 'order.cancel',
@@ -8,16 +8,18 @@ PERMISSIONS = {
                     'user.create', 'user.write', 'user.delete', 'user.read',
                     'settings.read', 'settings.write',
                     'report.read',
-                    'bulk.import'],
+                    'bulk.import',
+                    'inventory.create', 'inventory.write', 'inventory.delete', 'inventory.import', 'inventory.export'],
     },
     'manager': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'inventory'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write',
                     'order.create', 'order.write', 'order.cancel',
                     'session.open', 'session.close',
                     'report.read',
-                    'bulk.import'],
+                    'bulk.import',
+                    'inventory.export'],
     },
     'cashier': {
         'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard'],

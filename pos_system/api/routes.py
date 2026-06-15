@@ -23,6 +23,7 @@ from ..models.res_company import ResCompany
 from ..models.delivery_zone import DeliveryZone
 from ..models.stock_lot import StockLot
 from ..models.login_log import LoginLog
+from ..models.inventory_item import InventoryItem
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -1288,6 +1289,114 @@ def get_activity_log():
                 d['user_name'] = user[0]._data.get('name', '')
         result.append(d)
     return success_response(result)
+
+
+# === INVENTORY ===
+
+@api_bp.route('/inventory', methods=['GET'])
+@login_required
+@permission_required('inventory.export')
+def get_inventory():
+    args = request.args
+    domain = []
+    if args.get('search'):
+        domain.append(('name', 'ilike', args['search']))
+    items = InventoryItem().search(domain, limit=500)
+    return success_response(serialize_model(InventoryItem, items))
+
+
+@api_bp.route('/inventory', methods=['POST'])
+@login_required
+@permission_required('inventory.create')
+def create_inventory():
+    data = request.get_json() or {}
+    if not data.get('name'):
+        return error_response('Name is required')
+    item = InventoryItem().create(data)
+    log_activity('create', 'Inventory: %s' % item.name)
+    return success_response(model_to_dict(item), 'Inventory item created')
+
+
+@api_bp.route('/inventory/<int:item_id>', methods=['PUT'])
+@login_required
+@permission_required('inventory.write')
+def update_inventory(item_id):
+    items = InventoryItem().browse([item_id])
+    if not items:
+        return error_response('Item not found', 404)
+    items[0].write(request.get_json() or {})
+    log_activity('update', 'Inventory item ID: %s' % item_id)
+    return success_response(model_to_dict(items[0]), 'Inventory item updated')
+
+
+@api_bp.route('/inventory/<int:item_id>', methods=['DELETE'])
+@login_required
+@permission_required('inventory.delete')
+def delete_inventory(item_id):
+    items = InventoryItem().browse([item_id])
+    if not items:
+        return error_response('Item not found', 404)
+    name = items[0].name
+    items[0].unlink()
+    log_activity('delete', 'Inventory: %s' % name)
+    return success_response(message='Deleted')
+
+
+@api_bp.route('/inventory/import', methods=['POST'])
+@login_required
+@permission_required('inventory.import')
+def import_inventory():
+    content_type = request.content_type or ''
+    results = {'created': 0, 'updated': 0, 'errors': []}
+    if 'multipart/form-data' in content_type:
+        if 'file' not in request.files:
+            return error_response('No file provided')
+        file = request.files['file']
+        content = file.read().decode('utf-8')
+        import csv, io
+        reader = csv.DictReader(io.StringIO(content))
+        items_data = list(reader)
+    else:
+        items_data = request.get_json()
+        if not isinstance(items_data, list):
+            items_data = [items_data]
+    field_map = {
+        'name': 'name', 'Name': 'name', 'product': 'name', 'Product': 'name',
+        'barcode': 'barcode', 'Barcode': 'barcode',
+        'quantity': 'quantity', 'Quantity': 'quantity', 'qty': 'quantity', 'Qty': 'quantity',
+        'cost_price': 'cost_price', 'Cost': 'cost_price', 'cost': 'cost_price',
+        'selling_price': 'selling_price', 'price': 'selling_price', 'Price': 'selling_price',
+        'category': 'category', 'Category': 'category',
+        'notes': 'notes', 'Notes': 'notes', 'note': 'notes',
+    }
+    for row in items_data:
+        try:
+            vals = {}
+            if isinstance(row, dict):
+                for k, v in row.items():
+                    mapped = field_map.get(k.strip(), k.strip().lower().replace(' ', '_'))
+                    vals[mapped] = v.strip() if isinstance(v, str) else v
+            else:
+                continue
+            if not vals.get('name'):
+                results['errors'].append(f"Row missing name: {vals}")
+                continue
+            barcode = vals.get('barcode', '')
+            existing = InventoryItem().search([('barcode', '=', barcode)]) if barcode else []
+            if existing:
+                existing[0].write(vals)
+                results['updated'] += 1
+            else:
+                for num_field in ['quantity', 'cost_price', 'selling_price']:
+                    if num_field in vals:
+                        try: vals[num_field] = float(vals[num_field])
+                        except: vals[num_field] = 0.0
+                InventoryItem().create(vals)
+                results['created'] += 1
+        except Exception as e:
+            results['errors'].append(str(e))
+    log_activity('import', 'Inventory: %s created, %s updated' % (results['created'], results['updated']))
+    return success_response(results, 'Imported: %s created, %s updated, %s errors' % (results['created'], results['updated'], len(results['errors'])))
 
 
 # === COMPANY ===

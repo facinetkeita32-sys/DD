@@ -50,6 +50,7 @@
         <a class="nav-link" data-screen="products" data-i18n="nav.products">Products</a>
         <a class="nav-link" data-screen="orders" data-i18n="nav.orders">Orders</a>
         <a class="nav-link" data-screen="customers" data-i18n="nav.customers">Customers</a>
+        <a class="nav-link" data-screen="inventory" data-i18n="nav.inventory">Inventory</a>
         <a class="nav-link" data-screen="sessions" data-i18n="nav.sessions">Sessions</a>
         <a class="nav-link" data-screen="reports" data-i18n="nav.reports">Reports</a>
         <a class="nav-link" data-screen="dashboard" data-i18n="nav.dashboard">Dashboard</a>
@@ -226,6 +227,33 @@
             <th data-i18n="session.close">Close</th>
           </tr></thead>
           <tbody id="sessions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="screen-inventory" class="content-screen">
+      <div class="screen-header">
+        <h2 data-i18n="inventory.title">Inventory</h2>
+        <div class="btn-group">
+          <button id="inventory-export-csv-btn" class="btn btn-success" data-i18n="inventory.export_csv">Export CSV</button>
+          <button id="inventory-import-btn" class="btn btn-warning" data-i18n="inventory.import_csv">Import CSV</button>
+          <button id="add-inventory-btn" class="btn btn-primary" data-i18n="inventory.add">Add Item</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table id="inventory-table">
+          <thead><tr>
+            <th data-i18n="inventory.name">Name</th>
+            <th data-i18n="inventory.barcode">Barcode</th>
+            <th data-i18n="inventory.quantity">Qty</th>
+            <th data-i18n="inventory.cost_price">Cost</th>
+            <th data-i18n="inventory.selling_price">Price</th>
+            <th data-i18n="inventory.category">Category</th>
+            <th data-i18n="inventory.status">Status</th>
+            <th data-i18n="common.edit">Edit</th>
+            <th data-i18n="common.delete">Delete</th>
+          </tr></thead>
+          <tbody id="inventory-tbody"></tbody>
         </table>
       </div>
     </div>

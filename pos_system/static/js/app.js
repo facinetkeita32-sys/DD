@@ -101,6 +101,9 @@ let App = {
     document.getElementById('products-category-filter').onchange = () => this.renderProductsTable()
     document.getElementById('products-stock-filter').onchange = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
+    document.getElementById('add-inventory-btn').onclick = () => this.showInventoryModal()
+    document.getElementById('inventory-export-csv-btn').onclick = () => this.exportInventoryCsv()
+    document.getElementById('inventory-import-btn').onclick = () => this.showInventoryImportModal()
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
@@ -252,6 +255,7 @@ let App = {
     this.renderProductsTable()
     this.renderOrdersTable()
     this.renderCustomersTable()
+    this.renderInventory()
     this.renderSessionsTable()
     this.renderDashboard()
     this.renderActivity()
@@ -287,6 +291,7 @@ let App = {
     if (name === 'products') this.refreshAndRenderProducts()
     if (name === 'orders') this.renderOrdersTable()
     if (name === 'customers') this.renderCustomersTable()
+    if (name === 'inventory') this.renderInventory()
     if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
     if (name === 'activity') this.renderActivity()
@@ -1644,6 +1649,170 @@ let App = {
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('c-cancel').onclick = () => this.closeModal()
+  },
+
+  // === INVENTORY ===
+
+  inventoryItems: [],
+
+  async renderInventory() {
+    const tbody = document.getElementById('inventory-tbody')
+    if (!tbody) return
+    try {
+      const res = await this.api('GET', '/inventory?limit=500')
+      this.inventoryItems = res.data || []
+    } catch(e) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--danger)">${I18n.t('common.error', 'Error loading')}</td></tr>`
+      return
+    }
+    if (!this.inventoryItems.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('inventory.empty', 'No inventory items')}</td></tr>`
+      return
+    }
+    const canWrite = this.hasAction('inventory.write')
+    const canDelete = this.hasAction('inventory.delete')
+    tbody.innerHTML = this.inventoryItems.map(item => `
+      <tr>
+        <td>${this._esc(item.name || '')}</td>
+        <td>${this._esc(item.barcode || '-')}</td>
+        <td>${item.quantity || 0}</td>
+        <td>${this.currencyFormat(item.cost_price || 0)}</td>
+        <td>${this.currencyFormat(item.selling_price || 0)}</td>
+        <td>${this._esc(item.category || '-')}</td>
+        <td><span class="status-badge" style="background:${item.status === 'verified' ? 'var(--success-light)' : 'var(--warning-light)'};color:${item.status === 'verified' ? '#065f46' : '#92400e'}">${item.status || 'draft'}</span></td>
+        <td>${canWrite ? `<button class="btn btn-sm btn-primary edit-inv" data-id="${item.id}">${I18n.t('common.edit', 'Edit')}</button>` : '-'}</td>
+        <td>${canDelete ? `<button class="btn btn-sm btn-danger delete-inv" data-id="${item.id}">${I18n.t('common.delete', 'Delete')}</button>` : '-'}</td>
+      </tr>
+    `).join('')
+    tbody.querySelectorAll('.edit-inv').forEach(btn => {
+      btn.onclick = () => this.showInventoryModal(parseInt(btn.dataset.id))
+    })
+    tbody.querySelectorAll('.delete-inv').forEach(btn => {
+      btn.onclick = () => this.deleteInventoryItem(parseInt(btn.dataset.id))
+    })
+    // show/hide action buttons
+    document.getElementById('add-inventory-btn').style.display = this.hasAction('inventory.create') ? '' : 'none'
+    document.getElementById('inventory-import-btn').style.display = this.hasAction('inventory.import') ? '' : 'none'
+  },
+
+  showInventoryModal(id) {
+    const item = id ? this.inventoryItems.find(x => x.id === id) : null
+    const title = item ? I18n.t('inventory.edit', 'Edit Inventory Item') : I18n.t('inventory.add', 'Add Inventory Item')
+    let html = `<h3>${title}</h3>
+      <div class="form-group"><label data-i18n="inventory.name">Product Name</label><input id="inv-name" value="${item ? this._esc(item.name || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="inventory.barcode">Barcode</label><input id="inv-barcode" value="${item ? this._esc(item.barcode || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="inventory.quantity">Quantity</label><input type="number" step="any" id="inv-qty" value="${item ? item.quantity || 0 : 0}"></div>
+      <div class="form-group"><label data-i18n="inventory.cost_price">Cost Price</label><input type="number" step="any" id="inv-cost" value="${item ? item.cost_price || 0 : 0}"></div>
+      <div class="form-group"><label data-i18n="inventory.selling_price">Selling Price</label><input type="number" step="any" id="inv-price" value="${item ? item.selling_price || 0 : 0}"></div>
+      <div class="form-group"><label data-i18n="inventory.category">Category</label><input id="inv-category" value="${item ? this._esc(item.category || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="inventory.status">Status</label><select id="inv-status"><option value="draft" ${item && item.status === 'draft' ? 'selected' : ''}>Draft</option><option value="verified" ${item && item.status === 'verified' ? 'selected' : ''}>Verified</option></select></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="inv-save">${I18n.t('common.save', 'Save')}</button>
+        <button class="btn btn-secondary" id="inv-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('inv-save').onclick = async () => {
+      const data = {
+        name: document.getElementById('inv-name').value,
+        barcode: document.getElementById('inv-barcode').value,
+        quantity: parseFloat(document.getElementById('inv-qty').value) || 0,
+        cost_price: parseFloat(document.getElementById('inv-cost').value) || 0,
+        selling_price: parseFloat(document.getElementById('inv-price').value) || 0,
+        category: document.getElementById('inv-category').value,
+        status: document.getElementById('inv-status').value,
+      }
+      if (!data.name) { alert(I18n.t('inventory.name_required', 'Name is required')); return }
+      try {
+        if (item) {
+          await this.api('PUT', `/inventory/${item.id}`, data)
+        } else {
+          await this.api('POST', '/inventory', data)
+        }
+        this.closeModal()
+        await this.renderInventory()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('inv-cancel').onclick = () => this.closeModal()
+  },
+
+  async deleteInventoryItem(id) {
+    if (!confirm(I18n.t('common.confirm_delete', 'Delete this item?'))) return
+    try {
+      await this.api('DELETE', `/inventory/${id}`)
+      await this.renderInventory()
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  exportInventoryCsv() {
+    const rows = [['Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']]
+    this.inventoryItems.forEach(item => {
+      rows.push([
+        item.name || '',
+        item.barcode || '',
+        item.quantity || 0,
+        item.cost_price || 0,
+        item.selling_price || 0,
+        item.category || '',
+        item.status || 'draft',
+        item.notes || '',
+      ])
+    })
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+    }).join(',')).join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventory_${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
+
+  showInventoryImportModal() {
+    let html = `<h3>${I18n.t('inventory.import_title', 'Import Inventory CSV')}</h3>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">${I18n.t('inventory.import_hint', 'Upload a CSV file or paste JSON below.')}</p>
+      <div id="csv-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;margin-bottom:12px">
+        <div id="csv-upload-prompt">${I18n.t('inventory.import_csv', 'Import from CSV')}</div>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+      </div>
+      <textarea id="inv-import-json" rows="6" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-family:monospace;font-size:12px" placeholder='[{"name":"Product A","barcode":"123","quantity":10}]'></textarea>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-primary" id="inv-import-btn">${I18n.t('common.import', 'Import')}</button>
+        <button class="btn btn-secondary" id="inv-import-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('csv-upload-area').onclick = () => document.getElementById('csv-file-input').click()
+    document.getElementById('csv-file-input').onchange = async (e) => {
+      const file = e.target.files[0]
+      if (!file) return
+      document.getElementById('csv-upload-prompt').textContent = I18n.t('inventory.file_chosen', 'File chosen')
+      const formData = new FormData()
+      formData.append('file', file)
+      try {
+        const fetchRes = await fetch('/api/inventory/import', { method: 'POST', body: formData })
+        const json = await fetchRes.json()
+        if (!fetchRes.ok) throw new Error(json.error || 'Import failed')
+        alert(json.message || 'Import complete')
+        this.closeModal()
+        await this.renderInventory()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('inv-import-btn').onclick = async () => {
+      const jsonText = document.getElementById('inv-import-json').value.trim()
+      if (!jsonText) { alert(I18n.t('inventory.no_data', 'No data to import')); return }
+      try {
+        const jsonData = JSON.parse(jsonText)
+        const res = await this.api('POST', '/inventory/import', jsonData)
+        alert(res.message || 'Import complete')
+        this.closeModal()
+        await this.renderInventory()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('inv-import-cancel').onclick = () => this.closeModal()
   },
 
   // === SESSIONS ===

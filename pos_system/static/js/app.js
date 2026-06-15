@@ -1966,8 +1966,8 @@ let App = {
   },
 
   downloadInventoryTemplate() {
-    const headers = ['Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']
-    const example = ['Example Product','1234567890','10','5.00','8.00','Category Name','draft','Optional notes']
+    const headers = ['Date','Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']
+    const example = ['2026-06-15','Example Product','1234567890','10','5.00','8.00','Category Name','draft','Optional notes']
     const csv = [headers, example].map(r => r.map(v => {
       const s = String(v)
       return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s

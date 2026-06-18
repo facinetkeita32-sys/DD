@@ -11,6 +11,7 @@ _db_cache = {}
 _db_lock = threading.Lock()
 _cache_ver = -1
 _version_table_ensured = False
+_all_model_classes = []
 
 DB_HOST = os.environ.get('PGHOST', 'localhost')
 DB_PORT = int(os.environ.get('PGPORT', 5432))
@@ -186,8 +187,20 @@ def _migrate_table(conn, model_class):
 
 HEAVY_COLS = {'logo'}
 
+
+def _ensure_all_tables():
+    for cls in _all_model_classes:
+        try:
+            _ensure_table(cls)
+        except Exception:
+            import traceback
+            print('Error ensuring table {}:'.format(cls._name))
+            traceback.print_exc()
+
+
 def _load_cache():
     global _db_cache, _cache_ver
+    _ensure_all_tables()
     conn = get_conn()
     try:
         _ensure_version_table(conn)
@@ -484,7 +497,7 @@ class BaseModel(type):
             model_name = getattr(new_class, '_name', name.lower())
             new_class._name = model_name
             _db_cache.setdefault(model_name, {'_seq': 0, '_data': OrderedDict()})
-            _ensure_table(new_class)
+            _all_model_classes.append(new_class)
         return new_class
 
 

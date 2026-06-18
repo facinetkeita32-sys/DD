@@ -15,11 +15,30 @@ SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', 7200))
 app.register_blueprint(api_bp)
 
 
+_initialized = False
+
+
+def _ensure_initialized():
+    global _initialized
+    if _initialized:
+        return
+    has_data = False
+    for tname, tdata in _db_cache.items():
+        if tdata['_data'] and tname not in ('sqlite_sequence',):
+            has_data = True
+            break
+    if not has_data:
+        load_demo_data()
+    StockLot()._init_defaults()
+    _initialized = True
+
+
 @app.before_request
 def before_request():
     # Only load DB cache for API requests
     if request.path.startswith('/api/'):
         _load_cache()
+        _ensure_initialized()
     # Session inactivity timeout
     if 'user_id' in session:
         last = session.get('last_activity', 0)
@@ -82,18 +101,11 @@ def create_app():
     import traceback
     try:
         _load_cache()
-        has_data = False
-        for tname, tdata in _db_cache.items():
-            if tdata['_data'] and tname not in ('sqlite_sequence',):
-                has_data = True
-                break
-        if not has_data:
-            load_demo_data()
-        StockLot()._init_defaults()
+        _ensure_initialized()
     except Exception:
         print('STARTUP ERROR:', flush=True)
         traceback.print_exc()
-        print('App will start but cache may be empty.', flush=True)
+        print('App will start; init deferred to first request.', flush=True)
     return app
 
 

@@ -39,11 +39,20 @@ DB_USER = os.environ.get('PGUSER', _db_parsed['user'] if _db_parsed else 'pos_us
 DB_PASS = os.environ.get('PGPASSWORD', _db_parsed['password'] if _db_parsed else 'pos_pass')
 
 _pool = None
+_pool_pid = None
 
 
 def get_pool():
-    global _pool
+    global _pool, _pool_pid
+    pid = os.getpid()
+    if _pool is not None and _pool_pid != pid:
+        try:
+            _pool.closeall()
+        except Exception:
+            pass
+        _pool = None
     if _pool is None:
+        _pool_pid = pid
         last_error = None
         delays = [1, 2, 4, 8, 15]
         for attempt in range(1 + len(delays)):

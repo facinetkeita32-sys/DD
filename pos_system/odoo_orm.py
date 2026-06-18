@@ -389,8 +389,11 @@ class Float(Field):
 
     def convert(self, value):
         if value is not None:
-            return float(value)
-        return value
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return 0.0
+        return 0.0
 
 
 class Char(Field):

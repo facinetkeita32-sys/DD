@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import time
 import psycopg2
 from psycopg2 import pool, sql
 import threading
@@ -13,11 +15,28 @@ _cache_ver = -1
 _version_table_ensured = False
 _all_model_classes = []
 
-DB_HOST = os.environ.get('PGHOST', 'localhost')
-DB_PORT = int(os.environ.get('PGPORT', 5432))
-DB_NAME = os.environ.get('PGDATABASE', 'pos_db')
-DB_USER = os.environ.get('PGUSER', 'pos_user')
-DB_PASS = os.environ.get('PGPASSWORD', 'pos_pass')
+
+def _parse_db_url(url):
+    m = re.match(r'postgres(?:ql)?://(?:([^:]+)(?::([^@]*))?@)?([^:]+)(?::(\d+))?/([^?]+)', url)
+    if m:
+        return {
+            'user': m.group(1) or 'postgres',
+            'password': m.group(2) or '',
+            'host': m.group(3) or 'localhost',
+            'port': int(m.group(4)) if m.group(4) else 5432,
+            'dbname': m.group(5) or 'postgres',
+        }
+    return None
+
+
+_db_url = os.environ.get('DATABASE_URL', '')
+_db_parsed = _parse_db_url(_db_url) if _db_url else None
+
+DB_HOST = os.environ.get('PGHOST', _db_parsed['host'] if _db_parsed else 'localhost')
+DB_PORT = int(os.environ.get('PGPORT', _db_parsed['port'] if _db_parsed else 5432))
+DB_NAME = os.environ.get('PGDATABASE', _db_parsed['dbname'] if _db_parsed else 'pos_db')
+DB_USER = os.environ.get('PGUSER', _db_parsed['user'] if _db_parsed else 'pos_user')
+DB_PASS = os.environ.get('PGPASSWORD', _db_parsed['password'] if _db_parsed else 'pos_pass')
 
 _pool = None
 
@@ -25,15 +44,29 @@ _pool = None
 def get_pool():
     global _pool
     if _pool is None:
-        _pool = pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=5,
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-        )
+        last_error = None
+        delays = [1, 2, 4, 8, 15]
+        for attempt in range(1 + len(delays)):
+            try:
+                _pool = pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=5,
+                    host=DB_HOST,
+                    port=DB_PORT,
+                    dbname=DB_NAME,
+                    user=DB_USER,
+                    password=DB_PASS,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < len(delays):
+                    print('DB connection attempt {}/{} failed: {}'.format(attempt + 1, 1 + len(delays), e))
+                    time.sleep(delays[attempt])
+                else:
+                    print('DB connection failed after {} attempts: {}'.format(1 + len(delays), e))
+        if _pool is None:
+            raise last_error
     return _pool
 
 

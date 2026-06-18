@@ -79,15 +79,21 @@ def get_translations(lang):
 
 
 def create_app():
-    _load_cache()
-    has_data = False
-    for tname, tdata in _db_cache.items():
-        if tdata['_data'] and tname not in ('sqlite_sequence',):
-            has_data = True
-            break
-    if not has_data:
-        load_demo_data()
-    StockLot()._init_defaults()
+    import traceback
+    try:
+        _load_cache()
+        has_data = False
+        for tname, tdata in _db_cache.items():
+            if tdata['_data'] and tname not in ('sqlite_sequence',):
+                has_data = True
+                break
+        if not has_data:
+            load_demo_data()
+        StockLot()._init_defaults()
+    except Exception:
+        print('STARTUP ERROR:', flush=True)
+        traceback.print_exc()
+        print('App will start but cache may be empty.', flush=True)
     return app
 
 

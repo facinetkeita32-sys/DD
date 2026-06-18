@@ -37,8 +37,13 @@ def _ensure_initialized():
 def before_request():
     # Only load DB cache for API requests
     if request.path.startswith('/api/'):
-        _load_cache()
-        _ensure_initialized()
+        try:
+            _load_cache()
+            _ensure_initialized()
+        except Exception:
+            print('WARN: _load_cache/_ensure_initialized failed, serving with current cache', flush=True)
+            import traceback
+            traceback.print_exc()
     # Session inactivity timeout
     if 'user_id' in session:
         last = session.get('last_activity', 0)

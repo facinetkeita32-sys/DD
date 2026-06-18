@@ -242,7 +242,12 @@ def _ensure_all_tables():
 
 def _load_cache():
     global _db_cache, _cache_ver
-    _ensure_all_tables()
+    try:
+        _ensure_all_tables()
+    except Exception:
+        print('WARN: _ensure_all_tables() failed, continuing', flush=True)
+        import traceback
+        traceback.print_exc()
     conn = get_conn()
     try:
         _ensure_version_table(conn)
@@ -250,10 +255,16 @@ def _load_cache():
         if db_ver == _cache_ver:
             return
         model_tables = {cls._name for cls in _all_model_classes}
-        cur = conn.cursor()
-        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-        tables = [row[0] for row in cur.fetchall() if row[0] in model_tables and not row[0].endswith('_rel')]
-        cur.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+            tables = [row[0] for row in cur.fetchall() if row[0] in model_tables and not row[0].endswith('_rel')]
+            cur.close()
+        except Exception:
+            print('WARN: could not list tables', flush=True)
+            import traceback
+            traceback.print_exc()
+            tables = []
         seen = set()
         for table in tables:
             seen.add(table)
@@ -261,27 +272,38 @@ def _load_cache():
             tbl = _db_cache[table]
             tbl['_seq'] = 0
             tbl['_data'].clear()
-            cur = conn.cursor()
-            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (table,))
-            all_cols = [row[0] for row in cur.fetchall()]
-            cur.close()
-            light_cols = [c for c in all_cols if c not in HEAVY_COLS]
-            col_list = ','.join('"{}"'.format(c) for c in light_cols)
-            cur = conn.cursor()
-            cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
-            for row in cur.fetchall():
-                data = dict(zip(light_cols, row))
-                rid = data.pop('id')
-                tbl['_data'][rid] = data
-                if rid > tbl['_seq']:
-                    tbl['_seq'] = rid
-            cur.close()
-        for table in list(_db_cache.keys()):
-            if table not in seen and table != 'sqlite_sequence':
-                del _db_cache[table]
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (table,))
+                all_cols = [row[0] for row in cur.fetchall()]
+                cur.close()
+                light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+                col_list = ','.join('"{}"'.format(c) for c in light_cols)
+                cur = conn.cursor()
+                cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
+                for row in cur.fetchall():
+                    data = dict(zip(light_cols, row))
+                    rid = data.pop('id')
+                    tbl['_data'][rid] = data
+                    if rid > tbl['_seq']:
+                        tbl['_seq'] = rid
+                cur.close()
+            except Exception:
+                print('WARN: could not load table "{}", skipping'.format(table), flush=True)
+                import traceback
+                traceback.print_exc()
+        try:
+            for table in list(_db_cache.keys()):
+                if table not in seen and table != 'sqlite_sequence':
+                    del _db_cache[table]
+        except Exception:
+            pass
         _cache_ver = db_ver
     finally:
-        put_conn(conn)
+        try:
+            put_conn(conn)
+        except Exception:
+            pass
 
 
 def _load_heavy(cls, obj_id, col_name):

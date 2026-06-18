@@ -146,6 +146,11 @@ let App = {
     if (body) opts.body = JSON.stringify(body)
     try {
       const res = await fetch('/api' + path, opts)
+      const ct = (res.headers.get('content-type') || '').toLowerCase()
+      if (!ct.includes('application/json')) {
+        const text = await res.text()
+        throw new Error('Server returned ' + (res.status || 'error') + ': ' + text.substring(0, 120))
+      }
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Request failed')
       return json

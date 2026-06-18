@@ -276,6 +276,10 @@ def _persist_write(cls, obj_id):
         import traceback
         print('SQL ERROR ({}): {}'.format(table, e))
         traceback.print_exc()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
         put_conn(conn)
@@ -292,6 +296,12 @@ def _persist_delete(cls, obj_id):
         cur.close()
         conn.commit()
         _cache_ver = _get_db_version(conn)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         put_conn(conn)
 

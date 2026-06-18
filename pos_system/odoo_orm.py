@@ -249,9 +249,10 @@ def _load_cache():
         db_ver = _get_db_version(conn)
         if db_ver == _cache_ver:
             return
+        model_tables = {cls._name for cls in _all_model_classes}
         cur = conn.cursor()
         cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-        tables = [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence']
+        tables = [row[0] for row in cur.fetchall() if row[0] in model_tables and not row[0].endswith('_rel')]
         cur.close()
         seen = set()
         for table in tables:

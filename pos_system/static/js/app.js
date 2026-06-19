@@ -1184,10 +1184,19 @@ let App = {
     document.getElementById('bulk-update-cancel').onclick = () => this.closeModal()
   },
 
-  showProductModal(id) {
-    const product = id ? this.products.find(p => p.id === id) : null
+  async showProductModal(id) {
+    let product = id ? this.products.find(p => p.id === id) : null
+    let existingImg = product ? (product.image || '') : ''
+    if (product && !existingImg && id) {
+      try {
+        const res = await this.api('GET', '/products/' + id)
+        if (res.data && res.data.image) {
+          existingImg = res.data.image
+          product.image = res.data.image
+        }
+      } catch(e) {}
+    }
     const title = product ? I18n.t('product.edit', 'Edit Product') : I18n.t('product.add', 'Add Product')
-    const existingImg = product ? (product.image || '') : ''
     const cats = this.productCategories || []
     const catOpts = cats.map(c => `<option value="${c.id}" ${product && product.categ_id && product.categ_id.id === c.id ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')
     let html = `<h3>${title}</h3>
@@ -1386,7 +1395,6 @@ let App = {
           await this.api('POST', `/products/${productId}/lots`, data)
         }
         this.closeModal()
-        this.showProductModal(productId)
         const prodRes = await this.api('GET', '/products')
         this.products = prodRes.data || []
         this.renderAll()

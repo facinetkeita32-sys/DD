@@ -22,15 +22,19 @@ def _ensure_initialized():
     global _initialized
     if _initialized:
         return
-    has_data = False
-    for tname, tdata in _db_cache.items():
-        if tdata['_data'] and tname not in ('sqlite_sequence',):
-            has_data = True
-            break
-    if not has_data:
-        load_demo_data()
-    StockLot()._init_defaults()
     _initialized = True
+    try:
+        has_data = False
+        for tname, tdata in _db_cache.items():
+            if tdata['_data'] and tname not in ('sqlite_sequence',):
+                has_data = True
+                break
+        if not has_data:
+            load_demo_data()
+        StockLot()._init_defaults()
+    except Exception:
+        import traceback
+        traceback.print_exc()
 
 
 @app.before_request

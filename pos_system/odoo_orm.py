@@ -11,8 +11,7 @@ from flask import g
 
 _db_cache = {}
 _db_lock = threading.Lock()
-_cache_ver = -1
-_version_table_ensured = False
+_cache_loaded = False
 _all_model_classes = []
 
 
@@ -105,38 +104,6 @@ def put_conn(conn):
         pass
 
 
-def _ensure_version_table(conn):
-    global _version_table_ensured
-    if _version_table_ensured:
-        return
-    cur = conn.cursor()
-    try:
-        cur.execute("CREATE TABLE IF NOT EXISTS _db_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL DEFAULT 0)")
-        cur.execute("INSERT INTO _db_version (id, version) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
-        conn.commit()
-    finally:
-        cur.close()
-    _version_table_ensured = True
-
-
-def _get_db_version(conn):
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT version FROM _db_version WHERE id = 1")
-        row = cur.fetchone()
-        return row[0] if row else 0
-    finally:
-        cur.close()
-
-
-def _bump_db_version(conn):
-    cur = conn.cursor()
-    try:
-        cur.execute("UPDATE _db_version SET version = version + 1 WHERE id = 1")
-    finally:
-        cur.close()
-
-
 FIELD_TO_SQLITE = {
     'Char': 'TEXT',
     'Text': 'TEXT',
@@ -227,7 +194,7 @@ def _migrate_table(conn, model_class):
         conn.commit()
 
 
-HEAVY_COLS = {'logo'}
+HEAVY_COLS = {'logo', 'image'}
 
 
 def _ensure_all_tables():
@@ -241,7 +208,9 @@ def _ensure_all_tables():
 
 
 def _load_cache():
-    global _db_cache, _cache_ver
+    global _db_cache, _cache_loaded
+    if _cache_loaded:
+        return
     try:
         _ensure_all_tables()
     except Exception:
@@ -250,55 +219,47 @@ def _load_cache():
         traceback.print_exc()
     conn = get_conn()
     try:
-        _ensure_version_table(conn)
-        db_ver = _get_db_version(conn)
-        if db_ver == _cache_ver:
-            return
         model_tables = {cls._name for cls in _all_model_classes}
         try:
             cur = conn.cursor()
             cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-            tables = [row[0] for row in cur.fetchall() if row[0] in model_tables and not row[0].endswith('_rel')]
+            all_table_names = [row[0] for row in cur.fetchall()]
+            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel')]
             cur.close()
         except Exception:
             print('WARN: could not list tables', flush=True)
             import traceback
             traceback.print_exc()
             tables = []
-        seen = set()
         for table in tables:
-            seen.add(table)
             _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
-            tbl = _db_cache[table]
-            tbl['_seq'] = 0
-            tbl['_data'].clear()
+            new_data = OrderedDict()
+            new_seq = 0
             try:
                 cur = conn.cursor()
                 cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (table,))
                 all_cols = [row[0] for row in cur.fetchall()]
                 cur.close()
                 light_cols = [c for c in all_cols if c not in HEAVY_COLS]
-                col_list = ','.join('"{}"'.format(c) for c in light_cols)
-                cur = conn.cursor()
-                cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
-                for row in cur.fetchall():
-                    data = dict(zip(light_cols, row))
-                    rid = data.pop('id')
-                    tbl['_data'][rid] = data
-                    if rid > tbl['_seq']:
-                        tbl['_seq'] = rid
-                cur.close()
+                if light_cols:
+                    col_list = ','.join('"{}"'.format(c) for c in light_cols)
+                    cur = conn.cursor()
+                    cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
+                    for row in cur.fetchall():
+                        data = dict(zip(light_cols, row))
+                        rid = data.pop('id')
+                        new_data[rid] = data
+                        if rid > new_seq:
+                            new_seq = rid
+                    cur.close()
+                tbl = _db_cache[table]
+                tbl['_seq'] = new_seq
+                tbl['_data'] = new_data
             except Exception:
                 print('WARN: could not load table "{}", skipping'.format(table), flush=True)
                 import traceback
                 traceback.print_exc()
-        try:
-            for table in list(_db_cache.keys()):
-                if table not in seen and table != 'sqlite_sequence':
-                    del _db_cache[table]
-        except Exception:
-            pass
-        _cache_ver = db_ver
+        _cache_loaded = True
     finally:
         try:
             put_conn(conn)
@@ -318,8 +279,21 @@ def _load_heavy(cls, obj_id, col_name):
         put_conn(conn)
 
 
+def _batch_load_heavy(cls, ids, col_name):
+    if not ids:
+        return {}
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id, "{}" FROM "{}" WHERE id = ANY(%s)'.format(col_name, cls._name), (list(ids),))
+        result = dict(cur.fetchall())
+        cur.close()
+        return result
+    finally:
+        put_conn(conn)
+
+
 def _persist_write(cls, obj_id):
-    global _cache_ver
     table = cls._name
     data = dict(_db_cache[table]['_data'][obj_id])
     conn = get_conn()
@@ -328,6 +302,8 @@ def _persist_write(cls, obj_id):
         vals = []
         for k, v in data.items():
             if k == 'id':
+                continue
+            if k in HEAVY_COLS:
                 continue
             field = cls._fields.get(k)
             if field and isinstance(field, (One2many, Many2many)):
@@ -346,10 +322,8 @@ def _persist_write(cls, obj_id):
             table, all_cols, all_ph, update_set)
         cur = conn.cursor()
         cur.execute(sql, [obj_id] + vals)
-        _bump_db_version(conn)
         cur.close()
         conn.commit()
-        _cache_ver = _get_db_version(conn)
     except Exception as e:
         import traceback
         print('SQL ERROR ({}): {}'.format(table, e))
@@ -364,16 +338,32 @@ def _persist_write(cls, obj_id):
 
 
 def _persist_delete(cls, obj_id):
-    global _cache_ver
     table = cls._name
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute('DELETE FROM "{}" WHERE id=%s'.format(table), (obj_id,))
-        _bump_db_version(conn)
         cur.close()
         conn.commit()
-        _cache_ver = _get_db_version(conn)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        put_conn(conn)
+
+
+def _persist_heavy_column(cls, obj_id, col_name, value):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        if isinstance(value, bool):
+            value = 1 if value else 0
+        cur.execute('UPDATE "{}" SET "{}"=%s WHERE id=%s'.format(cls._name, col_name), (value, obj_id))
+        cur.close()
+        conn.commit()
     except Exception:
         try:
             conn.rollback()
@@ -631,12 +621,19 @@ class Model(metaclass=BaseModel):
                 self._data[fname] = field.convert(value)
         self._data['write_date'] = now
         self._data['write_uid'] = self._get_user_id()
+        for fname in vals:
+            if fname in HEAVY_COLS and fname in self._fields:
+                _persist_heavy_column(self.__class__, self.id, fname, self._data.get(fname))
         self._save()
         return True
 
     def _save(self):
         tbl = _db_cache[self._name]
-        tbl['_data'][self.id] = dict(self._data)
+        data = dict(self._data)
+        for k in list(data):
+            if k in HEAVY_COLS:
+                del data[k]
+        tbl['_data'][self.id] = data
         _persist_write(self.__class__, self.id)
 
     def unlink(self):
@@ -689,8 +686,12 @@ class Model(metaclass=BaseModel):
         uid = cls._get_user_id()
         data['create_uid'] = uid
         data['write_uid'] = uid
-        tbl['_data'][new_id] = data
+        cache_data = {k: v for k, v in data.items() if k not in HEAVY_COLS}
+        tbl['_data'][new_id] = cache_data
         _persist_write(cls, new_id)
+        for fname in data:
+            if fname in HEAVY_COLS and data.get(fname) is not None:
+                _persist_heavy_column(cls, new_id, fname, data[fname])
         obj = cls(**data)
         obj.id = new_id
         return obj

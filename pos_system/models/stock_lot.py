@@ -48,7 +48,9 @@ class StockLot(Model):
         total = sum(float(lot._data.get('available_qty', 0) or 0) for lot in lots)
         products = ProductProduct().browse([product_id])
         if products:
-            products[0].write({'available_qty': total})
+            current = float(products[0]._data.get('available_qty', 0) or 0)
+            if total != current:
+                products[0].write({'available_qty': total})
 
     @classmethod
     def deduct_fefo(cls, product_id, qty):

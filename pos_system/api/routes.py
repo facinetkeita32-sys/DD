@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db, _load_heavy, HEAVY_COLS
+from ..odoo_orm import env, _db_cache as _db, _load_heavy, _batch_load_heavy, HEAVY_COLS
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -291,19 +291,27 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    result = model_to_dict(products)
+    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
+    result = model_to_dict(products, fields)
     if isinstance(result, list):
-        for r in result:
-            pid = r.get('id')
-            if pid:
-                lots = StockLot().search([('product_id', '=', pid)])
-                dates = []
-                for lot in lots:
-                    exp = lot._data.get('expiration_date', '') or ''
-                    if exp:
-                        dates.append(exp)
-                r['nearest_expiry'] = min(dates) if dates else ''
-            else:
+        pids = [r['id'] for r in result if r.get('id')]
+        if pids:
+            images = _batch_load_heavy(ProductProduct, pids, 'image')
+            for r in result:
+                r['image'] = images.get(r['id'], '') or ''
+            all_lots = StockLot().search([('product_id', 'in', pids)])
+            expiry_map = {}
+            for lot in all_lots:
+                pid = lot._data.get('product_id')
+                exp = lot._data.get('expiration_date', '') or ''
+                if pid and exp:
+                    if pid not in expiry_map or exp < expiry_map[pid]:
+                        expiry_map[pid] = exp
+            for r in result:
+                r['nearest_expiry'] = expiry_map.get(r.get('id'), '')
+        else:
+            for r in result:
+                r['image'] = ''
                 r['nearest_expiry'] = ''
     return success_response(result)
 

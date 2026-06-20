@@ -12,7 +12,9 @@ from flask import g
 _db_cache = {}
 _db_lock = threading.Lock()
 _cache_loaded = False
+_cache_loaded_at = 0.0
 _all_model_classes = []
+_CACHE_VERSION_FILE = '/tmp/_pos_cache_version'
 
 
 def _parse_db_url(url):
@@ -237,13 +239,29 @@ def _get_model_columns(model_cls):
     return cols
 
 
+def _read_cache_version():
+    try:
+        with open(_CACHE_VERSION_FILE, 'r') as f:
+            return float(f.read().strip())
+    except Exception:
+        return 0.0
+
+def _write_cache_version():
+    try:
+        with open(_CACHE_VERSION_FILE, 'w') as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
 def _load_cache():
-    global _db_cache, _cache_loaded
+    global _db_cache, _cache_loaded, _cache_loaded_at
     if _cache_loaded:
-        return
+        if _read_cache_version() <= _cache_loaded_at:
+            return
     with _db_lock:
         if _cache_loaded:
-            return
+            if _read_cache_version() <= _cache_loaded_at:
+                return
         try:
             _ensure_all_tables()
         except Exception:
@@ -253,6 +271,7 @@ def _load_cache():
         conn = get_conn()
         try:
             now = time.time()
+            loaded_any = False
             for cls in _all_model_classes:
                 table = cls._name
                 if table in DB_ONLY_TABLES or table.endswith('_rel'):
@@ -277,13 +296,17 @@ def _load_cache():
                     tbl = _db_cache[table]
                     tbl['_seq'] = new_seq
                     tbl['_data'] = new_data
+                    if new_data:
+                        loaded_any = True
                 except Exception:
                     print('WARN: could not load table "{}", skipping'.format(table), flush=True)
                     import traceback
                     traceback.print_exc()
             elapsed = time.time() - now
             print('DB cache loaded {} tables in {:.2f}s'.format(len(_db_cache), elapsed), flush=True)
-            _cache_loaded = True
+            if loaded_any:
+                _cache_loaded = True
+                _cache_loaded_at = time.time()
         finally:
             try:
                 put_conn(conn)
@@ -724,6 +747,7 @@ class Model(metaclass=BaseModel):
             for pid in ids:
                 if pid in _db_cache[cls._name]['_data']:
                     _db_cache[cls._name]['_data'][pid][field] = value
+        _write_cache_version()
 
     def write(self, vals):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -754,6 +778,7 @@ class Model(metaclass=BaseModel):
                 del data[k]
         tbl['_data'][self.id] = data
         _persist_write(self.__class__, self.id)
+        _write_cache_version()
 
     def unlink(self):
         if self._name in DB_ONLY_TABLES:
@@ -763,6 +788,7 @@ class Model(metaclass=BaseModel):
         if self.id in tbl['_data']:
             del tbl['_data'][self.id]
         _persist_delete(self.__class__, self.id)
+        _write_cache_version()
         return True
 
     def read(self, fields=None):
@@ -813,6 +839,7 @@ class Model(metaclass=BaseModel):
         cache_data = {k: v for k, v in data.items() if k not in HEAVY_COLS}
         tbl['_data'][new_id] = cache_data
         _persist_write(cls, new_id)
+        _write_cache_version()
         for fname in data:
             if fname in HEAVY_COLS and data.get(fname) is not None:
                 _persist_heavy_column(cls, new_id, fname, data[fname])

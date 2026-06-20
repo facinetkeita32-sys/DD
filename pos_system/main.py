@@ -35,12 +35,20 @@ def _ensure_initialized():
             odoo_orm._cache_loaded = False
             _load_cache()
             # Validate post-init cache has critical tables
+            all_ok = True
             for tbl, label in [('product.product', 'products'), ('res.partner', 'customers')]:
                 cnt = len(_db_cache.get(tbl, {}).get('_data', {}))
                 if cnt == 0:
                     print('WARN: {} table empty after init'.format(tbl), flush=True)
+                    all_ok = False
                 else:
                     print('{}: {} records loaded'.format(label, cnt), flush=True)
+            if not all_ok:
+                print('Cache still empty after demo data load, will retry on next request', flush=True)
+                _initialized = False
+                from . import odoo_orm
+                odoo_orm._cache_loaded = False
+                return
         lot_start = time.time()
         StockLot()._init_defaults()
         lot_elapsed = time.time() - lot_start

@@ -25,7 +25,7 @@ class StockLot(Model):
                 name = lot._data.get('name', '')
                 if name.startswith('BATCH-A-') or name.startswith('BATCH-B-') or name.startswith('BATCH-DEFAULT-'):
                     qty = float(lot._data.get('available_qty', 0) or 0)
-                    if qty:
+                    if qty and lot._data.get('write_date', '') == lot._data.get('create_date', ''):
                         lot.write({'available_qty': 0})
         products = ProductProduct().search([])
         all_lots = self.search([])

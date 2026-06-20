@@ -24,19 +24,24 @@ def _ensure_initialized():
         return
     _initialized = True
     try:
-        has_data = any(
-            tdata['_data'] and tname not in ('sqlite_sequence',)
-            for tname, tdata in _db_cache.items()
-        )
-        if not has_data:
-            print('Cache empty, loading demo data...', flush=True)
+        # Check if critical tables have data in cache
+        need_demo = True
+        for tbl in ('res.users', 'product.product', 'res.partner'):
+            data = _db_cache.get(tbl, {}).get('_data', {})
+            if data:
+                need_demo = False
+            else:
+                need_demo = True
+                break
+        if need_demo:
+            print('Cache missing critical data, loading demo data...', flush=True)
             load_demo_data()
             from . import odoo_orm
             odoo_orm._cache_loaded = False
             _load_cache()
             # Validate post-init cache has critical tables
             all_ok = True
-            for tbl, label in [('product.product', 'products'), ('res.partner', 'customers')]:
+            for tbl, label in [('res.users', 'users'), ('product.product', 'products'), ('res.partner', 'customers')]:
                 cnt = len(_db_cache.get(tbl, {}).get('_data', {}))
                 if cnt == 0:
                     print('WARN: {} table empty after init'.format(tbl), flush=True)

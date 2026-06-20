@@ -679,50 +679,55 @@ def get_customer(customer_id):
 
 @api_bp.route('/orders', methods=['GET'])
 def get_orders():
-    domain = []
-    args = request.args
-    if args.get('session_id'):
-        domain.append(('session_id', '=', int(args['session_id'])))
-    if args.get('status'):
-        domain.append(('state', '=', args['status']))
-    orders = PosOrder().search(domain, order='id desc', limit=100)
-    result = []
-    for order in orders:
-        d = model_to_dict(order)
-        lines_data = []
-        lines = PosOrderLine().search([('order_id', '=', order.id)])
-        for line in lines:
-            ld = model_to_dict(line)
-            pid = line._data.get('product_id', 0) or 0
+    try:
+        domain = []
+        args = request.args
+        if args.get('session_id'):
+            domain.append(('session_id', '=', int(args['session_id'])))
+        if args.get('status'):
+            domain.append(('state', '=', args['status']))
+        orders = PosOrder().search(domain, order='id desc', limit=100)
+        result = []
+        for order in orders:
+            d = model_to_dict(order)
+            lines_data = []
+            lines = PosOrderLine().search([('order_id', '=', order.id)])
+            for line in lines:
+                ld = model_to_dict(line)
+                pid = line._data.get('product_id', 0) or 0
+                if pid:
+                    product = ProductProduct().browse([pid])
+                    if product:
+                        ld['product_name'] = product[0]._data.get('name', '')
+                lines_data.append(ld)
+            d['lines'] = lines_data
+            payments_data = []
+            payments = PosPayment().search([('order_id', '=', order.id)])
+            for pmt in payments:
+                pd_data = model_to_dict(pmt)
+                pmid = pmt._data.get('payment_method_id', 0) or 0
+                if pmid:
+                    method = PosPaymentMethod().browse([pmid])
+                    if method:
+                        pd_data['payment_method_name'] = method[0]._data.get('name', '')
+                payments_data.append(pd_data)
+            d['payments'] = payments_data
+            pid = order._data.get('partner_id', 0) or 0
             if pid:
-                product = ProductProduct().browse([pid])
-                if product:
-                    ld['product_name'] = product[0]._data.get('name', '')
-            lines_data.append(ld)
-        d['lines'] = lines_data
-        payments_data = []
-        payments = PosPayment().search([('order_id', '=', order.id)])
-        for pmt in payments:
-            pd_data = model_to_dict(pmt)
-            pmid = pmt._data.get('payment_method_id', 0) or 0
-            if pmid:
-                method = PosPaymentMethod().browse([pmid])
-                if method:
-                    pd_data['payment_method_name'] = method[0]._data.get('name', '')
-            payments_data.append(pd_data)
-        d['payments'] = payments_data
-        pid = order._data.get('partner_id', 0) or 0
-        if pid:
-            partner = ResPartner().browse([pid])
-            if partner:
-                d['partner_name'] = partner[0]._data.get('name', '')
-        uid = order._data.get('user_id', 0) or 0
-        if uid:
-            user = ResUsers().browse([uid])
-            if user:
-                d['user_name'] = user[0]._data.get('name', '')
-        result.append(d)
-    return success_response(result)
+                partner = ResPartner().browse([pid])
+                if partner:
+                    d['partner_name'] = partner[0]._data.get('name', '')
+            uid = order._data.get('user_id', 0) or 0
+            if uid:
+                user = ResUsers().browse([uid])
+                if user:
+                    d['user_name'] = user[0]._data.get('name', '')
+            result.append(d)
+        return success_response(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e))
 
 
 @api_bp.route('/orders/<int:order_id>', methods=['GET'])

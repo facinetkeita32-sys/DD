@@ -861,11 +861,10 @@ class Model(metaclass=BaseModel):
         domain = domain or []
         conn = get_conn()
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (cls._name,))
-            all_cols = [row[0] for row in cur.fetchall()]
-            cur.close()
+            all_cols = _get_model_columns(cls)
             light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+            if not light_cols:
+                return []
             where_clause, params = cls._domain_to_sql(domain)
             order_clause = ''
             order = order or cls._order
@@ -908,11 +907,10 @@ class Model(metaclass=BaseModel):
             return []
         conn = get_conn()
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (cls._name,))
-            all_cols = [row[0] for row in cur.fetchall()]
-            cur.close()
+            all_cols = _get_model_columns(cls)
             light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+            if not light_cols:
+                return []
             col_list = ','.join('"{}"'.format(c) for c in light_cols)
             cur = conn.cursor()
             cur.execute('SELECT {} FROM "{}" WHERE id = ANY(%s)'.format(col_list, cls._name), (list(ids),))
@@ -952,10 +950,11 @@ class Model(metaclass=BaseModel):
                     conditions.append('({} OR {})'.format(left_cond, right_cond))
                     params.extend(left_p + right_p)
                 continue
-            elif item == '&' or (isinstance(item, str) and item not in ('|', '!')):
+            elif isinstance(item, (list, tuple)) and len(item) == 3 or item == '&' or (isinstance(item, str) and item not in ('|', '!')):
                 and_conds = []
                 and_params = []
-                i += 1
+                if not (isinstance(item, (list, tuple)) and len(item) == 3):
+                    i += 1
                 while i < len(domain) and isinstance(domain[i], (list, tuple)) and len(domain[i]) == 3:
                     field, operator, value = domain[i]
                     col = '"{}"'.format(field)

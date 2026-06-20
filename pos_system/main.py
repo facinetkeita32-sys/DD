@@ -32,8 +32,9 @@ def _ensure_initialized():
         if not has_data:
             print('Cache empty, loading demo data...', flush=True)
             load_demo_data()
-            from .odoo_orm import _cache_loaded
-            _cache_loaded = False
+            from . import odoo_orm
+            odoo_orm._cache_loaded = False
+            _load_cache()
         lot_start = time.time()
         StockLot()._init_defaults()
         lot_elapsed = time.time() - lot_start

@@ -30,10 +30,15 @@ def _ensure_initialized():
                 has_data = True
                 break
         if not has_data:
+            print('Cache empty, loading demo data...', flush=True)
             load_demo_data()
             from .odoo_orm import _cache_loaded
             _cache_loaded = False
+        lot_start = time.time()
         StockLot()._init_defaults()
+        lot_elapsed = time.time() - lot_start
+        if lot_elapsed > 0.5:
+            print('StockLot._init_defaults took {:.2f}s'.format(lot_elapsed), flush=True)
     except Exception:
         import traceback
         traceback.print_exc()

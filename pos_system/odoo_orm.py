@@ -206,7 +206,14 @@ def _ensure_all_tables():
         existing = {row[0] for row in cur.fetchall()}
         cur.close()
         for cls in _all_model_classes:
-            if cls._name not in existing:
+            if cls._name in existing:
+                try:
+                    _migrate_table(conn, cls)
+                except Exception:
+                    import traceback
+                    print('Error migrating table {}:'.format(cls._name))
+                    traceback.print_exc()
+            else:
                 try:
                     _ensure_table(cls)
                 except Exception:
@@ -217,43 +224,44 @@ def _ensure_all_tables():
         put_conn(conn)
 
 
+def _get_model_columns(model_cls):
+    """Build column list from model field definitions (no DB query needed)."""
+    cols = ['id']
+    for fname, field in model_cls._fields.items():
+        if fname == 'id':
+            continue
+        if isinstance(field, (One2many, Many2many)):
+            continue
+        cols.append(fname)
+    cols += ['create_date', 'write_date', 'create_uid', 'write_uid']
+    return cols
+
+
 def _load_cache():
     global _db_cache, _cache_loaded
     if _cache_loaded:
         return
-    conn = get_conn()
-    try:
-        model_tables = {cls._name for cls in _all_model_classes}
+    with _db_lock:
+        if _cache_loaded:
+            return
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-            all_table_names = [row[0] for row in cur.fetchall()]
-            cur.close()
-            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel') and t not in DB_ONLY_TABLES]
+            _ensure_all_tables()
         except Exception:
-            print('WARN: could not list tables', flush=True)
+            print('WARN: _ensure_all_tables() failed, continuing', flush=True)
             import traceback
             traceback.print_exc()
-            tables = []
-        if tables:
-            try:
-                cur = conn.cursor()
-                cur.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_name = ANY(%s) ORDER BY table_name, ordinal_position", (tables,))
-                col_map = {}
-                for tbl, col in cur.fetchall():
-                    col_map.setdefault(tbl, []).append(col)
-                cur.close()
-            except Exception:
-                print('WARN: could not list columns', flush=True)
-                import traceback
-                traceback.print_exc()
-                col_map = {}
-            for table in tables:
+        conn = get_conn()
+        try:
+            now = time.time()
+            for cls in _all_model_classes:
+                table = cls._name
+                if table in DB_ONLY_TABLES or table.endswith('_rel'):
+                    continue
                 _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
                 new_data = OrderedDict()
                 new_seq = 0
                 try:
-                    all_cols = col_map.get(table, [])
+                    all_cols = _get_model_columns(cls)
                     light_cols = [c for c in all_cols if c not in HEAVY_COLS]
                     if light_cols:
                         col_list = ','.join('"{}"'.format(c) for c in light_cols)
@@ -273,12 +281,14 @@ def _load_cache():
                     print('WARN: could not load table "{}", skipping'.format(table), flush=True)
                     import traceback
                     traceback.print_exc()
-        _cache_loaded = True
-    finally:
-        try:
-            put_conn(conn)
-        except Exception:
-            pass
+            elapsed = time.time() - now
+            print('DB cache loaded {} tables in {:.2f}s'.format(len(_db_cache), elapsed), flush=True)
+            _cache_loaded = True
+        finally:
+            try:
+                put_conn(conn)
+            except Exception:
+                pass
 
 
 def _load_heavy(cls, obj_id, col_name):

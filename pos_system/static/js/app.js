@@ -1396,16 +1396,19 @@ let App = {
             const idx = this.products.findIndex(p => p.id === product.id)
             if (idx >= 0) this.products[idx] = res.data
           }
-          this.renderAll()
+          this.renderProducts()
+          this.renderProductsTable()
         } else {
           const createRes = await this.api('POST', '/products', data)
           this.closeModal()
           if (createRes.data && createRes.data.id) {
             this.products.unshift(createRes.data)
-            this.renderAll()
+            this.renderProducts()
+            this.renderProductsTable()
             this.showLotModal(createRes.data.id)
           } else {
-            this.renderAll()
+            this.renderProducts()
+            this.renderProductsTable()
           }
         }
       } catch(e) { alert('Error: ' + e.message) }

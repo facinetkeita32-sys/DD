@@ -28,9 +28,10 @@ class StockLot(Model):
                     if qty:
                         lot.write({'available_qty': 0})
         products = ProductProduct().search([])
+        all_lots = self.search([])
+        products_with_lots = {lot._data.get('product_id') for lot in all_lots if lot._data.get('product_id')}
         for p in products:
-            existing = self.search([('product_id', '=', p.id)])
-            if existing:
+            if p.id in products_with_lots:
                 continue
             self.create({
                 'name': 'BATCH-DEFAULT-%s' % p.name.replace(' ', ''),

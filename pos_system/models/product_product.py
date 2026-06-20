@@ -64,9 +64,9 @@ class ProductProduct(Model):
             {'name': 'French Fries', 'list_price': 8000, 'cost_price': 3000, 'type': 'consu', 'uom_name': 'Portion', 'available_qty': 0, 'barcode': '590009'},
             {'name': 'Hamburger', 'list_price': 18000, 'cost_price': 8500, 'type': 'consu', 'uom_name': 'Piece', 'available_qty': 0, 'barcode': '590010'},
         ]
+        existing_barcodes = {p._data.get('barcode') for p in self.search([]) if p._data.get('barcode')}
         for prod in products:
-            existing = self.search([('barcode', '=', prod['barcode'])])
-            if not existing:
+            if prod['barcode'] not in existing_barcodes:
                 self.create(prod)
 
 

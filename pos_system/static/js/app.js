@@ -2,6 +2,7 @@ let App = {
   user: null,
   permissions: null,
   _newLogoBase64: null,
+  _searchTimers: {},
   config: null,
   currency: null,
   products: [],
@@ -65,7 +66,10 @@ let App = {
       }
     })
 
-    document.getElementById('pos-search').oninput = () => this.renderProducts()
+    document.getElementById('pos-search').oninput = () => {
+      clearTimeout(this._searchTimers.pos)
+      this._searchTimers.pos = setTimeout(() => this.renderProducts(), 250)
+    }
     document.getElementById('pos-barcode').onkeydown = e => {
       if (e.key === 'Enter') {
         e.preventDefault()
@@ -97,7 +101,10 @@ let App = {
     document.getElementById('export-products-csv-btn').onclick = () => this.exportProductsCsv()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
-    document.getElementById('products-search').oninput = () => this.renderProductsTable()
+    document.getElementById('products-search').oninput = () => {
+      clearTimeout(this._searchTimers.products)
+      this._searchTimers.products = setTimeout(() => this.renderProductsTable(), 250)
+    }
     document.getElementById('products-category-filter').onchange = () => this.renderProductsTable()
     document.getElementById('products-stock-filter').onchange = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
@@ -258,18 +265,19 @@ let App = {
 
   renderAll() {
     this.applyNavPermissions()
+    const isVisible = id => document.getElementById('screen-' + id)?.classList.contains('active')
     this.renderProducts()
     this.renderCategories()
     this.renderCart()
-    this.renderProductsTable()
-    this.renderOrdersTable()
-    this.renderCustomersTable()
-    this.renderInventory()
-    this.renderSessionsTable()
-    this.renderDashboard()
-    this.renderActivity()
-    this.renderSettings()
-    this.renderUsersTable()
+    if (isVisible('products')) this.renderProductsTable()
+    if (isVisible('orders')) this.renderOrdersTable()
+    if (isVisible('customers')) this.renderCustomersTable()
+    if (isVisible('inventory')) this.renderInventory()
+    if (isVisible('sessions')) this.renderSessionsTable()
+    if (isVisible('dashboard')) this.renderDashboard()
+    if (isVisible('activity')) this.renderActivity()
+    if (isVisible('settings')) this.renderSettings()
+    if (isVisible('users')) this.renderUsersTable()
   },
 
   refreshUI() {
@@ -898,11 +906,6 @@ let App = {
       this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
-      this.api('GET', '/products').then(r => {
-        this.products = r.data || []
-        this.renderProducts()
-        this.renderProductsTable()
-      }).catch(() => {})
       const orderId = res.data ? res.data.id : null
       const ref = res.data ? res.data.id || res.data.name : ''
       if (orderId && confirm(`Order #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
@@ -949,11 +952,6 @@ let App = {
       this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
-      this.api('GET', '/products').then(r => {
-        this.products = r.data || []
-        this.renderProducts()
-        this.renderProductsTable()
-      }).catch(() => {})
       const orderId = res.data ? res.data.id : null
       const ref = res.data ? res.data.id || res.data.name : ''
       if (orderId && confirm(`${I18n.t('payment.pending_saved', 'Order saved as pending payment')} #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
@@ -1210,11 +1208,19 @@ let App = {
       if (field === 'categ_id') value = document.getElementById('bulk-cat-select').value
       if (field !== 'categ_id' && !value && value !== '0') { alert(I18n.t('product.value_required', 'Value is required')); return }
       try {
-        await this.api('POST', '/products/bulk-update', { ids, field, value })
+        const res = await this.api('POST', '/products/bulk-update', { ids, field, value })
         this.closeModal()
         this._selectedProductIds = []
-        const res = await this.api('GET', '/products')
-        this.products = res.data || []
+        if (res.data && Array.isArray(res.data)) {
+          for (const updated of res.data) {
+            const idx = this.products.findIndex(p => p.id === updated.id)
+            if (idx >= 0) {
+              const oldImage = this.products[idx].image || ''
+              Object.assign(this.products[idx], updated)
+              if (!this.products[idx].image) this.products[idx].image = oldImage
+            }
+          }
+        }
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }
     }
@@ -1394,7 +1400,10 @@ let App = {
           this.closeModal()
           if (res.data) {
             const idx = this.products.findIndex(p => p.id === product.id)
-            if (idx >= 0) this.products[idx] = res.data
+            if (idx >= 0) {
+              if (res.data.image === undefined) res.data.image = newImageBase64 !== undefined ? newImageBase64 : (this.products[idx].image || '')
+              this.products[idx] = res.data
+            }
           }
           this.renderProducts()
           this.renderProductsTable()

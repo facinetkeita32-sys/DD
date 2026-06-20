@@ -405,11 +405,29 @@ def _persist_write_data(cls, obj_id, data):
 
 
 def _persist_delete(cls, obj_id):
-    table = cls._name
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute('DELETE FROM "{}" WHERE id=%s'.format(table), (obj_id,))
+        cur.execute('DELETE FROM "{}" WHERE id=%s'.format(cls._name), (obj_id,))
+        cur.close()
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        put_conn(conn)
+
+
+def _persist_bulk_delete(cls, ids):
+    if not ids:
+        return
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM "{}" WHERE id = ANY(%s)'.format(cls._name), (list(ids),))
         cur.close()
         conn.commit()
     except Exception:
@@ -680,6 +698,33 @@ class Model(metaclass=BaseModel):
         except Exception:
             return False
 
+    @classmethod
+    def bulk_write(cls, ids, field, value):
+        if cls._name in DB_ONLY_TABLES or not ids:
+            return
+        conn = get_conn()
+        try:
+            sql_cmd = 'UPDATE "{}" SET "{}" = %s WHERE id = ANY(%s)'.format(cls._name, field)
+            cur = conn.cursor()
+            cur.execute(sql_cmd, (value, list(ids)))
+            cur.close()
+            conn.commit()
+        except Exception as e:
+            import traceback
+            print('SQL ERROR (bulk): {}'.format(e))
+            traceback.print_exc()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            put_conn(conn)
+        if cls._name in _db_cache:
+            for pid in ids:
+                if pid in _db_cache[cls._name]['_data']:
+                    _db_cache[cls._name]['_data'][pid][field] = value
+
     def write(self, vals):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         for fname, value in vals.items():
@@ -826,8 +871,9 @@ class Model(metaclass=BaseModel):
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM "{}"'.format(cls._name))
-            new_id = cur.fetchone()[0]
+            with _db_lock:
+                cur.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM "{}" FOR UPDATE'.format(cls._name))
+                new_id = cur.fetchone()[0]
             cur.close()
             data = {'id': new_id}
             for fname, field in cls._fields.items():
@@ -853,6 +899,21 @@ class Model(metaclass=BaseModel):
             obj = cls(**data)
             obj.id = new_id
             return obj
+        finally:
+            put_conn(conn)
+
+    @classmethod
+    def _db_search_count(cls, domain=None):
+        domain = domain or []
+        conn = get_conn()
+        try:
+            where_clause, params = cls._domain_to_sql(domain)
+            sql_cmd = 'SELECT COUNT(*) FROM "{}" {}'.format(cls._name, where_clause)
+            cur = conn.cursor()
+            cur.execute(sql_cmd, params)
+            count = cur.fetchone()[0]
+            cur.close()
+            return count
         finally:
             put_conn(conn)
 
@@ -978,17 +1039,23 @@ class Model(metaclass=BaseModel):
                         and_params.append(value)
                     elif operator == 'in':
                         if isinstance(value, (list, tuple)):
-                            placeholders = ','.join(['%s'] * len(value))
-                            and_conds.append('{} IN ({})'.format(col, placeholders))
-                            and_params.extend(value)
+                            if not value:
+                                and_conds.append('1=0')
+                            else:
+                                placeholders = ','.join(['%s'] * len(value))
+                                and_conds.append('{} IN ({})'.format(col, placeholders))
+                                and_params.extend(value)
                         else:
                             and_conds.append('{} = %s'.format(col))
                             and_params.append(value)
                     elif operator == 'not in':
                         if isinstance(value, (list, tuple)):
-                            placeholders = ','.join(['%s'] * len(value))
-                            and_conds.append('{} NOT IN ({})'.format(col, placeholders))
-                            and_params.extend(value)
+                            if not value:
+                                and_conds.append('1=1')
+                            else:
+                                placeholders = ','.join(['%s'] * len(value))
+                                and_conds.append('{} NOT IN ({})'.format(col, placeholders))
+                                and_params.extend(value)
                         else:
                             and_conds.append('{} != %s'.format(col))
                             and_params.append(value)
@@ -1008,7 +1075,18 @@ class Model(metaclass=BaseModel):
 
     @classmethod
     def search_count(cls, domain=None):
-        return len(cls.search(domain))
+        if cls._name in DB_ONLY_TABLES:
+            return cls._db_search_count(domain)
+        tbl = _db_cache.get(cls._name)
+        if not tbl:
+            return 0
+        if not domain:
+            return len(tbl['_data'])
+        count = 0
+        for rid, rdata in tbl['_data'].items():
+            if cls._match_domain(rdata, domain):
+                count += 1
+        return count
 
     @classmethod
     def _match_domain(cls, data, domain):

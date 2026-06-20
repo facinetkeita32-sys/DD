@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db, _load_heavy, _batch_load_heavy, HEAVY_COLS
+from ..odoo_orm import env, _db_cache as _db, _load_heavy, _batch_load_heavy, HEAVY_COLS, _persist_bulk_delete
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -343,7 +343,8 @@ def update_product(product_id):
     data = request.get_json() or {}
     products[0].write(data)
     log_activity('update', 'Product ID: %s' % product_id)
-    return success_response(model_to_dict(products[0]), 'Product updated')
+    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
+    return success_response(model_to_dict(products[0], fields), 'Product updated')
 
 
 @api_bp.route('/products/bulk-update', methods=['POST'])
@@ -356,19 +357,26 @@ def bulk_update_products():
     value = data.get('value')
     if not ids or not field:
         return error_response('ids and field are required')
-    count = 0
-    for pid in ids:
-        products = ProductProduct().browse([pid])
-        if products:
-            if field == 'categ_id':
-                products[0].write({field: int(value) if value else False})
-            elif field in ('list_price', 'cost_price', 'available_qty'):
+
+    if field == 'available_qty':
+        for pid in ids:
+            products = ProductProduct().browse([pid])
+            if products:
                 products[0].write({field: float(value) if value else 0.0})
-            else:
-                products[0].write({field: value})
-            count += 1
-    log_activity('bulk_update', '%s products %s=%s' % (count, field, value))
-    return success_response({'updated': count}, f'{count} products updated')
+    else:
+        if field == 'categ_id':
+            cv = int(value) if value else False
+        elif field in ('list_price', 'cost_price'):
+            cv = float(value) if value else 0.0
+        else:
+            cv = value
+        ProductProduct.bulk_write(ids, field, cv)
+
+    log_activity('bulk_update', '%s products %s=%s' % (len(ids), field, value))
+    updated = ProductProduct().search([('id', 'in', ids)])
+    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
+    result = model_to_dict(updated, fields)
+    return success_response(result, f'{len(ids)} products updated')
 
 
 @api_bp.route('/products/<int:product_id>', methods=['DELETE'])
@@ -1447,14 +1455,9 @@ def bulk_delete_inventory():
     ids = data.get('ids', [])
     if not ids:
         return error_response('ids are required')
-    count = 0
-    for iid in ids:
-        items = InventoryItem().browse([iid])
-        if items:
-            items[0].unlink()
-            count += 1
-    log_activity('delete', '%s inventory items bulk deleted' % count)
-    return success_response({'deleted': count}, '%s items deleted' % count)
+    _persist_bulk_delete(InventoryItem, ids)
+    log_activity('delete', '%s inventory items bulk deleted' % len(ids))
+    return success_response({'deleted': len(ids)}, '%s items deleted' % len(ids))
 
 
 # === COMPANY ===

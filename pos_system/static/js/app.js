@@ -174,8 +174,7 @@ let App = {
     try {
       const res = await this.api('GET', '/auth/me')
       this.user = res.data
-      const permRes = await this.api('GET', '/auth/permissions')
-      this.permissions = permRes.data
+      this.permissions = res.data.permissions
       document.getElementById('nav-user').textContent = `${this.user.name || this.user.login} (${this.user.role || ''})`
       await this.loadInitData()
       this.showScreen('pos')
@@ -209,8 +208,7 @@ let App = {
     try {
       const res = await this.api('POST', '/auth/login', { login, password })
       this.user = res.data
-      const permRes = await this.api('GET', '/auth/permissions')
-      this.permissions = permRes.data
+      this.permissions = res.data.permissions
       I18n.setLang(lang)
       document.getElementById('nav-user').textContent = `${this.user.name || this.user.login} (${this.user.role || ''})`
       await this.loadInitData()
@@ -225,6 +223,21 @@ let App = {
   async doLogout() {
     await this.api('POST', '/auth/logout')
     this.user = null
+    this.permissions = null
+    this.products = []
+    this.categories = []
+    this.productCategories = []
+    this.customers = []
+    this.paymentMethods = []
+    this.users = []
+    this.cart = []
+    this.cartCustomer = null
+    this.currentCategory = null
+    this.session = null
+    this.config = null
+    this.currency = null
+    this.company = null
+    this.deliveryZones = null
     this.showLogin()
   },
 

@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from datetime import datetime
 from functools import wraps
@@ -115,13 +116,14 @@ def success_response(data=None, message=None):
 
 def log_activity(action, details=''):
     uid = getattr(g, 'user_id', None) or session.get('user_id')
+    ip = request.remote_addr or ''
     if uid:
-        LoginLog().create({
+        threading.Thread(target=lambda: LoginLog().create({
             'user_id': uid,
             'action': action,
             'details': details,
-            'ip_address': request.remote_addr or '',
-        })
+            'ip_address': ip,
+        }), daemon=True).start()
 
 
 # === AUTH ===
@@ -138,7 +140,15 @@ def auth_login():
         session['lang'] = users[0].lang
         session['last_activity'] = now
         log_activity('login')
-        return success_response(model_to_dict(users[0]))
+        from ..permissions import get_role_screens, get_role_actions
+        role = users[0]._data.get('role', 'cashier')
+        result = model_to_dict(users[0])
+        result['permissions'] = {
+            'role': role,
+            'screens': get_role_screens(role),
+            'actions': get_role_actions(role),
+        }
+        return success_response(result)
     return error_response('Invalid credentials', 401)
 
 
@@ -153,7 +163,14 @@ def auth_logout():
 @api_bp.route('/auth/me', methods=['GET'])
 @login_required
 def auth_me():
-    return success_response(model_to_dict(g.user))
+    from ..permissions import get_role_screens, get_role_actions
+    result = model_to_dict(g.user)
+    result['permissions'] = {
+        'role': g.user_role,
+        'screens': get_role_screens(g.user_role),
+        'actions': get_role_actions(g.user_role),
+    }
+    return success_response(result)
 
 
 

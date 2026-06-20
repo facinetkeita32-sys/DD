@@ -313,7 +313,9 @@ def get_products():
             for r in result:
                 r['image'] = ''
                 r['nearest_expiry'] = ''
-    return success_response(result)
+    resp = success_response(result)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])
@@ -621,21 +623,20 @@ def get_pos_categories():
 
 @api_bp.route('/customers', methods=['GET'])
 def get_customers():
-    from ..odoo_orm import _db_cache
     domain = [('customer', '=', True)]
     args = request.args
     if args.get('search'):
         domain.append(('name', 'ilike', args['search']))
     customers = ResPartner().search(domain, limit=100)
-    orders_data = _db_cache.get('pos.order', {}).get('_data', {})
+    orders = PosOrder().search([])
     spent = {}
     due = {}
-    for oid, odata in orders_data.items():
-        pid = odata.get('partner_id', 0) or 0
+    for order in orders:
+        pid = order._data.get('partner_id', 0) or 0
         if pid:
-            amt = float(odata.get('amount_total', 0) or 0)
+            amt = float(order._data.get('amount_total', 0) or 0)
             spent[pid] = spent.get(pid, 0) + amt
-            if odata.get('state') == 'pending':
+            if order._data.get('state') == 'pending':
                 due[pid] = due.get(pid, 0) + amt
     result = serialize_model(ResPartner, customers)
     for c in result:
@@ -1316,10 +1317,7 @@ def get_inventory():
     if args.get('search'):
         domain.append(('name', 'ilike', args['search']))
     items = InventoryItem().search(domain, limit=500)
-    result = serialize_model(InventoryItem, items)
-    for r, obj in zip(result, items):
-        r['create_date'] = obj._data.get('create_date', '')
-    return success_response(result)
+    return success_response(serialize_model(InventoryItem, items))
 
 
 @api_bp.route('/inventory', methods=['POST'])
@@ -1384,6 +1382,7 @@ def import_inventory():
         'cost_price': 'cost_price', 'Cost': 'cost_price', 'cost': 'cost_price',
         'selling_price': 'selling_price', 'price': 'selling_price', 'Price': 'selling_price',
         'category': 'category', 'Category': 'category',
+        'date': 'date', 'Date': 'date',
         'notes': 'notes', 'Notes': 'notes', 'note': 'notes',
     }
     for row in items_data:
@@ -1431,8 +1430,7 @@ def bulk_update_inventory():
         items = InventoryItem().browse([iid])
         if items:
             if field == 'date':
-                items[0]._data['create_date'] = (value or '')[:10] + ' 00:00:00'
-                items[0]._save()
+                items[0].write({'date': (value or '')[:10]})
             elif field in ('quantity', 'cost_price', 'selling_price'):
                 items[0].write({field: float(value) if value else 0.0})
             else:
@@ -1495,6 +1493,19 @@ def init_system():
         if table_name.startswith('res_') or table_name.startswith('product_') or table_name.startswith('pos_'):
             table_data['_data'].clear()
             table_data['_seq'] = 0
+
+    from ..odoo_orm import DB_ONLY_TABLES, get_conn
+    conn = get_conn()
+    cur = conn.cursor()
+    for tbl in DB_ONLY_TABLES:
+        pg_table = tbl.replace('.', '_')
+        try:
+            cur.execute(f'DELETE FROM {pg_table}')
+        except Exception:
+            conn.rollback()
+        else:
+            conn.commit()
+    cur.close()
 
     from ..init_data import load_demo_data
     load_demo_data()

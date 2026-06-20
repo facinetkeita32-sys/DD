@@ -111,6 +111,8 @@ a { text-decoration: none; color: var(--primary); cursor: pointer; }
 .product-card:hover { border-color: var(--primary); box-shadow: 0 8px 25px var(--primary-glow); transform: translateY(-3px); }
 .product-card:active { transform: translateY(-1px); }
 .product-card .prod-img { width: 100%; height: 90px; object-fit: contain; border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--bg); padding: 4px; }
+.lazy-img:not([src]) { opacity: 0; }
+.lazy-img[src] { opacity: 1; transition: opacity 0.3s ease; }
 .product-card .prod-img-placeholder { width: 100%; height: 90px; border-radius: var(--radius-sm); margin-bottom: 8px; background: linear-gradient(135deg, var(--bg), var(--border-light)); display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--text-light); }
 .product-card .prod-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
 .product-card .prod-category { font-size: 10px; color: var(--text-light); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

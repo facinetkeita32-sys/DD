@@ -31,6 +31,26 @@ class ProductProduct(Model):
     color = Integer(string='Color Index', default=0)
     expiration_date = Date(string='Expiration Date')
 
+    def write(self, vals):
+        if 'available_qty' in vals:
+            new_qty = float(vals['available_qty'])
+            from .stock_lot import StockLot
+            lots = StockLot().search([('product_id', '=', self.id)])
+            if lots:
+                total = sum(float(l._data.get('available_qty', 0) or 0) for l in lots)
+                delta = new_qty - total
+                if delta != 0:
+                    lot = lots[0]
+                    cur = float(lot._data.get('available_qty', 0) or 0)
+                    lot.write({'available_qty': max(0, cur + delta)})
+            else:
+                StockLot().create({
+                    'name': 'BATCH-001-%s' % self._data.get('name', str(self.id)),
+                    'product_id': self.id,
+                    'available_qty': new_qty,
+                })
+        return super().write(vals)
+
     def _init_defaults(self):
         products = [
             {'name': 'Coffee (Small)', 'list_price': 5000, 'cost_price': 2000, 'type': 'consu', 'uom_name': 'Cup', 'available_qty': 0, 'barcode': '590001'},

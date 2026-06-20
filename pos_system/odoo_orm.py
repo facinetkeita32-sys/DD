@@ -195,6 +195,7 @@ def _migrate_table(conn, model_class):
 
 
 HEAVY_COLS = {'logo', 'image'}
+DB_ONLY_TABLES = {'pos.order', 'pos.order.line', 'pos.payment', 'pos.session', 'login.log', 'inventory.item'}
 
 
 def _ensure_all_tables():
@@ -224,7 +225,7 @@ def _load_cache():
             cur = conn.cursor()
             cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
             all_table_names = [row[0] for row in cur.fetchall()]
-            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel')]
+            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel') and t not in DB_ONLY_TABLES]
             cur.close()
         except Exception:
             print('WARN: could not list tables', flush=True)
@@ -245,7 +246,7 @@ def _load_cache():
                     col_list = ','.join('"{}"'.format(c) for c in light_cols)
                     cur = conn.cursor()
                     cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
-                    for row in cur.fetchall():
+                    for row in cur:
                         data = dict(zip(light_cols, row))
                         rid = data.pop('id')
                         new_data[rid] = data
@@ -322,6 +323,49 @@ def _persist_write(cls, obj_id):
             table, all_cols, all_ph, update_set)
         cur = conn.cursor()
         cur.execute(sql, [obj_id] + vals)
+        cur.close()
+        conn.commit()
+    except Exception as e:
+        import traceback
+        print('SQL ERROR ({}): {}'.format(table, e))
+        traceback.print_exc()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        put_conn(conn)
+
+
+def _persist_write_data(cls, obj_id, data):
+    table = cls._name
+    conn = get_conn()
+    try:
+        cols = []
+        vals = []
+        for k, v in data.items():
+            if k == 'id':
+                continue
+            if k in HEAVY_COLS:
+                continue
+            field = cls._fields.get(k)
+            if field and isinstance(field, (One2many, Many2many)):
+                continue
+            if isinstance(v, bool):
+                v = 1 if v else 0
+            cols.append(k)
+            vals.append(v)
+        if not cols:
+            return
+        qcols = ['"{}"'.format(c) for c in cols]
+        all_cols = '"id",' + ','.join(qcols)
+        all_ph = '%s,' + ','.join(['%s' for _ in cols])
+        update_set = ', '.join(['{}=EXCLUDED.{}'.format(q, q) for q in qcols])
+        sql_cmd = 'INSERT INTO "{}" ({}) VALUES ({}) ON CONFLICT (id) DO UPDATE SET {}'.format(
+            table, all_cols, all_ph, update_set)
+        cur = conn.cursor()
+        cur.execute(sql_cmd, [obj_id] + vals)
         cur.close()
         conn.commit()
     except Exception as e:
@@ -628,6 +672,13 @@ class Model(metaclass=BaseModel):
         return True
 
     def _save(self):
+        if self._name in DB_ONLY_TABLES:
+            data = dict(self._data)
+            for k in list(data):
+                if k in HEAVY_COLS:
+                    del data[k]
+            _persist_write_data(self.__class__, self.id, data)
+            return
         tbl = _db_cache[self._name]
         data = dict(self._data)
         for k in list(data):
@@ -637,6 +688,9 @@ class Model(metaclass=BaseModel):
         _persist_write(self.__class__, self.id)
 
     def unlink(self):
+        if self._name in DB_ONLY_TABLES:
+            _persist_delete(self.__class__, self.id)
+            return True
         tbl = _db_cache[self._name]
         if self.id in tbl['_data']:
             del tbl['_data'][self.id]
@@ -667,6 +721,8 @@ class Model(metaclass=BaseModel):
     @classmethod
     def create(cls, vals):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if cls._name in DB_ONLY_TABLES:
+            return cls._db_create(vals)
         tbl = _db_cache[cls._name]
         tbl['_seq'] += 1
         new_id = tbl['_seq']
@@ -699,6 +755,8 @@ class Model(metaclass=BaseModel):
     @classmethod
     def search(cls, domain=None, order=None, limit=None, offset=0):
         domain = domain or []
+        if cls._name in DB_ONLY_TABLES:
+            return cls._db_search(domain, order, limit, offset)
         tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
         results = []
         for rid, rdata in tbl['_data'].items():
@@ -713,7 +771,6 @@ class Model(metaclass=BaseModel):
             if order.startswith('-'):
                 reverse = True
                 order_field = order[1:]
-            # handle 'field desc' syntax
             parts = order_field.rsplit(None, 1)
             if len(parts) == 2 and parts[1].lower() == 'desc':
                 reverse = True
@@ -729,6 +786,8 @@ class Model(metaclass=BaseModel):
     def browse(cls, ids):
         if isinstance(ids, int):
             ids = [ids]
+        if cls._name in DB_ONLY_TABLES:
+            return cls._db_browse(ids)
         tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
         results = []
         for rid in ids:
@@ -737,6 +796,193 @@ class Model(metaclass=BaseModel):
                 obj.id = rid
                 results.append(obj)
         return results
+
+    @classmethod
+    def _db_create(cls, vals):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM "{}"'.format(cls._name))
+            new_id = cur.fetchone()[0]
+            cur.close()
+            data = {'id': new_id}
+            for fname, field in cls._fields.items():
+                if fname == 'id':
+                    continue
+                if fname in vals:
+                    data[fname] = field.convert(vals[fname])
+                elif field.default is not None:
+                    default = field.default() if callable(field.default) else field.default
+                    data[fname] = field.convert(default) if default is not None else field.convert(None)
+                else:
+                    data[fname] = field.convert(None)
+            data['create_date'] = now
+            data['write_date'] = now
+            uid = cls._get_user_id()
+            data['create_uid'] = uid
+            data['write_uid'] = uid
+            persist_data = {k: v for k, v in data.items() if k not in HEAVY_COLS}
+            _persist_write_data(cls, new_id, persist_data)
+            for fname in data:
+                if fname in HEAVY_COLS and data.get(fname) is not None:
+                    _persist_heavy_column(cls, new_id, fname, data[fname])
+            obj = cls(**data)
+            obj.id = new_id
+            return obj
+        finally:
+            put_conn(conn)
+
+    @classmethod
+    def _db_search(cls, domain=None, order=None, limit=None, offset=0):
+        domain = domain or []
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (cls._name,))
+            all_cols = [row[0] for row in cur.fetchall()]
+            cur.close()
+            light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+            where_clause, params = cls._domain_to_sql(domain)
+            order_clause = ''
+            order = order or cls._order
+            if order:
+                reverse = False
+                order_field = order
+                if order.startswith('-'):
+                    reverse = True
+                    order_field = order[1:]
+                parts = order_field.rsplit(None, 1)
+                if len(parts) == 2 and parts[1].lower() == 'desc':
+                    reverse = True
+                    order_field = parts[0]
+                order_clause = 'ORDER BY "{}" {}'.format(order_field, 'DESC' if reverse else 'ASC')
+            limit_clause = ''
+            if limit:
+                limit_clause = 'LIMIT {}'.format(limit)
+            offset_clause = ''
+            if offset:
+                offset_clause = 'OFFSET {}'.format(offset)
+            col_list = ','.join('"{}"'.format(c) for c in light_cols)
+            sql_cmd = 'SELECT {} FROM "{}" {} {} {} {}'.format(col_list, cls._name, where_clause, order_clause, limit_clause, offset_clause)
+            cur = conn.cursor()
+            cur.execute(sql_cmd, params)
+            results = []
+            for row in cur:
+                data = dict(zip(light_cols, row))
+                rid = data.pop('id')
+                obj = cls(**data)
+                obj.id = rid
+                results.append(obj)
+            cur.close()
+            return results
+        finally:
+            put_conn(conn)
+
+    @classmethod
+    def _db_browse(cls, ids):
+        if not ids:
+            return []
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (cls._name,))
+            all_cols = [row[0] for row in cur.fetchall()]
+            cur.close()
+            light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+            col_list = ','.join('"{}"'.format(c) for c in light_cols)
+            cur = conn.cursor()
+            cur.execute('SELECT {} FROM "{}" WHERE id = ANY(%s)'.format(col_list, cls._name), (list(ids),))
+            results = []
+            for row in cur:
+                data = dict(zip(light_cols, row))
+                rid = data.pop('id')
+                obj = cls(**data)
+                obj.id = rid
+                results.append(obj)
+            cur.close()
+            return results
+        finally:
+            put_conn(conn)
+
+    @classmethod
+    def _domain_to_sql(cls, domain):
+        if not domain:
+            return '', []
+        conditions = []
+        params = []
+        i = 0
+        while i < len(domain):
+            item = domain[i]
+            if item == '!':
+                cond, p = cls._domain_to_sql([domain[i + 1]])
+                i += 2
+                if cond:
+                    conditions.append('(NOT ({})'.format(cond[3:]) if cond.startswith('AND ') else '(NOT {})'.format(cond))
+                    params.extend(p)
+                continue
+            elif item == '|':
+                left_cond, left_p = cls._domain_to_sql([domain[i + 1]])
+                right_cond, right_p = cls._domain_to_sql([domain[i + 2]])
+                i += 3
+                if left_cond and right_cond:
+                    conditions.append('({} OR {})'.format(left_cond, right_cond))
+                    params.extend(left_p + right_p)
+                continue
+            elif item == '&' or (isinstance(item, str) and item not in ('|', '!')):
+                and_conds = []
+                and_params = []
+                i += 1
+                while i < len(domain) and isinstance(domain[i], (list, tuple)) and len(domain[i]) == 3:
+                    field, operator, value = domain[i]
+                    col = '"{}"'.format(field)
+                    if operator == '=':
+                        and_conds.append('{} = %s'.format(col))
+                        and_params.append(value)
+                    elif operator == '!=':
+                        and_conds.append('{} != %s'.format(col))
+                        and_params.append(value)
+                    elif operator == '>':
+                        and_conds.append('{} > %s'.format(col))
+                        and_params.append(value)
+                    elif operator == '<':
+                        and_conds.append('{} < %s'.format(col))
+                        and_params.append(value)
+                    elif operator == '>=':
+                        and_conds.append('{} >= %s'.format(col))
+                        and_params.append(value)
+                    elif operator == '<=':
+                        and_conds.append('{} <= %s'.format(col))
+                        and_params.append(value)
+                    elif operator == 'in':
+                        if isinstance(value, (list, tuple)):
+                            placeholders = ','.join(['%s'] * len(value))
+                            and_conds.append('{} IN ({})'.format(col, placeholders))
+                            and_params.extend(value)
+                        else:
+                            and_conds.append('{} = %s'.format(col))
+                            and_params.append(value)
+                    elif operator == 'not in':
+                        if isinstance(value, (list, tuple)):
+                            placeholders = ','.join(['%s'] * len(value))
+                            and_conds.append('{} NOT IN ({})'.format(col, placeholders))
+                            and_params.extend(value)
+                        else:
+                            and_conds.append('{} != %s'.format(col))
+                            and_params.append(value)
+                    elif operator in ('like', 'ilike'):
+                        and_conds.append('{} ILIKE %s'.format(col))
+                        and_params.append('%{}%'.format(value))
+                    i += 1
+                if and_conds:
+                    conditions.append('({})'.format(' AND '.join(and_conds)))
+                    params.extend(and_params)
+                continue
+            else:
+                i += 1
+        if conditions:
+            return 'WHERE {}'.format(' AND '.join(conditions)), params
+        return '', []
 
     @classmethod
     def search_count(cls, domain=None):

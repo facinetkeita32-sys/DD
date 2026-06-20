@@ -14,31 +14,29 @@ class StockLot(Model):
     available_qty = Float(string='Quantity', digits=(16, 2), default=0.0)
     active = Boolean(string='Active', default=True)
 
+    _migrated_default_qty = False
+
     def _init_defaults(self):
         from .product_product import ProductProduct
+        if not StockLot._migrated_default_qty:
+            StockLot._migrated_default_qty = True
+            all_lots = self.search([])
+            for lot in all_lots:
+                name = lot._data.get('name', '')
+                if name.startswith('BATCH-A-') or name.startswith('BATCH-B-') or name.startswith('BATCH-DEFAULT-'):
+                    qty = float(lot._data.get('available_qty', 0) or 0)
+                    if qty:
+                        lot.write({'available_qty': 0})
         products = ProductProduct().search([])
         for p in products:
             existing = self.search([('product_id', '=', p.id)])
             if existing:
                 continue
-            p_qty = float(p._data.get('available_qty', 0) or 0)
-            if p_qty > 0:
-                self.create({
-                    'name': 'BATCH-001-%s' % p.name.replace(' ', ''),
-                    'product_id': p.id,
-                    'available_qty': p_qty,
-                })
-            else:
-                self.create({
-                    'name': 'BATCH-A-%s' % p.name.replace(' ', ''),
-                    'product_id': p.id,
-                    'available_qty': 50,
-                })
-                self.create({
-                    'name': 'BATCH-B-%s' % p.name.replace(' ', ''),
-                    'product_id': p.id,
-                    'available_qty': 50,
-                })
+            self.create({
+                'name': 'BATCH-DEFAULT-%s' % p.name.replace(' ', ''),
+                'product_id': p.id,
+                'available_qty': 0,
+            })
             self._recompute_product_qty(p.id)
 
     @classmethod

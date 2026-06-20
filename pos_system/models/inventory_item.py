@@ -1,4 +1,4 @@
-from ..odoo_orm import Model, Char, Float, Selection, Text
+from ..odoo_orm import Model, Char, Float, Selection, Text, Date
 
 
 class InventoryItem(Model):
@@ -14,6 +14,7 @@ class InventoryItem(Model):
     selling_price = Float(string='Selling Price', digits=(16, 2), default=0.0)
     category = Char(string='Category')
     notes = Text(string='Notes')
+    date = Date(string='Date')
     status = Selection([
         ('draft', 'Draft'),
         ('verified', 'Verified'),

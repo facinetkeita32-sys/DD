@@ -348,12 +348,14 @@ let App = {
   },
 
   async refreshAndRenderProducts() {
+    this.renderProducts()
+    this.renderCategories()
     try {
       const res = await this.api('GET', '/products')
       this.products = res.data || []
+      this.renderProducts()
+      this.renderCategories()
     } catch(e) {}
-    this.renderProducts()
-    this.renderCategories()
   },
 
   renderProducts() {
@@ -388,7 +390,7 @@ let App = {
         : qty > 0 ? `<span class="stock-badge ok">${I18n.t('product.in_stock', 'In Stock')}</span>` : ''
       const catName = p.categ_id ? p.categ_id.name || '' : ''
       const imgHtml = p.image
-        ? `<img class="prod-img" src="data:image/png;base64,${p.image}" alt="${p.name}" loading="lazy">`
+        ? `<img class="prod-img lazy-img" data-src="${p.image}" alt="${p.name}">`
         : `<div class="prod-img-placeholder">📦</div>`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
@@ -399,9 +401,29 @@ let App = {
         <div class="stock-bar-wrap"><div class="stock-bar" style="width:${barWidth}%;background:${isOut ? 'var(--danger)' : isLow ? 'var(--warning)' : 'var(--success)'}"></div></div>
       </div>`
     }).join('')
+    this._observeLazyImages()
     grid.querySelectorAll('.product-card').forEach(card => {
       card.onclick = () => this.addToCart(parseInt(card.dataset.id))
     })
+  },
+
+  _observeLazyImages() {
+    if (this._lazyObserver) {
+      this._lazyObserver.disconnect()
+    }
+    this._lazyObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const img = entry.target
+        const b64 = img.getAttribute('data-src')
+        if (b64) {
+          img.src = 'data:image/png;base64,' + b64
+          img.removeAttribute('data-src')
+        }
+        this._lazyObserver.unobserve(img)
+      }
+    }, { rootMargin: '200px' })
+    document.querySelectorAll('.lazy-img').forEach(img => this._lazyObserver.observe(img))
   },
 
   _normalizeBarcode(code) {
@@ -868,12 +890,19 @@ let App = {
       const res = await this.api('POST', '/orders', orderData)
       this.closeModal()
       this.clearCart()
-      const prodRes = await this.api('GET', '/products')
-      this.products = prodRes.data || []
+      for (const item of lines) {
+        const p = this.products.find(pr => pr.id === item.product_id)
+        if (p) p.available_qty = Math.max(0, (p.available_qty || 0) - item.qty)
+      }
       this.renderProducts()
       this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
+      this.api('GET', '/products').then(r => {
+        this.products = r.data || []
+        this.renderProducts()
+        this.renderProductsTable()
+      }).catch(() => {})
       const orderId = res.data ? res.data.id : null
       const ref = res.data ? res.data.id || res.data.name : ''
       if (orderId && confirm(`Order #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
@@ -912,12 +941,19 @@ let App = {
       const res = await this.api('POST', '/orders', orderData)
       this.closeModal()
       this.clearCart()
-      const prodRes = await this.api('GET', '/products')
-      this.products = prodRes.data || []
+      for (const item of lines) {
+        const p = this.products.find(pr => pr.id === item.product_id)
+        if (p) p.available_qty = Math.max(0, (p.available_qty || 0) - item.qty)
+      }
       this.renderProducts()
       this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
+      this.api('GET', '/products').then(r => {
+        this.products = r.data || []
+        this.renderProducts()
+        this.renderProductsTable()
+      }).catch(() => {})
       const orderId = res.data ? res.data.id : null
       const ref = res.data ? res.data.id || res.data.name : ''
       if (orderId && confirm(`${I18n.t('payment.pending_saved', 'Order saved as pending payment')} #${ref} — ${I18n.t('receipt.print_prompt', 'Print receipt now?')}`)) {
@@ -1079,7 +1115,7 @@ let App = {
       const barWidthTbl = isOut ? 0 : Math.min(qty / barMaxTbl * 100, 100)
       return `<tr class="${rowCls + expCls}">
         <td><input type="checkbox" class="bulk-item-cb" data-id="${p.id}" ${checked}></td>
-        <td>${p.image ? `<img class="prod-table-img" src="data:image/png;base64,${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
+        <td>${p.image ? `<img class="prod-table-img lazy-img" data-src="${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>
@@ -1092,6 +1128,7 @@ let App = {
         <td>${canDelete ? `<button class="btn btn-sm btn-danger delete-product" data-id="${p.id}">${I18n.t('common.delete', 'Delete')}</button>` : '-'}</td>
       </tr>`
     }).join('')
+    this._observeLazyImages()
     tbody.querySelectorAll('.edit-product').forEach(btn => {
       btn.onclick = () => this.showProductModal(parseInt(btn.dataset.id))
     })
@@ -1353,17 +1390,24 @@ let App = {
       }
       try {
         if (product) {
-          await this.api('PUT', `/products/${product.id}`, data)
+          const res = await this.api('PUT', `/products/${product.id}`, data)
+          this.closeModal()
+          if (res.data) {
+            const idx = this.products.findIndex(p => p.id === product.id)
+            if (idx >= 0) this.products[idx] = res.data
+          }
+          this.renderAll()
         } else {
           const createRes = await this.api('POST', '/products', data)
+          this.closeModal()
           if (createRes.data && createRes.data.id) {
+            this.products.unshift(createRes.data)
+            this.renderAll()
             this.showLotModal(createRes.data.id)
+          } else {
+            this.renderAll()
           }
         }
-        this.closeModal()
-        const res = await this.api('GET', '/products')
-        this.products = res.data || []
-        this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('prod-cancel').onclick = () => this.closeModal()
@@ -1723,7 +1767,7 @@ let App = {
     this._selectedInventoryIds = this._selectedInventoryIds || []
     tbody.innerHTML = filtered.map(item => {
       const checked = this._selectedInventoryIds.includes(item.id) ? 'checked' : ''
-      const dateStr = (item.create_date || '').substring(0, 10)
+      const dateStr = (item.date || item.create_date || '').substring(0, 10)
       return `<tr>
         <td><input type="checkbox" class="inv-bulk-cb" data-id="${item.id}" ${checked}></td>
         <td style="font-size:13px;color:var(--text-light)">${dateStr || '-'}</td>
@@ -1853,6 +1897,7 @@ let App = {
       <div class="form-group"><label data-i18n="inventory.cost_price">Cost Price</label><input type="number" step="any" id="inv-cost" value="${item ? item.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="inventory.selling_price">Selling Price</label><input type="number" step="any" id="inv-price" value="${item ? item.selling_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="inventory.category">Category</label><select id="inv-category"><option value="">${I18n.t('common.none', 'None')}</option>${(this.productCategories || []).map(c => `<option value="${this._esc(c.name)}" ${item && item.category === c.name ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')}</select></div>
+      <div class="form-group"><label data-i18n="inventory.date">Date</label><input type="date" id="inv-date" value="${item ? (item.date || '').substring(0, 10) : ''}"></div>
       <div class="form-group"><label data-i18n="inventory.status">Status</label><select id="inv-status"><option value="draft" ${item && item.status === 'draft' ? 'selected' : ''}>Draft</option><option value="verified" ${item && item.status === 'verified' ? 'selected' : ''}>Verified</option></select></div>
       <div class="btn-group">
         <button class="btn btn-primary" id="inv-save">${I18n.t('common.save', 'Save')}</button>
@@ -1863,6 +1908,7 @@ let App = {
       const data = {
         name: document.getElementById('inv-name').value,
         barcode: document.getElementById('inv-barcode').value,
+        date: document.getElementById('inv-date').value || null,
         quantity: parseFloat(document.getElementById('inv-qty').value) || 0,
         cost_price: parseFloat(document.getElementById('inv-cost').value) || 0,
         selling_price: parseFloat(document.getElementById('inv-price').value) || 0,
@@ -1895,7 +1941,7 @@ let App = {
     const rows = [['Date','Name','Barcode','Quantity','Cost Price','Selling Price','Category','Status','Notes']]
     this.inventoryItems.forEach(item => {
       rows.push([
-        (item.create_date || '').substring(0, 10),
+        (item.date || item.create_date || '').substring(0, 10),
         item.name || '',
         item.barcode || '',
         item.quantity || 0,

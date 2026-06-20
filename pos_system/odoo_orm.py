@@ -15,6 +15,7 @@ _cache_loaded = False
 _cache_loaded_at = 0.0
 _all_model_classes = []
 _CACHE_VERSION_FILE = '/tmp/_pos_cache_version'
+_tables_ensured = False
 
 
 def _parse_db_url(url):
@@ -262,12 +263,14 @@ def _load_cache():
         if _cache_loaded:
             if _read_cache_version() <= _cache_loaded_at:
                 return
-        try:
-            _ensure_all_tables()
-        except Exception:
-            print('WARN: _ensure_all_tables() failed, continuing', flush=True)
-            import traceback
-            traceback.print_exc()
+        if not _tables_ensured:
+            try:
+                _ensure_all_tables()
+                _tables_ensured = True
+            except Exception:
+                print('WARN: _ensure_all_tables() failed, continuing', flush=True)
+                import traceback
+                traceback.print_exc()
         conn = get_conn()
         try:
             now = time.time()

@@ -131,11 +131,6 @@ def auth_login():
     data = request.get_json() or {}
     login = data.get('login', '')
     password = data.get('password', '')
-    all_users = ResUsers().search([])
-    print('DEBUG LOGIN: login=%s password=%s total_users=%d user_keys=%s' % (
-        login, password, len(all_users),
-        [str(u._data.get('login')) + '/' + str(u._data.get('password')) for u in all_users]
-    ), flush=True)
     users = ResUsers().search([('login', '=', login), ('password', '=', password)])
     if users:
         now = time.time()
@@ -144,7 +139,6 @@ def auth_login():
         session['last_activity'] = now
         log_activity('login')
         return success_response(model_to_dict(users[0]))
-    print('DEBUG LOGIN FAIL: user not found with login=%s password=%s' % (login, password), flush=True)
     return error_response('Invalid credentials', 401)
 
 

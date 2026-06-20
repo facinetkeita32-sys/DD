@@ -199,25 +199,28 @@ DB_ONLY_TABLES = {'pos.order', 'pos.order.line', 'pos.payment', 'pos.session', '
 
 
 def _ensure_all_tables():
-    for cls in _all_model_classes:
-        try:
-            _ensure_table(cls)
-        except Exception:
-            import traceback
-            print('Error ensuring table {}:'.format(cls._name))
-            traceback.print_exc()
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+        existing = {row[0] for row in cur.fetchall()}
+        cur.close()
+        for cls in _all_model_classes:
+            if cls._name not in existing:
+                try:
+                    _ensure_table(cls)
+                except Exception:
+                    import traceback
+                    print('Error ensuring table {}:'.format(cls._name))
+                    traceback.print_exc()
+    finally:
+        put_conn(conn)
 
 
 def _load_cache():
     global _db_cache, _cache_loaded
     if _cache_loaded:
         return
-    try:
-        _ensure_all_tables()
-    except Exception:
-        print('WARN: _ensure_all_tables() failed, continuing', flush=True)
-        import traceback
-        traceback.print_exc()
     conn = get_conn()
     try:
         model_tables = {cls._name for cls in _all_model_classes}
@@ -225,41 +228,51 @@ def _load_cache():
             cur = conn.cursor()
             cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
             all_table_names = [row[0] for row in cur.fetchall()]
-            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel') and t not in DB_ONLY_TABLES]
             cur.close()
+            tables = [t for t in all_table_names if t in model_tables and not t.endswith('_rel') and t not in DB_ONLY_TABLES]
         except Exception:
             print('WARN: could not list tables', flush=True)
             import traceback
             traceback.print_exc()
             tables = []
-        for table in tables:
-            _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
-            new_data = OrderedDict()
-            new_seq = 0
+        if tables:
             try:
                 cur = conn.cursor()
-                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (table,))
-                all_cols = [row[0] for row in cur.fetchall()]
+                cur.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_name = ANY(%s) ORDER BY table_name, ordinal_position", (tables,))
+                col_map = {}
+                for tbl, col in cur.fetchall():
+                    col_map.setdefault(tbl, []).append(col)
                 cur.close()
-                light_cols = [c for c in all_cols if c not in HEAVY_COLS]
-                if light_cols:
-                    col_list = ','.join('"{}"'.format(c) for c in light_cols)
-                    cur = conn.cursor()
-                    cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
-                    for row in cur:
-                        data = dict(zip(light_cols, row))
-                        rid = data.pop('id')
-                        new_data[rid] = data
-                        if rid > new_seq:
-                            new_seq = rid
-                    cur.close()
-                tbl = _db_cache[table]
-                tbl['_seq'] = new_seq
-                tbl['_data'] = new_data
             except Exception:
-                print('WARN: could not load table "{}", skipping'.format(table), flush=True)
+                print('WARN: could not list columns', flush=True)
                 import traceback
                 traceback.print_exc()
+                col_map = {}
+            for table in tables:
+                _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
+                new_data = OrderedDict()
+                new_seq = 0
+                try:
+                    all_cols = col_map.get(table, [])
+                    light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+                    if light_cols:
+                        col_list = ','.join('"{}"'.format(c) for c in light_cols)
+                        cur = conn.cursor()
+                        cur.execute('SELECT {} FROM "{}" ORDER BY id'.format(col_list, table))
+                        for row in cur:
+                            data = dict(zip(light_cols, row))
+                            rid = data.pop('id')
+                            new_data[rid] = data
+                            if rid > new_seq:
+                                new_seq = rid
+                        cur.close()
+                    tbl = _db_cache[table]
+                    tbl['_seq'] = new_seq
+                    tbl['_data'] = new_data
+                except Exception:
+                    print('WARN: could not load table "{}", skipping'.format(table), flush=True)
+                    import traceback
+                    traceback.print_exc()
         _cache_loaded = True
     finally:
         try:

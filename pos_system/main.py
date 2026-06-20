@@ -31,10 +31,13 @@ def _ensure_initialized():
                 break
         if not has_data:
             load_demo_data()
+            from .odoo_orm import _cache_loaded
+            _cache_loaded = False
         StockLot()._init_defaults()
     except Exception:
         import traceback
         traceback.print_exc()
+        _initialized = False
 
 
 @app.before_request

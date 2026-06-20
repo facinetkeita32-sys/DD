@@ -29,12 +29,21 @@ def _ensure_initialized():
             if tdata['_data'] and tname not in ('sqlite_sequence',):
                 has_data = True
                 break
+        print('INIT: _initialized=True, has_data={}'.format(has_data), flush=True)
         if not has_data:
-            print('Cache empty, loading demo data...', flush=True)
+            print('INIT: cache empty, loading demo data...', flush=True)
             load_demo_data()
+            prod_count = len(_db_cache.get('product.product', {}).get('_data', {}))
+            print('INIT: after load_demo_data, product.product has {} records in cache'.format(prod_count), flush=True)
             from . import odoo_orm
             odoo_orm._cache_loaded = False
+            print('INIT: reset _cache_loaded, calling _load_cache() again', flush=True)
             _load_cache()
+            prod_count2 = len(_db_cache.get('product.product', {}).get('_data', {}))
+            print('INIT: after 2nd _load_cache, product.product has {} records in cache'.format(prod_count2), flush=True)
+        else:
+            prod_count = len(_db_cache.get('product.product', {}).get('_data', {}))
+            print('INIT: cache already has data, product.product has {} records'.format(prod_count), flush=True)
         lot_start = time.time()
         StockLot()._init_defaults()
         lot_elapsed = time.time() - lot_start
@@ -51,8 +60,14 @@ def before_request():
     # Only load DB cache for API requests
     if request.path.startswith('/api/'):
         try:
+            print('BEFORE_REQ: _load_cache() start', flush=True)
             _load_cache()
+            print('BEFORE_REQ: _load_cache() done', flush=True)
+            print('BEFORE_REQ: _ensure_initialized() start', flush=True)
             _ensure_initialized()
+            print('BEFORE_REQ: _ensure_initialized() done', flush=True)
+            prod_count = len(_db_cache.get('product.product', {}).get('_data', {}))
+            print('BEFORE_REQ: product.product has {} records in cache'.format(prod_count), flush=True)
         except Exception:
             print('WARN: _load_cache/_ensure_initialized failed, serving with current cache', flush=True)
             import traceback

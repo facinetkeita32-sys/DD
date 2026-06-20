@@ -304,8 +304,8 @@ let App = {
     document.getElementById('screen-' + name)?.classList.add('active')
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'))
     document.querySelector(`.nav-link[data-screen="${name}"]`)?.classList.add('active')
-    if (name === 'pos') this.refreshAndRenderProducts()
-    if (name === 'products') this.refreshAndRenderProducts()
+    if (name === 'pos') { this.refreshAndRenderProducts() }
+    if (name === 'products') { this.refreshAndRenderProducts(); this.renderProductsTable() }
     if (name === 'orders') this.renderOrdersTable()
     if (name === 'customers') this.renderCustomersTable()
     if (name === 'inventory') this.renderInventory()

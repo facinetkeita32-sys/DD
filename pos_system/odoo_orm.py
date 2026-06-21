@@ -255,7 +255,7 @@ def _write_cache_version():
         pass
 
 def _load_cache():
-    global _db_cache, _cache_loaded, _cache_loaded_at
+    global _db_cache, _cache_loaded, _cache_loaded_at, _tables_ensured
     if _cache_loaded:
         if _read_cache_version() <= _cache_loaded_at:
             return

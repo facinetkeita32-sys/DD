@@ -902,8 +902,9 @@ class Model(metaclass=BaseModel):
         try:
             cur = conn.cursor()
             with _db_lock:
-                cur.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM "{}" FOR UPDATE'.format(cls._name))
-                new_id = cur.fetchone()[0]
+                cur.execute('SELECT id FROM "{}" ORDER BY id DESC LIMIT 1 FOR UPDATE'.format(cls._name))
+                row = cur.fetchone()
+                new_id = (row[0] + 1) if row else 1
             cur.close()
             data = {'id': new_id}
             for fname, field in cls._fields.items():

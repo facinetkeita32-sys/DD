@@ -319,7 +319,36 @@ import base64
 
 # === PRODUCTS ===
 
-@api_bp.route('/products', methods=['GET'])
+@api_bp.route('/products/best-sellers', methods=['GET'])
+def get_best_sellers():
+    from ..odoo_orm import get_conn, put_conn
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT l.product_id, SUM(l.qty) AS total_qty
+            FROM \"pos.order.line\" l
+            JOIN \"pos.order\" o ON o.id = l.order_id
+            WHERE o.state IN ('paid', 'done')
+            GROUP BY l.product_id
+            ORDER BY total_qty DESC
+            LIMIT 20
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        if not rows:
+            return success_response([])
+        pids = [r[0] for r in rows]
+        quantities = {r[0]: float(r[1]) for r in rows}
+        products = ProductProduct().search([('id', 'in', pids)])
+        result = model_to_dict(products, PRODUCT_FIELDS)
+        if isinstance(result, list):
+            for r in result:
+                r['total_sold'] = quantities.get(r['id'], 0)
+            result.sort(key=lambda x: quantities.get(x['id'], 0), reverse=True)
+        return success_response(result)
+    finally:
+        put_conn(conn)
 def get_products():
     domain = []
     args = request.args

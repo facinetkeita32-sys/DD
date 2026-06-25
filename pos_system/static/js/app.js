@@ -672,7 +672,7 @@ let App = {
       return
     }
 
-    const DISCOUNT_OPTIONS = [0, 20, 25, 30, 35, 40]
+    const DISCOUNT_OPTIONS = [0, 10, 20, 40]
     let subtotal = 0
     container.innerHTML = this.cart.map((item, i) => {
       const lineTotal = item.qty * item.price_unit

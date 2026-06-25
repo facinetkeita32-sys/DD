@@ -14,6 +14,8 @@ let App = {
   cart: [],
   cartCustomer: null,
   currentCategory: null,
+  _showBestSellers: false,
+  _cachedBestSellers: null,
   session: null,
   company: null,
 
@@ -354,14 +356,21 @@ let App = {
   renderCategories() {
     const container = document.getElementById('pos-categories')
     const cats = this.productCategories || []
-    let html = `<button class="pos-cat-btn ${!this.currentCategory ? 'active' : ''}" data-cat-id="">${I18n.t('pos.category_all', 'All')}</button>`
+    let html = `<button class="pos-cat-btn ${!this.currentCategory && !this._showBestSellers ? 'active' : ''}" data-cat-id="">${I18n.t('pos.category_all', 'All')}</button>`
     cats.forEach(c => {
       html += `<button class="pos-cat-btn ${this.currentCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${c.name}</button>`
     })
+    html += `<button class="pos-cat-btn ${this._showBestSellers ? 'active' : ''}" data-best-sellers="1">${I18n.t('pos.best_sellers', 'Best Sellers')}</button>`
     container.innerHTML = html
     container.querySelectorAll('.pos-cat-btn').forEach(btn => {
       btn.onclick = () => {
-        this.currentCategory = btn.dataset.catId ? parseInt(btn.dataset.catId) : null
+        if (btn.dataset.bestSellers) {
+          this._showBestSellers = true
+          this.currentCategory = null
+        } else {
+          this._showBestSellers = false
+          this.currentCategory = btn.dataset.catId ? parseInt(btn.dataset.catId) : null
+        }
         this.renderCategories()
         this.renderProducts()
       }
@@ -371,6 +380,7 @@ let App = {
   async refreshAndRenderProducts() {
     this.renderProducts()
     this.renderCategories()
+    this._cachedBestSellers = null
     try {
       const res = await this.api('GET', '/products')
       this.products = res.data || []
@@ -392,6 +402,10 @@ let App = {
       return true
     })
     const grid = document.getElementById('pos-product-grid')
+    if (this._showBestSellers) {
+      this._renderBestSellers(grid)
+      return
+    }
     if (!filtered.length) {
       grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</div>`
       return
@@ -443,6 +457,42 @@ let App = {
       }
     }, { rootMargin: '200px' })
     document.querySelectorAll('.lazy-img').forEach(img => this._lazyObserver.observe(img))
+  },
+
+  async _renderBestSellers(grid) {
+    if (!this._cachedBestSellers) {
+      try {
+        const res = await this.api('GET', '/products/best-sellers')
+        this._cachedBestSellers = res.data || []
+      } catch(e) {
+        grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger)">Error loading best sellers</div>`
+        return
+      }
+    }
+    const items = this._cachedBestSellers
+    if (!items.length) {
+      grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-light)">${I18n.t('product.no_products', 'No data yet')}</div>`
+      return
+    }
+    const threshold = this.lowStockThreshold || 5
+    const barMax = Math.max(threshold * 3, 1)
+    grid.innerHTML = items.map((p, idx) => {
+      const qty = p.available_qty || 0
+      const isOut = qty <= 0
+      const isLow = qty > 0 && qty < threshold
+      const cls = isOut ? 'product-card out-of-stock' : 'product-card'
+      return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
+        <div class="prod-img-wrap"><img class="prod-img lazy-img" data-src="/api/products/${p.id}/image" alt="${p.name}" onerror="this.outerHTML='<div class=prod-img-placeholder>📦</div>'" loading="lazy"></div>
+        <div class="prod-name">${p.name || ''}</div>
+        <div class="prod-price">${this.currencyFormat(p.list_price)}</div>
+        <div style="font-size:11px;color:var(--warning);font-weight:600">${p.total_sold || 0} sold</div>
+        <div class="stock-bar-wrap"><div class="stock-bar" style="width:${isOut ? 0 : Math.min(qty / barMax * 100, 100)}%;background:${isOut ? 'var(--danger)' : isLow ? 'var(--warning)' : 'var(--success)'}"></div></div>
+      </div>`
+    }).join('')
+    this._observeLazyImages()
+    grid.querySelectorAll('.product-card').forEach(card => {
+      card.onclick = () => this.addToCart(parseInt(card.dataset.id))
+    })
   },
 
   _normalizeBarcode(code) {

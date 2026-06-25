@@ -199,6 +199,7 @@ def _migrate_table(conn, model_class):
 
 
 HEAVY_COLS = {'logo', 'image'}
+CACHE_EXCLUDE_COLS = {'description', 'description_sale', 'notes', 'note'}
 DB_ONLY_TABLES = {'pos.order', 'pos.order.line', 'pos.payment', 'pos.session', 'login.log', 'inventory.item'}
 
 
@@ -289,7 +290,7 @@ def _load_cache():
                 new_seq = 0
                 try:
                     all_cols = _get_model_columns(cls)
-                    light_cols = [c for c in all_cols if c not in HEAVY_COLS]
+                    light_cols = [c for c in all_cols if c not in HEAVY_COLS and c not in CACHE_EXCLUDE_COLS]
                     if light_cols:
                         col_list = ','.join('"{}"'.format(c) for c in light_cols)
                         cur = conn.cursor()

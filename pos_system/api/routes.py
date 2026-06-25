@@ -126,6 +126,15 @@ def log_activity(action, details=''):
         }), daemon=True).start()
 
 
+# Field whitelists for API responses (only what frontend needs)
+PRODUCT_FIELDS = ['id', 'name', 'barcode', 'default_code', 'categ_id', 'list_price', 'cost_price', 'available_qty']
+USER_FIELDS = ['id', 'login', 'name', 'email', 'role', 'active']
+CUSTOMER_FIELDS = ['id', 'name', 'phone', 'email']
+ORDER_FIELDS = ['id', 'name', 'date_order', 'partner_id', 'user_id', 'amount_total', 'amount_paid', 'amount_change', 'state', 'delivery_cost', 'delivery_contact_name', 'delivery_contact_phone']
+ORDER_LINE_FIELDS = ['id', 'product_id', 'product_name', 'qty', 'price_unit', 'discount', 'price_subtotal']
+PAYMENT_FIELDS = ['id', 'payment_method_id', 'amount', 'payment_date']
+
+
 # === AUTH ===
 
 @api_bp.route('/auth/login', methods=['POST'])
@@ -142,7 +151,7 @@ def auth_login():
         log_activity('login')
         from ..permissions import get_role_screens, get_role_actions
         role = users[0]._data.get('role', 'cashier')
-        result = model_to_dict(users[0])
+        result = model_to_dict(users[0], USER_FIELDS)
         result['permissions'] = {
             'role': role,
             'screens': get_role_screens(role),
@@ -164,7 +173,7 @@ def auth_logout():
 @login_required
 def auth_me():
     from ..permissions import get_role_screens, get_role_actions
-    result = model_to_dict(g.user)
+    result = model_to_dict(g.user, USER_FIELDS)
     result['permissions'] = {
         'role': g.user_role,
         'screens': get_role_screens(g.user_role),
@@ -181,11 +190,7 @@ def auth_me():
 @permission_required('user.read')
 def get_users():
     users = ResUsers().search([])
-    result = []
-    for u in users:
-        d = model_to_dict(u)
-        d.pop('password', None)
-        result.append(d)
+    result = model_to_dict(users, USER_FIELDS)
     return success_response(result)
 
 
@@ -200,8 +205,7 @@ def create_user():
         return error_response('Login already exists')
     try:
         user = ResUsers().create(data)
-        d = model_to_dict(user)
-        d.pop('password', None)
+        d = model_to_dict(user, USER_FIELDS)
         log_activity('create', 'User: %s' % data.get('login', ''))
         return success_response(d, 'User created')
     except Exception as e:
@@ -221,8 +225,7 @@ def update_user(user_id):
     if data.get('password') == '' or data.get('password') is None:
         data.pop('password', None)
     users[0].write(data)
-    d = model_to_dict(users[0])
-    d.pop('password', None)
+    d = model_to_dict(users[0], USER_FIELDS)
     log_activity('update', 'User ID: %s' % user_id)
     return success_response(d, 'User updated')
 
@@ -302,8 +305,7 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
-    result = model_to_dict(products, fields)
+    result = model_to_dict(products, PRODUCT_FIELDS)
     if isinstance(result, list):
         pids = [r['id'] for r in result if r.get('id')]
         if pids:
@@ -358,7 +360,7 @@ def create_product():
     try:
         product = ProductProduct().create(data)
         log_activity('create', 'Product: %s' % data.get('name', ''))
-        return success_response(model_to_dict(product), 'Product created')
+        return success_response(model_to_dict(product, PRODUCT_FIELDS), 'Product created')
     except Exception as e:
         return error_response(str(e))
 
@@ -373,8 +375,7 @@ def update_product(product_id):
     data = request.get_json() or {}
     products[0].write(data)
     log_activity('update', 'Product ID: %s' % product_id)
-    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
-    return success_response(model_to_dict(products[0], fields), 'Product updated')
+    return success_response(model_to_dict(products[0], PRODUCT_FIELDS), 'Product updated')
 
 
 @api_bp.route('/products/bulk-update', methods=['POST'])
@@ -404,8 +405,7 @@ def bulk_update_products():
 
     log_activity('bulk_update', '%s products %s=%s' % (len(ids), field, value))
     updated = ProductProduct().search([('id', 'in', ids)])
-    fields = [f for f in ProductProduct._fields.keys() if f != 'image']
-    result = model_to_dict(updated, fields)
+    result = model_to_dict(updated, PRODUCT_FIELDS)
     return success_response(result, f'{len(ids)} products updated')
 
 
@@ -670,7 +670,7 @@ def get_customers():
             spent[pid] = spent.get(pid, 0) + amt
             if order._data.get('state') == 'pending':
                 due[pid] = due.get(pid, 0) + amt
-    result = serialize_model(ResPartner, customers)
+    result = serialize_model(ResPartner, customers, CUSTOMER_FIELDS)
     for c in result:
         c['total_spent'] = round(spent.get(c['id'], 0), 2)
         c['total_due'] = round(due.get(c['id'], 0), 2)
@@ -727,11 +727,11 @@ def get_orders():
         orders = PosOrder().search(domain, order='id desc', limit=100)
         result = []
         for order in orders:
-            d = model_to_dict(order)
+            d = model_to_dict(order, ORDER_FIELDS)
             lines_data = []
             lines = PosOrderLine().search([('order_id', '=', order.id)])
             for line in lines:
-                ld = model_to_dict(line)
+                ld = model_to_dict(line, ORDER_LINE_FIELDS)
                 pid = line._data.get('product_id', 0) or 0
                 if pid:
                     product = ProductProduct().browse([pid])
@@ -742,7 +742,7 @@ def get_orders():
             payments_data = []
             payments = PosPayment().search([('order_id', '=', order.id)])
             for pmt in payments:
-                pd_data = model_to_dict(pmt)
+                pd_data = model_to_dict(pmt, PAYMENT_FIELDS)
                 pmid = pmt._data.get('payment_method_id', 0) or 0
                 if pmid:
                     method = PosPaymentMethod().browse([pmid])
@@ -774,11 +774,11 @@ def get_order(order_id):
     if not orders:
         return error_response('Order not found', 404)
     order = orders[0]
-    d = model_to_dict(order)
+    d = model_to_dict(order, ORDER_FIELDS)
     lines = PosOrderLine().search([('order_id', '=', order.id)])
     d['lines'] = []
     for line in lines:
-        ld = model_to_dict(line)
+        ld = model_to_dict(line, ORDER_LINE_FIELDS)
         pid = line._data.get('product_id', 0) or 0
         if pid:
             product = ProductProduct().browse([pid])
@@ -786,7 +786,7 @@ def get_order(order_id):
                 ld['product_name'] = product[0]._data.get('name', '')
         d['lines'].append(ld)
     payments = PosPayment().search([('order_id', '=', order.id)])
-    d['payments'] = [model_to_dict(p) for p in payments]
+    d['payments'] = [model_to_dict(p, PAYMENT_FIELDS) for p in payments]
     pid = order._data.get('partner_id', 0) or 0
     if pid:
         partner = ResPartner().browse([pid])

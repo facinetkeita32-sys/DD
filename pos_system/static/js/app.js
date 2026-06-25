@@ -410,9 +410,7 @@ let App = {
         : isLow ? `<span class="stock-badge low">${I18n.t('product.low_stock', 'Low')}</span>`
         : qty > 0 ? `<span class="stock-badge ok">${I18n.t('product.in_stock', 'In Stock')}</span>` : ''
       const catName = p.categ_id ? p.categ_id.name || '' : ''
-      const imgHtml = p.image
-        ? `<img class="prod-img lazy-img" data-src="${p.image}" alt="${p.name}">`
-        : `<div class="prod-img-placeholder">📦</div>`
+      const imgHtml = `<img class="prod-img lazy-img" data-src="/api/products/${p.id}/image" alt="${p.name}" onerror="this.outerHTML='<div class=prod-img-placeholder>📦</div>'" loading="lazy">`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
         <div class="prod-name">${p.name || ''}</div>
@@ -436,9 +434,9 @@ let App = {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue
         const img = entry.target
-        const b64 = img.getAttribute('data-src')
-        if (b64) {
-          img.src = 'data:image/png;base64,' + b64
+        const url = img.getAttribute('data-src')
+        if (url) {
+          img.src = url
           img.removeAttribute('data-src')
         }
         this._lazyObserver.unobserve(img)
@@ -1126,7 +1124,7 @@ let App = {
       const barWidthTbl = isOut ? 0 : Math.min(qty / barMaxTbl * 100, 100)
       return `<tr class="${rowCls + expCls}">
         <td><input type="checkbox" class="bulk-item-cb" data-id="${p.id}" ${checked}></td>
-        <td>${p.image ? `<img class="prod-table-img lazy-img" data-src="${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
+        <td><img class="prod-table-img lazy-img" data-src="/api/products/${p.id}/image" alt="" onerror="this.outerHTML='<span class=prod-table-img-placeholder>📦</span>'" loading="lazy"></td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>

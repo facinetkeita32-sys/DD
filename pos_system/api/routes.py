@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db, _load_heavy, _batch_load_heavy, HEAVY_COLS, _persist_bulk_delete
+from ..odoo_orm import env, _db_cache as _db, _load_heavy, HEAVY_COLS, _persist_bulk_delete
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -307,9 +307,6 @@ def get_products():
     if isinstance(result, list):
         pids = [r['id'] for r in result if r.get('id')]
         if pids:
-            images = _batch_load_heavy(ProductProduct, pids, 'image')
-            for r in result:
-                r['image'] = images.get(r['id'], '') or ''
             all_lots = StockLot().search([('product_id', 'in', pids)])
             expiry_map = {}
             for lot in all_lots:
@@ -322,7 +319,6 @@ def get_products():
                 r['nearest_expiry'] = expiry_map.get(r.get('id'), '')
         else:
             for r in result:
-                r['image'] = ''
                 r['nearest_expiry'] = ''
     resp = success_response(result)
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -335,6 +331,23 @@ def get_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     return success_response(model_to_dict(products[0]))
+
+
+@api_bp.route('/products/<int:product_id>/image', methods=['GET'])
+def get_product_image(product_id):
+    products = ProductProduct().browse([product_id])
+    if not products:
+        return error_response('Product not found', 404)
+    raw = _load_heavy(ProductProduct, product_id, 'image')
+    if not raw:
+        return error_response('Image not found', 404)
+    if isinstance(raw, memoryview):
+        raw = bytes(raw)
+    elif isinstance(raw, str):
+        raw = raw.encode('latin-1')
+    import imghdr
+    img_type = imghdr.what(None, raw[:32]) or 'png'
+    return Response(raw, mimetype='image/{}'.format(img_type))
 
 
 @api_bp.route('/products', methods=['POST'])

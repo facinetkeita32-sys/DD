@@ -13,6 +13,7 @@ _db_cache = {}
 _db_lock = threading.Lock()
 _cache_loaded = False
 _cache_loaded_at = 0.0
+_MIN_CACHE_RELOAD_INTERVAL = 5.0
 _all_model_classes = []
 _CACHE_VERSION_FILE = '/tmp/_pos_cache_version'
 _tables_ensured = False
@@ -257,10 +258,14 @@ def _write_cache_version():
 def _load_cache():
     global _db_cache, _cache_loaded, _cache_loaded_at, _tables_ensured
     if _cache_loaded:
+        if time.time() - _cache_loaded_at < _MIN_CACHE_RELOAD_INTERVAL:
+            return
         if _read_cache_version() <= _cache_loaded_at:
             return
     with _db_lock:
         if _cache_loaded:
+            if time.time() - _cache_loaded_at < _MIN_CACHE_RELOAD_INTERVAL:
+                return
             if _read_cache_version() <= _cache_loaded_at:
                 return
         if not _tables_ensured:

@@ -349,6 +349,8 @@ def get_best_sellers():
         return success_response(result)
     finally:
         put_conn(conn)
+
+@api_bp.route('/products', methods=['GET'])
 def get_products():
     domain = []
     args = request.args

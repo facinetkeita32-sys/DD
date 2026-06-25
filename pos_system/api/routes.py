@@ -346,9 +346,21 @@ def get_product_image(product_id):
     if isinstance(raw, memoryview):
         raw = bytes(raw)
     elif isinstance(raw, str):
-        raw = raw.encode('latin-1')
-    import imghdr
-    img_type = imghdr.what(None, raw[:32]) or 'png'
+        import base64
+        raw = base64.b64decode(raw)
+    # Detect image type from magic bytes
+    if raw[:4] == b'\x89PNG':
+        img_type = 'png'
+    elif raw[:2] in (b'\xff\xd8',):
+        img_type = 'jpeg'
+    elif raw[:4] == b'GIF8':
+        img_type = 'gif'
+    elif raw[:2] == b'BM':
+        img_type = 'bmp'
+    elif raw[:4] == b'RIFF':
+        img_type = 'webp'
+    else:
+        img_type = 'png'
     return Response(raw, mimetype='image/{}'.format(img_type))
 
 

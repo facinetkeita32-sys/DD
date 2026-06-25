@@ -24,6 +24,7 @@ class ProductProduct(Model):
     uom_name = Char(string='Unit of Measure', default='Unit(s)')
     active = Boolean(string='Active', default=True)
     image = Text(string='Image')
+    image_path = Char(string='Image Path')
     tax_ids = Many2many('pos.tax', string='Taxes')
     pos_categ_ids = Many2many('pos.category', string='POS Categories')
     track_serial = Boolean(string='Track by Serial Number', default=False)

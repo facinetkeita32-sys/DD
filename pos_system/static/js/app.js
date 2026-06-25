@@ -1240,13 +1240,17 @@ let App = {
 
   async showProductModal(id) {
     let product = id ? this.products.find(p => p.id === id) : null
-    let existingImg = product ? (product.image || '') : ''
-    if (product && !existingImg && id) {
+    const imgUrl = id ? `/api/products/${id}/image` : ''
+    let existingImg = imgUrl
+    if (id) {
       try {
         const res = await this.api('GET', '/products/' + id)
-        if (res.data && res.data.image) {
-          existingImg = res.data.image
-          product.image = res.data.image
+        if (res.data) {
+          if (!product) {
+            product = res.data
+          } else {
+            Object.assign(product, res.data)
+          }
         }
       } catch(e) {}
     }
@@ -1276,7 +1280,7 @@ let App = {
         <label data-i18n="product.image">Image</label>
         <div class="image-upload-area ${existingImg ? 'has-image' : ''}" id="image-upload-area">
           <div id="image-upload-prompt">${I18n.t('product.upload_image', 'Upload Image')}</div>
-          <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg ? 'data:image/png;base64,' + existingImg : ''}">
+          <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg || ''}">
           <input type="file" id="image-file-input" accept="image/*" style="display:none">
           <input type="file" id="image-camera-input" accept="image/*" capture="environment" style="display:none">
         </div>

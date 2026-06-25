@@ -50,7 +50,8 @@ def _ensure_initialized():
                     print('{}: {} records loaded'.format(label, cnt), flush=True)
             if not all_ok:
                 print('Cache still empty after demo data load, will retry on next request', flush=True)
-                _initialized = False
+_initialized = False
+_images_migrated = False
                 from . import odoo_orm
                 odoo_orm._cache_loaded = False
                 return
@@ -59,6 +60,16 @@ def _ensure_initialized():
         lot_elapsed = time.time() - lot_start
         if lot_elapsed > 0.5:
             print('StockLot._init_defaults took {:.2f}s'.format(lot_elapsed), flush=True)
+        # One-time migration: existing base64 images to Supabase Storage
+        global _images_migrated
+        if not _images_migrated:
+            _images_migrated = True
+            try:
+                from .api.routes import migrate_product_images
+                migrate_product_images()
+            except Exception:
+                import traceback
+                traceback.print_exc()
     except Exception:
         import traceback
         traceback.print_exc()

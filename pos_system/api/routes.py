@@ -3,9 +3,10 @@ import threading
 import time
 from datetime import datetime
 from functools import wraps
-from flask import Blueprint, request, jsonify, g, session, Response
+from flask import Blueprint, request, jsonify, g, session, Response, redirect
 
 from ..odoo_orm import env, _db_cache as _db, _load_heavy, HEAVY_COLS, _persist_bulk_delete
+from ..services.storage import upload_image, delete_image, get_public_url, ensure_bucket
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -25,6 +26,30 @@ from ..models.delivery_zone import DeliveryZone
 from ..models.stock_lot import StockLot
 from ..models.login_log import LoginLog
 from ..models.inventory_item import InventoryItem
+
+
+def migrate_product_images():
+    products = ProductProduct().search([])
+    migrated = 0
+    for p in products:
+        image_path = p._data.get('image_path', '') or ''
+        if image_path:
+            continue
+        raw = _load_heavy(ProductProduct, p.id, 'image')
+        if raw:
+            if isinstance(raw, memoryview):
+                raw = bytes(raw)
+            if isinstance(raw, bytes):
+                import base64
+                raw = base64.b64encode(raw).decode('utf-8')
+            if isinstance(raw, str):
+                url = upload_image(p.id, raw)
+                if url:
+                    p.write({'image_path': str(p.id)})
+                    migrated += 1
+    if migrated:
+        print('Migrated {} product images to Supabase Storage'.format(migrated), flush=True)
+
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -127,7 +152,7 @@ def log_activity(action, details=''):
 
 
 # Field whitelists for API responses (only what frontend needs)
-PRODUCT_FIELDS = ['id', 'name', 'barcode', 'default_code', 'categ_id', 'list_price', 'cost_price', 'available_qty']
+PRODUCT_FIELDS = ['id', 'name', 'barcode', 'default_code', 'categ_id', 'list_price', 'cost_price', 'available_qty', 'image_path']
 USER_FIELDS = ['id', 'login', 'name', 'email', 'role', 'active']
 CUSTOMER_FIELDS = ['id', 'name', 'phone', 'email']
 ORDER_FIELDS = ['id', 'name', 'date_order', 'partner_id', 'user_id', 'amount_total', 'amount_paid', 'amount_change', 'state', 'delivery_cost', 'delivery_contact_name', 'delivery_contact_phone']
@@ -340,6 +365,11 @@ def get_product_image(product_id):
     products = ProductProduct().browse([product_id])
     if not products:
         return error_response('Product not found', 404)
+    p = products[0]
+    image_path = p._data.get('image_path', '') or ''
+    if image_path:
+        from flask import redirect
+        return redirect(get_public_url(product_id))
     raw = _load_heavy(ProductProduct, product_id, 'image')
     if not raw:
         return error_response('Image not found', 404)
@@ -371,6 +401,10 @@ def create_product():
     data = request.get_json() or {}
     try:
         product = ProductProduct().create(data)
+        if data.get('image'):
+            url = upload_image(product.id, data['image'])
+            if url:
+                product.write({'image_path': str(product.id)})
         log_activity('create', 'Product: %s' % data.get('name', ''))
         return success_response(model_to_dict(product, PRODUCT_FIELDS), 'Product created')
     except Exception as e:
@@ -385,7 +419,12 @@ def update_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     data = request.get_json() or {}
+    img_data = data.pop('image', None)
     products[0].write(data)
+    if img_data:
+        url = upload_image(product_id, img_data)
+        if url:
+            products[0].write({'image_path': str(product_id)})
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0], PRODUCT_FIELDS), 'Product updated')
 
@@ -429,6 +468,8 @@ def delete_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     name = products[0]._data.get('name', product_id)
+    if products[0]._data.get('image_path'):
+        delete_image(product_id)
     products[0].unlink()
     log_activity('delete', 'Product: %s' % name)
     return success_response(message='Product deleted')
@@ -451,8 +492,12 @@ def upload_product_image():
         return error_response('Empty file')
     try:
         img_data = base64.b64encode(file.read()).decode('utf-8')
+        url = upload_image(product_id, img_data)
+        if url:
+            products[0].write({'image_path': '{}'.format(product_id), 'image': img_data})
+            return success_response({'id': product_id, 'image_url': url}, 'Image uploaded')
         products[0].write({'image': img_data})
-        return success_response({'id': product_id, 'image': img_data}, 'Image uploaded')
+        return success_response({'id': product_id, 'image': img_data}, 'Image uploaded (local)')
     except Exception as e:
         return error_response(str(e))
 

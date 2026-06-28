@@ -456,6 +456,8 @@ def update_product(product_id):
         url = upload_image(product_id, img_data)
         if url:
             products[0].write({'image_path': str(product_id)})
+        else:
+            products[0].write({'image': img_data})
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0], PRODUCT_FIELDS), 'Product updated')
 

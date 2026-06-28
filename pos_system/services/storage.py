@@ -58,6 +58,7 @@ def upload_image(product_id, base64_data):
             _api_url('object/{}/{}'.format(BUCKET_NAME, path)),
             headers={'Authorization': 'Bearer {}'.format(SUPABASE_SERVICE_KEY)},
             data=raw,
+            params={'cacheControl': 'public, max-age=604800, immutable'},
         )
         if resp.status_code not in (200, 201):
             print('WARN: failed to upload image: {}'.format(resp.text), flush=True)

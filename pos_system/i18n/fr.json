@@ -87,6 +87,8 @@
   "product.import_json": "Importer depuis JSON",
   "product.import_title": "Import en Masse de Produits",
   "product.import_success": "Import terminé",
+  "product.bulk_delete": "Supprimer la Sélection",
+  "product.bulk_delete_confirm": "Supprimer",
   "product.import_result": "Résultat",
   "product.import_created": "Créés",
   "product.import_updated": "Mis à Jour",

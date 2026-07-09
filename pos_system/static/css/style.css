@@ -242,6 +242,10 @@ tr:hover td { background: var(--hover); }
 .backup-status #backup-status-text.idle { color: var(--success); }
 .backup-status #backup-status-text.error { color: var(--danger); }
 
+/* === Bulk Delete === */
+.bulk-delete-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--danger-light); border-radius: var(--radius) var(--radius) 0 0; border: 1px solid #fecaca; border-bottom: none; font-size: 13px; font-weight: 600; color: #991b1b; }
+.bulk-delete-bar .btn { flex-shrink: 0; }
+
 /* === Utility === */
 .status-badge { display: inline-block; padding: 3px 12px; border-radius: 100px; font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
 .status-paid, .status-done { background: var(--success-light); color: #065f46; }

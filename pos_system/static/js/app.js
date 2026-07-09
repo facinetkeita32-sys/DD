@@ -85,6 +85,7 @@ let App = {
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
+    document.getElementById('bulk-delete-btn').onclick = () => this.bulkDeleteProducts()
     document.getElementById('settings-save-btn').onclick = () => this.saveSettings()
     document.getElementById('add-user-btn').onclick = () => this.showUserModal()
     document.getElementById('add-delivery-zone-btn').onclick = () => this.showDeliveryZoneModal()
@@ -720,13 +721,17 @@ let App = {
 
   renderProductsTable() {
     const tbody = document.getElementById('products-tbody')
+    const selected = new Set(window._selectedProductIds || [])
     if (!this.products.length) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
+      document.getElementById('select-all-products').checked = false
+      this._updateBulkDeleteBar()
       return
     }
     const threshold = this.lowStockThreshold || 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
+    const allSelected = this.products.length > 0 && this.products.every(p => selected.has(p.id))
     tbody.innerHTML = this.products.map(p => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
@@ -753,7 +758,9 @@ let App = {
           expHtml = expDate.substring(0, 10)
         }
       }
+      const checked = selected.has(p.id) ? 'checked' : ''
       return `<tr class="${rowCls + expCls}">
+        <td><input type="checkbox" class="product-checkbox" value="${p.id}" ${checked} ${canDelete ? '' : 'disabled'}></td>
         <td>${p.image ? `<img class="prod-table-img" src="data:image/png;base64,${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
@@ -767,12 +774,31 @@ let App = {
         <td>${canDelete ? `<button class="btn btn-sm btn-danger delete-product" data-id="${p.id}">${I18n.t('common.delete', 'Delete')}</button>` : '-'}</td>
       </tr>`
     }).join('')
+    document.getElementById('select-all-products').checked = allSelected
     tbody.querySelectorAll('.edit-product').forEach(btn => {
       btn.onclick = () => this.showProductModal(parseInt(btn.dataset.id))
     })
     tbody.querySelectorAll('.delete-product').forEach(btn => {
       btn.onclick = () => this.deleteProduct(parseInt(btn.dataset.id))
     })
+    tbody.querySelectorAll('.product-checkbox').forEach(cb => {
+      cb.onchange = () => {
+        const ids = window._selectedProductIds || []
+        if (cb.checked) { if (!ids.includes(cb.value)) ids.push(cb.value) }
+        else { const i = ids.indexOf(cb.value); if (i >= 0) ids.splice(i, 1) }
+        window._selectedProductIds = ids
+        this._updateBulkDeleteBar()
+        document.getElementById('select-all-products').checked = this.products.length > 0 && this.products.every(p => ids.includes(p.id))
+      }
+    })
+    document.getElementById('select-all-products').onchange = () => {
+      const checked = document.getElementById('select-all-products').checked
+      const ids = checked ? this.products.map(p => p.id) : []
+      window._selectedProductIds = ids
+      this._updateBulkDeleteBar()
+      tbody.querySelectorAll('.product-checkbox').forEach(cb => { cb.checked = checked })
+    }
+    this._updateBulkDeleteBar()
     const headerActions = document.querySelector('#screen-products .screen-header .btn-group')
     if (headerActions) {
       headerActions.querySelectorAll('button').forEach(b => b.style.display = '')
@@ -784,6 +810,33 @@ let App = {
         const addBtn = document.getElementById('add-product-btn')
         if (addBtn) addBtn.style.display = 'none'
       }
+    }
+  },
+
+  _updateBulkDeleteBar() {
+    const ids = window._selectedProductIds || []
+    const bar = document.getElementById('bulk-delete-bar')
+    const countEl = document.getElementById('bulk-delete-count')
+    if (ids.length === 0 || !this.hasAction('product.delete')) {
+      bar.style.display = 'none'
+      return
+    }
+    bar.style.display = 'flex'
+    countEl.textContent = `${ids.length} product${ids.length !== 1 ? 's' : ''} selected`
+  },
+
+  async bulkDeleteProducts() {
+    const ids = window._selectedProductIds || []
+    if (!ids.length) return
+    if (!confirm(`${I18n.t('common.confirm', 'Confirm')}? ${I18n.t('product.bulk_delete_confirm', 'Delete')} ${ids.length} product${ids.length !== 1 ? 's' : ''}?`)) return
+    try {
+      await this.api('DELETE', '/products/bulk-delete', { ids })
+      this.products = this.products.filter(p => !ids.includes(p.id))
+      window._selectedProductIds = []
+      this._updateBulkDeleteBar()
+      this.renderAll()
+    } catch (e) {
+      alert('Error: ' + e.message)
     }
   },
 

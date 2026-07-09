@@ -294,6 +294,23 @@ def update_product(product_id):
     return success_response(model_to_dict(products[0]), 'Product updated')
 
 
+@api_bp.route('/products/bulk-delete', methods=['DELETE'])
+@login_required
+@permission_required('product.delete')
+def bulk_delete_products():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return error_response('No product IDs provided', 400)
+    count = 0
+    for pid in ids:
+        products = ProductProduct().browse([pid])
+        if products:
+            products[0].unlink()
+            count += 1
+    return success_response(message=f'{count} products deleted', data={'deleted': count})
+
+
 @api_bp.route('/products/<int:product_id>', methods=['DELETE'])
 @login_required
 @permission_required('product.delete')

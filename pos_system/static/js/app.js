@@ -728,7 +728,8 @@ let App = {
 
   renderProductsTable() {
     const tbody = document.getElementById('products-tbody')
-    const selected = new Set(window._selectedProductIds || [])
+    const selectedIds = (window._selectedProductIds || []).map(id => parseInt(id))
+    const selected = new Set(selectedIds)
     const catSelect = document.getElementById('products-category-filter')
     if (catSelect && !catSelect.dataset.populated) {
       catSelect.innerHTML = '<option value="">All Categories</option>' + (this.productCategories || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('')
@@ -812,9 +813,10 @@ let App = {
     })
     tbody.querySelectorAll('.product-checkbox').forEach(cb => {
       cb.onchange = () => {
-        const ids = window._selectedProductIds || []
-        if (cb.checked) { if (!ids.includes(cb.value)) ids.push(cb.value) }
-        else { const i = ids.indexOf(cb.value); if (i >= 0) ids.splice(i, 1) }
+        const pid = parseInt(cb.value)
+        let ids = window._selectedProductIds || []
+        if (cb.checked) { if (!ids.includes(pid)) ids.push(pid) }
+        else { ids = ids.filter(id => id !== pid) }
         window._selectedProductIds = ids
         this._updateBulkDeleteBar()
         const fp = this._filteredProducts || this.products
@@ -829,6 +831,7 @@ let App = {
       this._updateBulkDeleteBar()
       tbody.querySelectorAll('.product-checkbox').forEach(cb => { cb.checked = checked })
     }
+    window._selectedProductIds = window._selectedProductIds || []
     this._updateBulkDeleteBar()
     const headerActions = document.querySelector('#screen-products .screen-header .btn-group')
     if (headerActions) {

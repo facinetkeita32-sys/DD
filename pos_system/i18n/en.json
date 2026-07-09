@@ -11,6 +11,7 @@
   "nav.users": "Users",
   "nav.sessions": "Sessions",
   "nav.dashboard": "Dashboard",
+  "nav.activity": "Activity",
   "nav.logout": "Logout",
   "nav.login": "Login",
 
@@ -154,6 +155,7 @@
   "common.finish": "Finish",
   "common.print": "Print",
   "common.close": "Close",
+  "common.remaining": "remaining",
   "common.or": "- or -",
   "common.name": "Name",
 
@@ -235,5 +237,47 @@
   "backup.restore_btn": "Upload & Restore",
   "backup.restore_confirm": "This will overwrite existing data. Are you sure?",
   "backup.restore_done": "Restore completed",
-  "backup.exporting": "Exporting data..."
+  "backup.exporting": "Exporting data...",
+
+  "activity.title": "Activity Log",
+  "activity.no_logs": "No activity recorded yet.",
+  "activity.user": "User",
+  "activity.action": "Action",
+  "activity.details": "Details",
+  "activity.message": "Message",
+  "activity.timestamp": "Timestamp",
+  "activity.ip": "IP Address",
+  "activity.login": "Login",
+  "activity.logout": "Logout",
+  "activity.error": "Error loading activity log",
+  "activity.total": "Total:",
+  "activity.export": "Export CSV",
+  "common.filter": "Filter",
+  "common.all": "All Actions",
+
+  "payment.pay_later": "Pay Later (Credit)",
+  "payment.validate": "Validate Payment",
+
+  "product.use_batches": "Use Batches/Lots",
+  "product.manage_lots": "Manage Batches",
+  "lot.name": "Batch#",
+  "lot.qty": "Qty",
+  "lot.available": "Available",
+  "lot.cost": "Cost",
+  "lot.expiration": "Expiry",
+  "lot.add": "+ Add Batch",
+
+  "scanner.title": "Barcode Scanner",
+  "scanner.starting": "Starting camera...",
+  "scanner.ready": "Point camera at a barcode",
+  "scanner.found": "Found: ",
+  "scanner.no_detector": "BarcodeDetector not available",
+  "scanner.error": "Scanner error",
+  "scanner.camera_error": "Camera error: ",
+
+  "category.add": "Add Category",
+
+  "order.state_pending": "Pending Payment",
+
+  "dashboard.orders_pending": "Pending Orders"
 }

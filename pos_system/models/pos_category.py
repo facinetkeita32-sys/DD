@@ -1,4 +1,4 @@
-from ..odoo_orm import Model, Char, Many2one, Boolean, Integer
+from ..odoo_orm import Model, Char, Many2one, Boolean, Integer, Float
 
 
 class PosCategory(Model):
@@ -12,6 +12,7 @@ class PosCategory(Model):
     sequence = Integer(string='Sequence', default=10)
     active = Boolean(string='Active', default=True)
     color = Integer(string='Color Index', default=0)
+    ref_category_id = Many2one('product.category', string='Product Category')
 
     def _init_defaults(self):
         categories = [

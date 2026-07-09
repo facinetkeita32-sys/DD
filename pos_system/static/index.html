@@ -47,6 +47,7 @@
         <a class="nav-link" data-screen="sessions" data-i18n="nav.sessions">Sessions</a>
         <a class="nav-link" data-screen="reports" data-i18n="nav.reports">Reports</a>
         <a class="nav-link" data-screen="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+        <a class="nav-link" data-screen="activity" data-i18n="nav.activity">Activity</a>
         <a class="nav-link nav-link-users" data-screen="users" data-i18n="nav.users" style="display:none">Users</a>
         <a class="nav-link" data-screen="settings" data-i18n="nav.settings">Settings</a>
       </div>
@@ -66,6 +67,7 @@
           <div class="pos-toolbar">
             <div class="pos-scan-row">
               <input type="text" id="pos-barcode" class="barcode-input" placeholder="Scan barcode..." data-i18n-placeholder="pos.barcode" autofocus>
+              <button class="btn btn-sm btn-secondary" id="pos-scanner-btn" title="Camera Scanner" data-i18n-title="scanner.title">📷</button>
               <input type="text" id="pos-search" class="search-input" placeholder="Search products..." data-i18n-placeholder="pos.search">
             </div>
             <div id="pos-categories" class="pos-categories"></div>
@@ -337,7 +339,43 @@
         </div>
         <button class="btn btn-danger" id="backup-restore-btn" data-i18n="backup.restore_btn">Upload & Restore</button>
         <p id="backup-restore-message" class="success-message" style="margin-top:12px"></p>
+    </div>
+
+    <div id="screen-activity" class="content-screen">
+      <div class="screen-header"><h2 data-i18n="activity.title">Activity Log</h2></div>
+      <div id="activity-toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <input type="text" id="activity-search" placeholder="Search..." style="flex:1;min-width:120px">
+        <select id="activity-filter-action">
+          <option value="" data-i18n="common.all">All Actions</option>
+          <option value="login">Login</option>
+          <option value="logout">Logout</option>
+          <option value="create">Create</option>
+          <option value="update">Update</option>
+          <option value="delete">Delete</option>
+          <option value="cancel">Cancel</option>
+          <option value="validate_payment">Payment</option>
+          <option value="bulk_delete">Bulk Delete</option>
+          <option value="import">Import</option>
+          <option value="sync">Sync</option>
+        </select>
+        <input type="date" id="activity-date-from">
+        <input type="date" id="activity-date-to">
+        <button class="btn btn-sm btn-primary" id="activity-filter-btn" data-i18n="common.filter">Filter</button>
+        <button class="btn btn-sm btn-secondary" id="activity-export-btn" data-i18n="activity.export">Export CSV</button>
       </div>
+      <div id="activity-log-container"></div>
+    </div>
+  </div>
+</div>
+
+<div id="scanner-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" id="scanner-content" style="max-width:600px">
+    <h3 data-i18n="scanner.title">Barcode Scanner</h3>
+    <video id="scanner-video" style="width:100%;max-height:400px;background:#000" autoplay playsinline></video>
+    <canvas id="scanner-canvas" style="display:none"></canvas>
+    <p id="scanner-result" style="text-align:center;font-size:18px;margin:8px 0"></p>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="scanner-close" data-i18n="common.close">Close</button>
     </div>
   </div>
 </div>

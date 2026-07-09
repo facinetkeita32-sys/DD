@@ -13,6 +13,7 @@ let App = {
   cart: [],
   cartCustomer: null,
   currentCategory: null,
+  _cartDiscountPct: 0,
   session: null,
   company: null,
 
@@ -76,6 +77,10 @@ let App = {
         }, 150)
       }
     }
+    document.getElementById('pos-scanner-btn').onclick = () => this.showScannerModal()
+    document.getElementById('scanner-close').onclick = () => this.closeScanner()
+    document.getElementById('activity-filter-btn').onclick = () => this.renderActivity()
+    document.getElementById('activity-export-btn').onclick = () => this.exportActivityLog()
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
@@ -243,6 +248,7 @@ let App = {
     this.renderDashboard()
     this.renderSettings()
     this.renderUsersTable()
+    this.renderActivity()
   },
 
   refreshUI() {
@@ -276,6 +282,7 @@ let App = {
     if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
     if (name === 'reports') this.generateReport()
+    if (name === 'activity') this.renderActivity()
     if (name === 'users') this.renderUsersTable()
   },
 
@@ -518,6 +525,13 @@ let App = {
 
     // Delivery zones
     const zones = this.deliveryZones || []
+
+    // Cart-level discount
+    let discPct = parseFloat(document.getElementById('cart-discount-input')?.value) || 0
+    if (discPct > 0) {
+      subtotal = subtotal * (1 - discPct / 100)
+    }
+
     if (zones.length && deliveryEl) {
       deliveryEl.style.display = 'block'
       // Save contact field values before re-render
@@ -551,15 +565,23 @@ let App = {
       : 0
     const grandTotal = subtotal + dzCost
 
-    let totalHtml = `<span class="total-amount">${this.currencyFormat(subtotal)}</span>`
+    let totalHtml = `<div class="total-breakdown">
+      <span>${I18n.t('pos.subtotal', 'Subtotal')}: <strong>${this.currencyFormat(subtotal)}</strong></span>`
     if (dzCost > 0) {
-      totalHtml = `<div class="total-breakdown">
-        <span>${I18n.t('pos.subtotal', 'Subtotal')}: <strong>${this.currencyFormat(subtotal)}</strong></span>
-        <span style="font-size:13px;color:var(--text-secondary)">${I18n.t('delivery.cost', 'Delivery')}: <strong>${this.currencyFormat(dzCost)}</strong></span>
+      totalHtml += `<span style="font-size:13px;color:var(--text-secondary)">${I18n.t('delivery.cost', 'Delivery')}: <strong>${this.currencyFormat(dzCost)}</strong></span>`
+    }
+    totalHtml += `</div>
+      <div class="cart-discount-row">
+        <label data-i18n="pos.discount">Discount %</label>
+        <input type="number" id="cart-discount-input" value="${this._cartDiscountPct || 0}" min="0" max="100" step="1" style="width:60px" data-i18n-placeholder="pos.discount">
       </div>
       <span class="total-amount">${this.currencyFormat(grandTotal)}</span>`
-    }
     totalEl.innerHTML = totalHtml
+
+    document.getElementById('cart-discount-input').onchange = () => {
+      this._cartDiscountPct = parseFloat(document.getElementById('cart-discount-input').value) || 0
+      this.renderCart()
+    }
 
     container.querySelectorAll('.cart-qty-input').forEach(inp => {
       inp.onchange = () => this.updateCartQty(parseInt(inp.dataset.index), inp.value)
@@ -577,15 +599,18 @@ let App = {
       const lineTotal = item.qty * item.price_unit
       return sum + lineTotal - (lineTotal * (item.discount || 0) / 100)
     }, 0)
+    const discPct = this._cartDiscountPct || 0
+    const discountedSub = discPct > 0 ? subtotal * (1 - discPct / 100) : subtotal
     const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
     const dzCost = dz ? dz.cost : 0
-    const total = subtotal + dzCost
+    const total = discountedSub + dzCost
 
     let totalDisplay = `${this.currencyFormat(total)}`
-    if (dzCost > 0) {
-      totalDisplay = `${I18n.t('pos.subtotal', 'Subtotal')}: ${this.currencyFormat(subtotal)}<br>
-        <span style="font-size:14px;color:var(--text-light)">${I18n.t('delivery.cost', 'Delivery')}: ${this.currencyFormat(dzCost)}</span><br>
-        <span style="font-size:32px;font-weight:700">${this.currencyFormat(total)}</span>`
+    if (dzCost > 0 || discPct > 0) {
+      totalDisplay = `${I18n.t('pos.subtotal', 'Subtotal')}: ${this.currencyFormat(subtotal)}`
+      if (discPct > 0) totalDisplay += `<br><span style="font-size:14px;color:var(--text-light)">${I18n.t('pos.discount', 'Discount')} (${discPct}%): -${this.currencyFormat(subtotal - discountedSub)}</span>`
+      if (dzCost > 0) totalDisplay += `<br><span style="font-size:14px;color:var(--text-light)">${I18n.t('delivery.cost', 'Delivery')}: ${this.currencyFormat(dzCost)}</span>`
+      totalDisplay += `<br><span style="font-size:32px;font-weight:700">${this.currencyFormat(total)}</span>`
     }
 
     let html = `<h3>${I18n.t('payment.title', 'Payment')}</h3>
@@ -602,6 +627,9 @@ let App = {
         <input type="number" id="payment-tendered" value="${total}" step="100">
       </div>
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
+      <div class="form-group">
+        <label><input type="checkbox" id="payment-pay-later"> <span data-i18n="payment.pay_later">Pay Later (Credit)</span></label>
+      </div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
@@ -616,6 +644,12 @@ let App = {
         : `${this.currencyFormat(Math.abs(change))} ${I18n.t('common.remaining', 'remaining')}`
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
+    document.getElementById('payment-pay-later').onchange = () => {
+      const checked = document.getElementById('payment-pay-later').checked
+      document.getElementById('payment-tendered').disabled = checked
+      document.getElementById('payment-tendered').value = checked ? 0 : total
+      document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
+    }
     document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
   },
@@ -637,9 +671,12 @@ let App = {
       price_subtotal: (item.qty * item.price_unit) * (1 - (item.discount || 0) / 100),
     }))
 
+    const discPct = this._cartDiscountPct || 0
+    const payLater = document.getElementById('payment-pay-later')?.checked || false
+
     const payments = [{
       payment_method_id: methodId,
-      amount: total,
+      amount: payLater ? 0 : total,
       is_change: change,
     }]
 
@@ -654,7 +691,9 @@ let App = {
       delivery_cost: dzCost,
       delivery_contact_name: deliveryContactName,
       delivery_contact_phone: deliveryContactPhone,
-      state: 'paid',
+      discount: discPct,
+      discount_type: 'percent',
+      state: payLater ? 'pending' : 'paid',
     }
     if (dz) orderData.delivery_zone_id = dz.id
 
@@ -676,7 +715,7 @@ let App = {
 
       if (orderId) {
         const msg = changeMsg ? changeMsg + '\n\n' : ''
-        if (confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
+        if (!payLater && confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
           this.openPrintReceipt(orderId)
         }
       }
@@ -896,6 +935,8 @@ let App = {
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
+      <div class="form-group"><label><input type="checkbox" id="prod-use-batches" ${product && product.use_batches ? 'checked' : ''}> <span data-i18n="product.use_batches">Use Batches/Lots</span></label></div>
+      ${product && product.id ? '<div class="form-group"><button class="btn btn-sm btn-secondary" id="prod-manage-lots" data-i18n="product.manage_lots">Manage Batches</button></div>' : ''}
       <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" value="${product ? this._esc(product.barcode || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
       <div class="form-group">
@@ -940,6 +981,11 @@ let App = {
 
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
+    const manageLotsBtn = document.getElementById('prod-manage-lots')
+    if (manageLotsBtn) {
+      manageLotsBtn.onclick = () => this.showLotsModal(product.id)
+    }
+
     document.getElementById('prod-save').onclick = async () => {
       const catVal = document.getElementById('prod-category').value
       const data = {
@@ -947,6 +993,7 @@ let App = {
         list_price: parseFloat(document.getElementById('prod-price').value) || 0,
         cost_price: parseFloat(document.getElementById('prod-cost').value) || 0,
         available_qty: parseFloat(document.getElementById('prod-qty').value) || 0,
+        use_batches: document.getElementById('prod-use-batches').checked,
         barcode: document.getElementById('prod-barcode').value,
         expiration_date: document.getElementById('prod-expiration').value || false,
       }
@@ -1225,11 +1272,53 @@ let App = {
       }
       html += `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="App.openPrintReceipt(${id})">${I18n.t('receipt.print', 'Print Receipt')}</button>
-        <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>
-        <button class="btn btn-secondary" onclick="App.closeModal()">${I18n.t('common.close', 'Close')}</button>
-      </div>`
+        <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>`
+      if (o.state === 'pending') {
+        html += `<button class="btn btn-warning" id="validate-payment-btn" data-i18n="payment.validate">Validate Payment</button>`
+      }
+      html += `</div><div id="validate-payment-area"></div>`
       this.showModal(html)
+      const vpBtn = document.getElementById('validate-payment-btn')
+      if (vpBtn) {
+        vpBtn.onclick = () => this.showValidatePaymentModal(id, o)
+      }
     } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async showValidatePaymentModal(orderId, o) {
+    const remaining = (o.amount_total || 0) - (o.amount_paid || 0)
+    let html = `<h3 data-i18n="payment.validate">Validate Payment</h3>
+      <div style="text-align:center;font-size:24px;margin:16px 0">
+        <span data-i18n="common.remaining">Remaining:</span> <strong>${this.currencyFormat(Math.max(0, remaining))}</strong>
+      </div>
+      <div class="form-group">
+        <label data-i18n="payment.method">Payment Method</label>
+        <select id="vp-method">`
+    this.paymentMethods.forEach(pm => {
+      html += `<option value="${pm.id}">${pm.name}</option>`
+    })
+    html += `</select></div>
+      <div class="form-group">
+        <label data-i18n="payment.amount">Amount</label>
+        <input type="number" id="vp-amount" value="${Math.max(0, remaining)}" step="100">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="vp-confirm">${I18n.t('payment.confirm', 'Confirm')}</button>
+        <button class="btn btn-secondary" id="vp-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('vp-confirm').onclick = async () => {
+      const methodId = parseInt(document.getElementById('vp-method').value)
+      const amount = parseFloat(document.getElementById('vp-amount').value) || 0
+      try {
+        await this.api('POST', `/orders/${orderId}/validate-payment`, { payment_method_id: methodId, amount })
+        this.closeModal()
+        const res = await this.api('GET', '/orders')
+        this.renderOrdersTable()
+        this.renderDashboard()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('vp-cancel').onclick = () => this.closeModal()
   },
 
   openPrintReceipt(id) {
@@ -1381,9 +1470,11 @@ let App = {
       const d = res.data
       const cards = document.getElementById('dashboard-cards')
       const isAdmin = this.user && this.user.role === 'admin'
+      const pendingOrders = d.pending_orders || 0
       cards.innerHTML = `
         <div class="dash-card"><div class="dash-icon">💰</div><div class="dash-value">${this.currencyFormat(d.today_sales || 0)}</div><div class="dash-label">${I18n.t('dashboard.today_sales', "Today's Sales")}</div></div>
         <div class="dash-card"><div class="dash-icon">📋</div><div class="dash-value">${d.today_orders || 0}</div><div class="dash-label">${I18n.t('dashboard.today_orders', 'Orders Today')}</div></div>
+        <div class="dash-card"><div class="dash-icon">⏳</div><div class="dash-value">${pendingOrders}</div><div class="dash-label">${I18n.t('dashboard.orders_pending', 'Pending Orders')}</div></div>
         <div class="dash-card"><div class="dash-icon">📦</div><div class="dash-value">${d.total_products || 0}</div><div class="dash-label">${I18n.t('dashboard.active_products', 'Active Products')}</div></div>
         ${isAdmin ? `<div class="dash-card"><div class="dash-icon">💎</div><div class="dash-value">${this.currencyFormat(d.inventory_value || 0)}</div><div class="dash-label">${I18n.t('dashboard.inventory_value', 'Inventory Value')}</div></div>` : ''}
         <div class="dash-card"><div class="dash-icon">👥</div><div class="dash-value">${d.total_customers || 0}</div><div class="dash-label">${I18n.t('dashboard.active_customers', 'Active Customers')}</div></div>
@@ -1842,6 +1933,216 @@ let App = {
     await this.api('DELETE', `/product-categories/${id}`)
     this.productCategories = this.productCategories.filter(c => c.id !== id)
     this.renderAll()
+  },
+
+  // === BATCHES / LOTS ===
+
+  async showLotsModal(productId) {
+    const product = this.products.find(p => p.id === productId)
+    if (!product) return
+    let lots = []
+    try {
+      const res = await this.api('GET', `/products/${productId}/lots`)
+      lots = res.data || []
+    } catch(e) { lots = [] }
+    const rows = lots.map((l, i) => `<tr>
+      <td><input class="lot-name" value="${this._esc(l.name || '')}"></td>
+      <td><input class="lot-qty" type="number" step="0.01" value="${l.qty || 0}"></td>
+      <td><input class="lot-avail" type="number" step="0.01" value="${l.qty_available || 0}"></td>
+      <td><input class="lot-cost" type="number" step="100" value="${l.cost_price || 0}"></td>
+      <td><input class="lot-exp" type="date" value="${(l.expiration_date || '').substring(0, 10)}"></td>
+      <td><button class="btn btn-sm btn-danger lot-del" data-id="${l.id}">${I18n.t('common.delete', 'Del')}</button></td>
+    </tr>`).join('')
+    const html = `<h3>${I18n.t('product.manage_lots', 'Manage Batches')} — ${this._esc(product.name)}</h3>
+      <table class="table">
+        <thead><tr><th data-i18n="lot.name">Batch#</th><th data-i18n="lot.qty">Qty</th><th data-i18n="lot.available">Available</th><th data-i18n="lot.cost">Cost</th><th data-i18n="lot.expiration">Expiry</th><th></th></tr></thead>
+        <tbody id="lots-tbody">${rows}</tbody>
+      </table>
+      <button class="btn btn-sm btn-secondary" id="lot-add-row" data-i18n="lot.add">+ Add Batch</button>
+      <div class="btn-group" style="margin-top:8px">
+        <button class="btn btn-primary" id="lot-save" data-i18n="common.save">Save</button>
+        <button class="btn btn-secondary" id="lot-cancel" data-i18n="common.close">Close</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('lot-add-row').onclick = () => {
+      const tbody = document.getElementById('lots-tbody')
+      const tr = document.createElement('tr')
+      tr.innerHTML = '<td><input class="lot-name"></td><td><input class="lot-qty" type="number" step="0.01" value="0"></td><td><input class="lot-avail" type="number" step="0.01" value="0"></td><td><input class="lot-cost" type="number" step="100" value="0"></td><td><input class="lot-exp" type="date"></td><td><button class="btn btn-sm btn-danger lot-del">Del</button></td>'
+      tr.querySelector('.lot-del').onclick = () => tr.remove()
+      tbody.appendChild(tr)
+    }
+    document.getElementById('lots-tbody').querySelectorAll('.lot-del').forEach(btn => {
+      btn.onclick = async () => {
+        if (btn.dataset.id) {
+          await this.api('DELETE', `/lots/${btn.dataset.id}`)
+        }
+        btn.closest('tr').remove()
+      }
+    })
+    document.getElementById('lot-save').onclick = async () => {
+      const tbody = document.getElementById('lots-tbody')
+      const newRows = []
+      const updateRows = []
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const inputs = tr.querySelectorAll('input')
+        const delBtn = tr.querySelector('.lot-del')
+        if (!inputs[0].value.trim()) return
+        const data = {
+          name: inputs[0].value.trim(),
+          qty: parseFloat(inputs[1].value) || 0,
+          qty_available: parseFloat(inputs[2].value) || 0,
+          cost_price: parseFloat(inputs[3].value) || 0,
+          expiration_date: inputs[4].value || false,
+        }
+        if (delBtn && delBtn.dataset.id) {
+          data.id = parseInt(delBtn.dataset.id)
+          updateRows.push(data)
+        } else {
+          newRows.push(data)
+        }
+      })
+      try {
+        for (const r of newRows) {
+          await this.api('POST', `/products/${productId}/lots`, r)
+        }
+        for (const r of updateRows) {
+          await this.api('PUT', `/lots/${r.id}`, r)
+        }
+        this.closeModal()
+        const res = await this.api('GET', '/products')
+        this.products = res.data || []
+        this.renderAll()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('lot-cancel').onclick = () => this.closeModal()
+  },
+
+  // === ACTIVITY LOG ===
+
+  async renderActivity() {
+    const container = document.getElementById('activity-log-container')
+    if (!container) return
+    try {
+      const search = document.getElementById('activity-search')?.value || ''
+      const action = document.getElementById('activity-filter-action')?.value || ''
+      const dateFrom = document.getElementById('activity-date-from')?.value || ''
+      const dateTo = document.getElementById('activity-date-to')?.value || ''
+      let query = '/activity-log?limit=200'
+      if (search) query += '&search=' + encodeURIComponent(search)
+      if (action) query += '&action=' + encodeURIComponent(action)
+      if (dateFrom) query += '&date_from=' + encodeURIComponent(dateFrom)
+      if (dateTo) query += '&date_to=' + encodeURIComponent(dateTo)
+      const res = await this.api('GET', query)
+      const data = res.data || {}
+      const logs = data.data || []
+      const total = data.total || 0
+      if (!logs.length) {
+        container.innerHTML = `<p style="color:var(--text-light);padding:20px">${I18n.t('activity.no_logs', 'No activity recorded yet.')}</p>`
+        return
+      }
+      const actionLabels = {
+        'login': { label: 'Login', cls: 'badge badge-success' },
+        'logout': { label: 'Logout', cls: 'badge badge-secondary' },
+        'create': { label: 'Create', cls: 'badge badge-primary' },
+        'update': { label: 'Update', cls: 'badge badge-info' },
+        'delete': { label: 'Delete', cls: 'badge badge-danger' },
+        'cancel': { label: 'Cancel', cls: 'badge badge-warning' },
+        'validate_payment': { label: 'Payment', cls: 'badge badge-success' },
+        'bulk_update': { label: 'Bulk Update', cls: 'badge badge-info' },
+        'import': { label: 'Import', cls: 'badge badge-primary' },
+      }
+      container.innerHTML = `<div style="margin-bottom:8px;color:var(--text-light)" data-i18n="activity.total">Total: ${total}</div>
+        <div style="max-height:500px;overflow-y:auto"><table><thead><tr>
+        <th>${I18n.t('activity.user', 'User')}</th>
+        <th>${I18n.t('activity.action', 'Action')}</th>
+        <th>${I18n.t('activity.details', 'Details')}</th>
+        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
+        <th>${I18n.t('activity.ip', 'IP')}</th>
+      </tr></thead><tbody>${logs.map(l => {
+        const al = actionLabels[l.action] || { label: l.action, cls: 'badge badge-secondary' }
+        return `<tr>
+          <td>${this._esc(l.user_name || '')}</td>
+          <td><span class="${al.cls}">${al.label}</span></td>
+          <td style="font-size:13px;color:var(--text-light)">${this._esc(l.message || l.details || '-')}</td>
+          <td>${(l.timestamp || '').substring(0, 19)}</td>
+          <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
+        </tr>`
+      }).join('')}</tbody></table></div>`
+    } catch(e) { container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}</p>` }
+  },
+
+  async exportActivityLog() {
+    try {
+      const search = document.getElementById('activity-search')?.value || ''
+      const action = document.getElementById('activity-filter-action')?.value || ''
+      const dateFrom = document.getElementById('activity-date-from')?.value || ''
+      const dateTo = document.getElementById('activity-date-to')?.value || ''
+      let query = '/activity-log/export?'
+      if (search) query += '&search=' + encodeURIComponent(search)
+      if (action) query += '&action=' + encodeURIComponent(action)
+      if (dateFrom) query += '&date_from=' + encodeURIComponent(dateFrom)
+      if (dateTo) query += '&date_to=' + encodeURIComponent(dateTo)
+      window.open('/api' + query, '_blank')
+    } catch(e) { alert('Export error: ' + e.message) }
+  },
+
+  // === CAMERA SCANNER ===
+
+  showScannerModal() {
+    const overlay = document.getElementById('scanner-overlay')
+    overlay.style.display = 'flex'
+    const video = document.getElementById('scanner-video')
+    const canvas = document.getElementById('scanner-canvas')
+    const result = document.getElementById('scanner-result')
+    result.textContent = I18n.t('scanner.starting', 'Starting camera...')
+    if (this._scannerStream) {
+      this._scannerStream.getTracks().forEach(t => t.stop())
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        this._scannerStream = stream
+        video.srcObject = stream
+        video.play()
+        result.textContent = I18n.t('scanner.ready', 'Point camera at a barcode')
+        this._scanInterval = setInterval(() => {
+          if (video.readyState === 4) {
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+            try {
+              if (window.BarcodeDetector) {
+                const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e'] })
+                detector.detect(canvas).then(barcodes => {
+                  if (barcodes.length > 0) {
+                    result.textContent = I18n.t('scanner.found', 'Found: ') + barcodes[0].rawValue
+                    this.closeScanner()
+                    this.handleBarcodeScan(barcodes[0].rawValue)
+                  }
+                }).catch(() => {})
+              } else {
+                result.textContent = I18n.t('scanner.no_detector', 'BarcodeDetector not available')
+              }
+            } catch(e) {
+              result.textContent = I18n.t('scanner.error', 'Scanner error')
+            }
+          }
+        }, 500)
+      })
+      .catch(err => {
+        result.textContent = I18n.t('scanner.camera_error', 'Camera error: ') + err.message
+      })
+  },
+
+  closeScanner() {
+    if (this._scanInterval) {
+      clearInterval(this._scanInterval)
+      this._scanInterval = null
+    }
+    if (this._scannerStream) {
+      this._scannerStream.getTracks().forEach(t => t.stop())
+      this._scannerStream = null
+    }
+    document.getElementById('scanner-overlay').style.display = 'none'
   },
 
   // === MODAL ===

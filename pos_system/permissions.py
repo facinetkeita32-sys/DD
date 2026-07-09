@@ -1,6 +1,6 @@
 PERMISSIONS = {
     'admin': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write', 'customer.delete',
                     'order.create', 'order.cancel',

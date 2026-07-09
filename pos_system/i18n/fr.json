@@ -11,6 +11,7 @@
   "nav.users": "Utilisateurs",
   "nav.sessions": "Sessions",
   "nav.dashboard": "Tableau de Bord",
+  "nav.activity": "Activité",
   "nav.logout": "Déconnexion",
   "nav.login": "Connexion",
 
@@ -154,6 +155,7 @@
   "common.finish": "Terminer",
   "common.print": "Imprimer",
   "common.close": "Fermer",
+  "common.remaining": "restant",
   "common.or": "- ou -",
   "common.name": "Nom",
 
@@ -235,5 +237,47 @@
   "backup.restore_btn": "Charger et Restaurer",
   "backup.restore_confirm": "Cela écrasera les données existantes. Êtes-vous sûr ?",
   "backup.restore_done": "Restauration terminée",
-  "backup.exporting": "Exportation des données..."
+  "backup.exporting": "Exportation des données...",
+
+  "activity.title": "Journal d'Activité",
+  "activity.no_logs": "Aucune activité enregistrée.",
+  "activity.user": "Utilisateur",
+  "activity.action": "Action",
+  "activity.details": "Détails",
+  "activity.message": "Message",
+  "activity.timestamp": "Date/Heure",
+  "activity.ip": "Adresse IP",
+  "activity.login": "Connexion",
+  "activity.logout": "Déconnexion",
+  "activity.error": "Erreur lors du chargement du journal",
+  "activity.total": "Total:",
+  "activity.export": "Exporter CSV",
+  "common.filter": "Filtrer",
+  "common.all": "Toutes les Actions",
+
+  "payment.pay_later": "Payer Plus Tard (Crédit)",
+  "payment.validate": "Valider le Paiement",
+
+  "product.use_batches": "Utiliser Lots",
+  "product.manage_lots": "Gérer les Lots",
+  "lot.name": "Lot #",
+  "lot.qty": "Qté",
+  "lot.available": "Disponible",
+  "lot.cost": "Coût",
+  "lot.expiration": "Expiration",
+  "lot.add": "+ Ajouter Lot",
+
+  "scanner.title": "Scanner Code-barres",
+  "scanner.starting": "Démarrage de la caméra...",
+  "scanner.ready": "Pointez la caméra vers un code-barres",
+  "scanner.found": "Trouvé: ",
+  "scanner.no_detector": "Détecteur de code-barres non disponible",
+  "scanner.error": "Erreur du scanner",
+  "scanner.camera_error": "Erreur de caméra: ",
+
+  "category.add": "Ajouter Catégorie",
+
+  "order.state_pending": "Paiement en Attente",
+
+  "dashboard.orders_pending": "Commandes en Attente"
 }

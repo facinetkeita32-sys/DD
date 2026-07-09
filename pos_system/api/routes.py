@@ -1,9 +1,12 @@
 import json
+import threading
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
 from ..odoo_orm import env, _db_cache as _db
+from ..models.login_log import LoginLog
+from ..models.stock_lot import StockLot
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -105,6 +108,17 @@ def success_response(data=None, message=None):
 
 
 
+def log_activity(action, details='', model='', message=''):
+    uid = getattr(g, 'user_id', None) or session.get('user_id')
+    ip = request.remote_addr or ''
+    if uid:
+        threading.Thread(target=lambda: LoginLog().create({
+            'user_id': uid, 'action': action, 'details': details,
+            'model': model, 'message': message,
+            'ip_address': ip,
+        }), daemon=True).start()
+
+
 # === AUTH ===
 
 @api_bp.route('/auth/login', methods=['POST'])
@@ -116,6 +130,7 @@ def auth_login():
     if users:
         session['user_id'] = users[0].id
         session['lang'] = users[0].lang
+        log_activity('login')
         return success_response(model_to_dict(users[0]))
     return error_response('Invalid credentials', 401)
 
@@ -123,6 +138,7 @@ def auth_login():
 @api_bp.route('/auth/logout', methods=['POST'])
 @login_required
 def auth_logout():
+    log_activity('logout')
     session.clear()
     return success_response(message='Logged out')
 
@@ -162,6 +178,7 @@ def create_user():
         user = ResUsers().create(data)
         d = model_to_dict(user)
         d.pop('password', None)
+        log_activity('create', 'User: %s' % data.get('login', ''))
         return success_response(d, 'User created')
     except Exception as e:
         return error_response(str(e))
@@ -182,6 +199,7 @@ def update_user(user_id):
     users[0].write(data)
     d = model_to_dict(users[0])
     d.pop('password', None)
+    log_activity('update', 'User ID: %s' % user_id)
     return success_response(d, 'User updated')
 
 
@@ -195,6 +213,7 @@ def delete_user(user_id):
     if users[0].id == g.user_id:
         return error_response('Cannot delete yourself')
     users[0].unlink()
+    log_activity('delete', 'User ID: %s' % user_id)
     return success_response(message='User deleted')
 
 
@@ -277,6 +296,7 @@ def create_product():
     data = request.get_json() or {}
     try:
         product = ProductProduct().create(data)
+        log_activity('create', 'Product: %s' % data.get('name', ''))
         return success_response(model_to_dict(product), 'Product created')
     except Exception as e:
         return error_response(str(e))
@@ -291,6 +311,7 @@ def update_product(product_id):
         return error_response('Product not found', 404)
     data = request.get_json() or {}
     products[0].write(data)
+    log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0]), 'Product updated')
 
 
@@ -313,6 +334,7 @@ def bulk_update_products():
             products[0].write(update_vals)
             count += 1
     products = ProductProduct().search([])
+    log_activity('bulk_update', '%s products' % count)
     return success_response(message=f'{count} products updated', data=serialize_model(ProductProduct, products))
 
 
@@ -330,6 +352,7 @@ def bulk_delete_products():
         if products:
             products[0].unlink()
             count += 1
+    log_activity('bulk_delete', 'Products: %s IDs' % len(ids), model='product.product', message='Bulk deleted %d products' % count)
     return success_response(message=f'{count} products deleted', data={'deleted': count})
 
 
@@ -340,7 +363,9 @@ def delete_product(product_id):
     products = ProductProduct().browse([product_id])
     if not products:
         return error_response('Product not found', 404)
+    name = products[0]._data.get('name', str(product_id))
     products[0].unlink()
+    log_activity('delete', 'Product: %s' % name)
     return success_response(message='Product deleted')
 
 
@@ -455,6 +480,7 @@ def create_product_category():
         return error_response('Category already exists')
     try:
         cat = ProductCategory().create(data)
+        log_activity('create', 'Category: %s' % data.get('name', ''))
         return success_response(model_to_dict(cat), 'Category created')
     except Exception as e:
         return error_response(str(e))
@@ -470,6 +496,7 @@ def update_product_category(cat_id):
     data = request.get_json() or {}
     data.pop('id', None)
     cats[0].write(data)
+    log_activity('update', 'Category ID: %s' % cat_id)
     return success_response(model_to_dict(cats[0]), 'Category updated')
 
 
@@ -480,7 +507,9 @@ def delete_product_category(cat_id):
     cats = ProductCategory().browse([cat_id])
     if not cats:
         return error_response('Category not found', 404)
+    name = cats[0].name
     cats[0].unlink()
+    log_activity('delete', 'Category: %s' % name)
     return success_response(message='Category deleted')
 
 
@@ -491,6 +520,62 @@ def get_pos_categories():
     cats = PosCategory().search([])
     return success_response(serialize_model(PosCategory, cats))
 
+
+@api_bp.route('/product-categories/sync', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def sync_product_categories():
+    """Sync pos.category from product.category"""
+    data = request.get_json() or {}
+    cat_ids = data.get('category_ids', [])
+    if not cat_ids:
+        return error_response('No category IDs provided', 400)
+    count = 0
+    for cid in cat_ids:
+        cats = ProductCategory().browse([cid])
+        if not cats:
+            continue
+        pc = cats[0]
+        existing = PosCategory().search([('ref_category_id', '=', pc.id)])
+        pos_data = {'name': pc.name, 'ref_category_id': pc.id}
+        if pc.parent_id:
+            parent_pc_id = pc._data.get('parent_id') or getattr(pc.parent_id, 'id', None)
+            if parent_pc_id:
+                parent_pos = PosCategory().search([('ref_category_id', '=', parent_pc_id)])
+                if parent_pos:
+                    pos_data['parent_id'] = parent_pos[0].id
+        if existing:
+            existing[0].write(pos_data)
+        else:
+            PosCategory().create(pos_data)
+        count += 1
+    log_activity('sync', 'Product categories synced')
+    return success_response({'synced': count}, 'Categories synced')
+
+
+@api_bp.route('/pos-categories/sync', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def sync_pos_categories():
+    """Sync product.category from pos.category"""
+    data = request.get_json() or {}
+    cat_ids = data.get('category_ids', [])
+    if not cat_ids:
+        return error_response('No category IDs provided', 400)
+    count = 0
+    for cid in cat_ids:
+        poss = PosCategory().browse([cid])
+        if not poss:
+            continue
+        pc = poss[0]
+        existing = ProductCategory().search([('name', '=', pc.name)])
+        if existing:
+            existing[0].write({'name': pc.name})
+        else:
+            ProductCategory().create({'name': pc.name})
+        count += 1
+    log_activity('sync', 'POS categories synced')
+    return success_response({'synced': count}, 'Categories synced')
 
 
 # === CUSTOMERS ===
@@ -513,6 +598,7 @@ def create_customer():
     data['customer'] = True
     try:
         partner = ResPartner().create(data)
+        log_activity('create', 'Customer: %s' % data.get('name', ''))
         return success_response(model_to_dict(partner), 'Customer created')
     except Exception as e:
         return error_response(str(e))
@@ -527,6 +613,7 @@ def update_customer(customer_id):
         return error_response('Customer not found', 404)
     data = request.get_json() or {}
     partners[0].write(data)
+    log_activity('update', 'Customer ID: %s' % customer_id)
     return success_response(model_to_dict(partners[0]), 'Customer updated')
 
 
@@ -647,14 +734,16 @@ def create_order():
             prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
             qty = line._data.get('qty', 0) or 0
             if prod_id and qty:
-                products = ProductProduct().browse([prod_id])
-                if products:
-                    product = products[0]
-                    current_qty = product._data.get('available_qty', 0) or 0
-                    new_qty = current_qty - qty
-                    product.write({'available_qty': max(0, new_qty)})
+                StockLot.deduct_fefo(prod_id, qty)
 
         delivery_cost = float(data.get('delivery_cost', 0) or 0)
+        order_discount_pct = float(data.get('discount', 0) or 0)
+        discount_type = data.get('discount_type', 'percent')
+        if order_discount_pct > 0:
+            if discount_type == 'percent':
+                total = total * (1 - order_discount_pct / 100)
+            else:
+                total = max(0, total - order_discount_pct)
         grand_total = total + delivery_cost
 
         paid_total = 0
@@ -663,13 +752,18 @@ def create_order():
             pmt = PosPayment().create(pmt_data)
             paid_total += pmt.amount
 
+        is_pending = paid_total < grand_total
         order.write({
             'amount_total': grand_total,
             'delivery_cost': delivery_cost,
             'amount_paid': paid_total,
             'amount_change': max(0, paid_total - grand_total),
-            'state': 'paid',
+            'discount': order_discount_pct,
+            'discount_type': discount_type,
+            'amount_due': grand_total - paid_total if is_pending else 0,
+            'state': 'pending' if is_pending else 'paid',
         })
+        log_activity('create', 'Order: %s' % order.name)
         return success_response(model_to_dict(order), 'Order created')
     except Exception as e:
         return error_response(str(e))
@@ -690,14 +784,91 @@ def cancel_order(order_id):
         prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
         qty = line._data.get('qty', 0) or 0
         if prod_id and qty:
-            products = ProductProduct().browse([prod_id])
-            if products:
-                product = products[0]
-                current_qty = product._data.get('available_qty', 0) or 0
-                product.write({'available_qty': current_qty + qty})
+            StockLot.restore_qty(prod_id, qty)
     orders[0].action_cancel()
+    log_activity('cancel', 'Order: %s' % order.name)
     return success_response(message='Order cancelled')
 
+
+@api_bp.route('/orders/<int:order_id>/validate-payment', methods=['POST'])
+@login_required
+@permission_required('order.write')
+def validate_payment(order_id):
+    orders = PosOrder().browse([order_id])
+    if not orders:
+        return error_response('Order not found', 404)
+    order = orders[0]
+    if order.state != 'pending':
+        return error_response('Order is not pending payment', 400)
+    data = request.get_json() or {}
+    amount = float(data.get('amount', 0) or 0)
+    payment_method_id = data.get('payment_method_id')
+    if payment_method_id and amount > 0:
+        PosPayment().create({
+            'order_id': order.id,
+            'payment_method_id': payment_method_id,
+            'amount': amount,
+        })
+    total_paid = sum(p.amount for p in PosPayment().search([('order_id', '=', order.id)]))
+    change = max(0, total_paid - order.amount_total)
+    new_state = 'paid' if total_paid >= order.amount_total else 'pending'
+    order.write({'amount_paid': total_paid, 'amount_change': change, 'state': new_state})
+    log_activity('validate_payment', 'Order: %s' % order.name)
+    return success_response(model_to_dict(order), 'Payment validated')
+
+
+# === BATCHES / LOTS ===
+
+@api_bp.route('/products/<int:product_id>/lots', methods=['GET'])
+@login_required
+def get_product_lots(product_id):
+    lots = StockLot().search([('product_id', '=', product_id)])
+    return success_response(serialize_model(StockLot, lots))
+
+
+@api_bp.route('/products/<int:product_id>/lots', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def create_product_lot(product_id):
+    data = request.get_json() or {}
+    data['product_id'] = product_id
+    try:
+        lot = StockLot().create(data)
+        StockLot.recompute_product_qty(product_id)
+        log_activity('create', 'Lot: %s' % lot.name)
+        return success_response(model_to_dict(lot), 'Lot created')
+    except Exception as e:
+        return error_response(str(e))
+
+
+@api_bp.route('/lots/<int:lot_id>', methods=['PUT'])
+@login_required
+@permission_required('product.write')
+def update_lot(lot_id):
+    lots = StockLot().browse([lot_id])
+    if not lots:
+        return error_response('Lot not found', 404)
+    data = request.get_json() or {}
+    lots[0].write(data)
+    StockLot.recompute_product_qty(lots[0]._data.get('product_id'))
+    log_activity('update', 'Lot ID: %s' % lot_id)
+    return success_response(model_to_dict(lots[0]), 'Lot updated')
+
+
+@api_bp.route('/lots/<int:lot_id>', methods=['DELETE'])
+@login_required
+@permission_required('product.write')
+def delete_lot(lot_id):
+    lots = StockLot().browse([lot_id])
+    if not lots:
+        return error_response('Lot not found', 404)
+    pid = lots[0]._data.get('product_id')
+    name = lots[0].name
+    lots[0].unlink()
+    if pid:
+        StockLot.recompute_product_qty(pid)
+    log_activity('delete', 'Lot: %s' % name)
+    return success_response(message='Lot deleted')
 
 
 # === RECEIPTS ===
@@ -928,9 +1099,12 @@ def get_dashboard():
         unit_val = cost if cost > 0 else price
         inventory_value += qty * unit_val
 
+    pending_orders = PosOrder().search([('state', '=', 'pending')])
+
     return success_response({
         'today_sales': total_sales,
         'today_orders': total_orders,
+        'pending_orders': len(pending_orders),
         'total_products': len(products),
         'total_customers': len(ResPartner().search([('customer', '=', True)])),
         'inventory_value': inventory_value,
@@ -1075,6 +1249,77 @@ def get_sales_report():
 
 
 
+# === ACTIVITY LOG ===
+
+@api_bp.route('/activity-log', methods=['GET'])
+@login_required
+def get_activity_log():
+    args = request.args
+    domain = []
+    if args.get('action'):
+        domain.append(('action', '=', args['action']))
+    if args.get('model'):
+        domain.append(('model', '=', args['model']))
+    if args.get('user_id'):
+        domain.append(('user_id', '=', int(args['user_id'])))
+    if args.get('search'):
+        domain.append(('message', 'ilike', args['search']))
+    if args.get('date_from'):
+        domain.append(('timestamp', '>=', args['date_from'] + ' 00:00:00'))
+    if args.get('date_to'):
+        domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
+    offset = args.get('offset', 0, type=int)
+    limit = args.get('limit', 50, type=int)
+    logs = LoginLog().search(domain, order='timestamp desc', offset=offset, limit=limit)
+    total = LoginLog().search_count(domain)
+    result = []
+    for log in logs:
+        d = model_to_dict(log)
+        uid = log._data.get('user_id', 0) or 0
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                d['user_name'] = user[0]._data.get('name', '')
+        result.append(d)
+    return success_response({'total': total, 'data': result})
+
+
+@api_bp.route('/activity-log/export', methods=['GET'])
+@login_required
+def export_activity_log():
+    args = request.args
+    domain = []
+    if args.get('action'):
+        domain.append(('action', '=', args['action']))
+    if args.get('model'):
+        domain.append(('model', '=', args['model']))
+    if args.get('search'):
+        domain.append(('message', 'ilike', args['search']))
+    if args.get('date_from'):
+        domain.append(('timestamp', '>=', args['date_from'] + ' 00:00:00'))
+    if args.get('date_to'):
+        domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
+    total = LoginLog().search_count(domain)
+    logs = LoginLog().search(domain, order='timestamp desc')
+    lines = ['timestamp,user,action,model,message']
+    for log in logs:
+        d = model_to_dict(log)
+        uid = log._data.get('user_id', 0) or 0
+        uname = ''
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                uname = user[0]._data.get('name', '')
+        ts = d.get('timestamp', '')
+        action = d.get('action', '')
+        model = d.get('model', '')
+        msg = (d.get('message', '') or '').replace('"', '""')
+        lines.append(f'{ts},"{uname}",{action},{model},"{msg}"')
+    csv = '\r\n'.join(lines)
+    from flask import Response as FlaskResponse
+    return FlaskResponse(csv, mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename=activity_log.csv'})
+
+
 # === COMPANY ===
 
 @api_bp.route('/company', methods=['GET'])
@@ -1093,9 +1338,11 @@ def update_company():
     data = request.get_json() or {}
     if companies:
         companies[0].write(data)
+        log_activity('update', 'Company settings')
         return success_response(model_to_dict(companies[0]), 'Company updated')
     else:
         company = ResCompany().create(data)
+        log_activity('create', 'Company')
         return success_response(model_to_dict(company), 'Company created')
 
 

@@ -22,6 +22,7 @@ class PosOrder(Model):
     amount_change = Float(string='Change', digits=(16, 2), default=0.0)
     state = Selection([
         ('draft', 'Draft'),
+        ('pending', 'Pending Payment'),
         ('paid', 'Paid'),
         ('done', 'Done'),
         ('cancelled', 'Cancelled'),
@@ -33,6 +34,11 @@ class PosOrder(Model):
     delivery_contact_phone = Char(string='Delivery Contact Phone')
     note = Text(string='Note')
     pos_reference = Char(string='POS Reference')
+    discount = Float(string='Discount %', digits=(16, 2), default=0.0)
+    discount_type = Char(string='Discount Type', default='percent')
+    amount_due = Float(string='Amount Due', digits=(16, 2), default=0.0)
+    credit_limit = Float(string='Credit Limit', digits=(16, 2), default=0.0)
+    date_due = DateTime(string='Due Date')
 
     def action_paid(self):
         self.write({'state': 'paid', 'amount_paid': self.amount_total})

@@ -1088,9 +1088,13 @@ let App = {
 
   async deleteProduct(id) {
     if (!confirm(I18n.t('common.confirm', 'Confirm') + '?')) return
-    await this.api('DELETE', `/products/${id}`)
-    this.products = this.products.filter(p => p.id !== id)
-    this.renderAll()
+    try {
+      await this.api('DELETE', `/products/${id}`)
+      this.products = this.products.filter(p => p.id !== id)
+      this.renderAll()
+    } catch(e) {
+      alert('Error: ' + e.message)
+    }
   },
 
   showBulkUpdateModal() {

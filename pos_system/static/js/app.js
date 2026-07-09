@@ -80,6 +80,7 @@ let App = {
     document.getElementById('cart-clear').onclick = () => this.clearCart()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
+    document.getElementById('bulk-update-btn').onclick = () => this.showBulkUpdateModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
     const psearch = document.getElementById('products-search')
     if (psearch) psearch.oninput = () => this.renderProductsTable()
@@ -876,12 +877,19 @@ let App = {
     const existingImg = product ? (product.image || '') : ''
     const cats = this.productCategories || []
     const catOpts = cats.map(c => `<option value="${c.id}" ${product && product.categ_id && product.categ_id.id === c.id ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')
+    const posCats = this.categories || []
+    const userPosCats = product ? (product.pos_categ_ids || []) : []
+    const posCatCbs = posCats.map(c => {
+      const checked = userPosCats.includes(c.id) ? 'checked' : ''
+      return `<label class="pos-cat-checkbox"><input type="checkbox" class="pos-cat-cb" value="${c.id}" ${checked}> ${this._esc(c.name)}</label>`
+    }).join('')
     let html = `<h3>${title}</h3>
       <div class="form-group"><label data-i18n="product.name">Name</label><input id="prod-name" value="${product ? this._esc(product.name || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.category">Category</label>
         <select id="prod-category"><option value="">${I18n.t('common.none', 'None')}</option>${catOpts}</select>
         <button class="btn btn-sm btn-secondary" id="prod-add-cat" style="margin-top:4px" data-i18n="category.add">+ Add Category</button>
       </div>
+      ${posCats.length ? `<div class="form-group"><label data-i18n="product.pos_categories">POS Categories</label><div class="pos-cat-grid">${posCatCbs}</div></div>` : ''}
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
@@ -889,10 +897,14 @@ let App = {
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
-        <div class="image-upload-area ${existingImg ? 'has-image' : ''}" id="image-upload-area">
-          <div id="image-upload-prompt">${I18n.t('product.upload_image', 'Upload Image')}</div>
-          <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg ? 'data:image/png;base64,' + existingImg : ''}">
-          <input type="file" id="image-file-input" accept="image/*" style="display:none">
+        <div class="image-upload-row">
+          <div class="image-upload-area ${existingImg ? 'has-image' : ''}" id="image-upload-area">
+            <div id="image-upload-prompt">${I18n.t('product.upload_image', 'Upload Image')}</div>
+            <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg ? 'data:image/png;base64,' + existingImg : ''}">
+            <input type="file" id="image-file-input" accept="image/*" style="display:none">
+          </div>
+          <button class="btn btn-sm btn-secondary camera-btn" id="camera-btn" title="Capture from camera" data-i18n-title="product.camera">📷</button>
+          <input type="file" id="camera-file-input" accept="image/*" capture="environment" style="display:none">
         </div>
         ${existingImg ? `<button class="btn btn-sm btn-danger" id="remove-image-btn" style="margin-top:4px">${I18n.t('common.delete', 'Remove')}</button>` : ''}
       </div>
@@ -901,28 +913,20 @@ let App = {
         <button class="btn btn-secondary" id="prod-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
       </div>`
     this.showModal(html)
-    let newImageBase64 = existingImg
+    this._newImageBase64 = existingImg
 
     document.getElementById('image-upload-area').onclick = () => document.getElementById('image-file-input').click()
-    document.getElementById('image-file-input').onchange = (e) => {
-      const file = e.target.files[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const base64 = ev.target.result.split(',')[1]
-        newImageBase64 = base64
-        document.getElementById('image-preview').src = ev.target.result
-        document.getElementById('image-preview').style.display = 'block'
-        document.getElementById('image-upload-area').classList.add('has-image')
-        document.getElementById('image-upload-prompt').textContent = I18n.t('product.upload_image', 'Change Image')
-      }
-      reader.readAsDataURL(file)
+    document.getElementById('image-file-input').onchange = (e) => { this._handleImageFile(e, 'image-file-input') }
+    const cameraBtn = document.getElementById('camera-btn')
+    if (cameraBtn) {
+      cameraBtn.onclick = () => document.getElementById('camera-file-input').click()
+      document.getElementById('camera-file-input').onchange = (e) => { this._handleImageFile(e, 'camera-file-input') }
     }
 
     const removeBtn = document.getElementById('remove-image-btn')
     if (removeBtn) {
       removeBtn.onclick = () => {
-        newImageBase64 = ''
+        this._newImageBase64 = ''
         document.getElementById('image-preview').style.display = 'none'
         document.getElementById('image-upload-area').classList.remove('has-image')
         document.getElementById('image-upload-prompt').textContent = I18n.t('product.upload_image', 'Upload Image')
@@ -944,8 +948,14 @@ let App = {
         expiration_date: document.getElementById('prod-expiration').value || false,
       }
       if (catVal) data.categ_id = parseInt(catVal)
-      if (newImageBase64 !== undefined) {
-        data.image = newImageBase64
+      const posCatCbs = document.querySelectorAll('.pos-cat-cb:checked')
+      if (posCatCbs.length) {
+        data.pos_categ_ids = Array.from(posCatCbs).map(cb => parseInt(cb.value))
+      } else {
+        data.pos_categ_ids = []
+      }
+      if (this._newImageBase64 !== undefined) {
+        data.image = this._newImageBase64
       }
       try {
         if (product) {
@@ -960,6 +970,29 @@ let App = {
       } catch(e) { alert('Error: ' + e.message) }
     }
     document.getElementById('prod-cancel').onclick = () => this.closeModal()
+  },
+
+  _handleImageFile(e, inputId) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(',')[1]
+      this._newImageBase64 = base64
+      const preview = document.getElementById('image-preview')
+      if (preview) {
+        preview.src = ev.target.result
+        preview.style.display = 'block'
+      }
+      const area = document.getElementById('image-upload-area')
+      if (area) area.classList.add('has-image')
+      const prompt = document.getElementById('image-upload-prompt')
+      if (prompt) prompt.textContent = I18n.t('product.upload_image', 'Change Image')
+      const removeBtn = document.getElementById('remove-image-btn')
+      if (removeBtn) removeBtn.style.display = 'inline-block'
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
   },
 
   _esc(str) {
@@ -1058,6 +1091,54 @@ let App = {
     await this.api('DELETE', `/products/${id}`)
     this.products = this.products.filter(p => p.id !== id)
     this.renderAll()
+  },
+
+  showBulkUpdateModal() {
+    const ids = window._selectedProductIds || []
+    if (!ids.length) { alert('Select products first'); return }
+    const cats = this.productCategories || []
+    const catOpts = '<option value="">' + I18n.t('common.no_change', 'No Change') + '</option>' +
+      cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+    const html = `<h3>${I18n.t('product.bulk_update_title', 'Bulk Update Products')}</h3>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">${ids.length} product${ids.length !== 1 ? 's' : ''} selected. Leave blank to keep current value.</p>
+      <div class="form-group"><label data-i18n="product.price">Price</label><input id="bulk-price" type="number" step="100" placeholder="New price"></div>
+      <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="bulk-cost" type="number" step="100" placeholder="New cost"></div>
+      <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="bulk-qty" type="number" step="1" placeholder="New quantity"></div>
+      <div class="form-group"><label data-i18n="product.category">Category</label>
+        <select id="bulk-category">${catOpts}</select>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="bulk-update-exec">${I18n.t('common.save', 'Update')}</button>
+        <button class="btn btn-secondary" id="bulk-update-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    const priceEl = document.getElementById('bulk-price')
+    document.getElementById('bulk-update-exec').onclick = async () => {
+      const data = {}
+      if (priceEl.value) data.list_price = parseFloat(priceEl.value)
+      const costEl = document.getElementById('bulk-cost')
+      if (costEl.value) data.cost_price = parseFloat(costEl.value)
+      const qtyEl = document.getElementById('bulk-qty')
+      if (qtyEl.value) data.available_qty = parseFloat(qtyEl.value)
+      const catEl = document.getElementById('bulk-category')
+      if (catEl.value) data.categ_id = parseInt(catEl.value)
+      if (!Object.keys(data).length) { alert('No changes specified'); return }
+      data.ids = ids
+      try {
+        const res = await this.api('PUT', '/products/bulk-update', data)
+        this.closeModal()
+        if (res.data) {
+          this.products = res.data
+        } else {
+          const prodRes = await this.api('GET', '/products')
+          this.products = prodRes.data || []
+        }
+        window._selectedProductIds = []
+        this._updateBulkDeleteBar()
+        this.renderAll()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('bulk-update-cancel').onclick = () => this.closeModal()
   },
 
   // === ORDERS TABLE ===

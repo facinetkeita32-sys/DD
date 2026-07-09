@@ -367,6 +367,10 @@ class Model(metaclass=BaseModel):
         self._data['write_date'] = now
         self._data['write_uid'] = self._get_user_id()
         self._save()
+        for fname, value in list(vals.items()):
+            if fname in self._fields and isinstance(self._fields[fname], Many2many):
+                target_ids = [int(getattr(v, 'id', v)) for v in (value or [])]
+                _persist_m2m(self.__class__, self.id, fname, target_ids)
         return True
 
     def _save(self):
@@ -386,16 +390,21 @@ class Model(metaclass=BaseModel):
         fnames = fields if fields else list(self._fields.keys())
         for fname in fnames:
             if fname in self._fields:
-                val = self._data.get(fname)
-                if isinstance(self._fields[fname], Many2one) and val:
-                    comodel = self._fields[fname].comodel_name
-                    if comodel in _db_cache:
-                        name = _db_cache[comodel]['_data'].get(val, {}).get(self._rec_name, '')
-                        result[fname] = [val, str(name)]
+                field = self._fields[fname]
+                if isinstance(field, Many2many):
+                    m2m_ids = _load_m2m(self.__class__, self.id, fname)
+                    result[fname] = m2m_ids
+                else:
+                    val = self._data.get(fname)
+                    if isinstance(field, Many2one) and val:
+                        comodel = field.comodel_name
+                        if comodel in _db_cache:
+                            name = _db_cache[comodel]['_data'].get(val, {}).get(self._rec_name, '')
+                            result[fname] = [val, str(name)]
+                        else:
+                            result[fname] = val
                     else:
                         result[fname] = val
-                else:
-                    result[fname] = val
         return result
 
     def name_get(self):
@@ -428,6 +437,10 @@ class Model(metaclass=BaseModel):
         _persist_write(cls, new_id)
         obj = cls(**data)
         obj.id = new_id
+        for fname in cls._fields:
+            if isinstance(cls._fields[fname], Many2many) and fname in vals:
+                target_ids = [int(getattr(v, 'id', v)) for v in (vals[fname] or [])]
+                _persist_m2m(cls, new_id, fname, target_ids)
         return obj
 
     @classmethod

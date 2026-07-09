@@ -94,6 +94,10 @@
   "product.import_updated": "Mis à Jour",
   "product.import_errors": "Erreurs",
   "product.download_template": "Télécharger le Modèle CSV",
+  "product.bulk_update": "Mise à Jour Groupée",
+  "product.bulk_update_title": "Mise à Jour Groupée des Produits",
+  "product.pos_categories": "Catégories POS",
+  "product.camera": "Appareil Photo",
 
   "customer.title": "Clients",
   "customer.name": "Nom",

@@ -294,6 +294,28 @@ def update_product(product_id):
     return success_response(model_to_dict(products[0]), 'Product updated')
 
 
+@api_bp.route('/products/bulk-update', methods=['PUT'])
+@login_required
+@permission_required('product.write')
+def bulk_update_products():
+    data = request.get_json() or {}
+    ids = data.pop('ids', [])
+    if not ids:
+        return error_response('No product IDs provided', 400)
+    allowed = {'list_price', 'cost_price', 'available_qty', 'categ_id'}
+    update_vals = {k: v for k, v in data.items() if k in allowed and v is not None}
+    if not update_vals:
+        return error_response('No valid fields to update', 400)
+    count = 0
+    for pid in ids:
+        products = ProductProduct().browse([pid])
+        if products:
+            products[0].write(update_vals)
+            count += 1
+    products = ProductProduct().search([])
+    return success_response(message=f'{count} products updated', data=serialize_model(ProductProduct, products))
+
+
 @api_bp.route('/products/bulk-delete', methods=['DELETE'])
 @login_required
 @permission_required('product.delete')

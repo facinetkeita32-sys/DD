@@ -94,6 +94,10 @@
   "product.import_updated": "Updated",
   "product.import_errors": "Errors",
   "product.download_template": "Download CSV Template",
+  "product.bulk_update": "Bulk Update",
+  "product.bulk_update_title": "Bulk Update Products",
+  "product.pos_categories": "POS Categories",
+  "product.camera": "Camera",
 
   "customer.title": "Customers",
   "customer.name": "Name",

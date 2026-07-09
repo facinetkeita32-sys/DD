@@ -145,6 +145,13 @@ tr.row-expiring td { background: #fffbeb; }
 .image-upload-area { border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all var(--transition); background: var(--bg); }
 .image-upload-area:hover { border-color: var(--primary); background: rgba(124, 58, 237, 0.03); }
 .image-upload-area.has-image { border-color: var(--success); border-style: solid; background: var(--success-light); }
+.image-upload-row { display: flex; gap: 8px; align-items: flex-start; }
+.image-upload-row .image-upload-area { flex: 1; }
+.camera-btn { font-size: 20px; padding: 12px 16px; min-width: 48px; display: flex; align-items: center; justify-content: center; }
+.pos-cat-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pos-cat-checkbox { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-card); transition: all var(--transition); }
+.pos-cat-checkbox:hover { border-color: var(--primary); background: var(--primary-glow); }
+.pos-cat-checkbox input { margin: 0; }
 
 /* Cart */
 .cart-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, var(--bg), var(--bg-card)); }

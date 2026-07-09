@@ -24,7 +24,8 @@ FIELD_MAP = {
 
 def _get_pg_conn():
     import psycopg2
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    from psycopg2.extras import RealDictCursor
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=RealDictCursor)
     conn.autocommit = True
     return conn
 

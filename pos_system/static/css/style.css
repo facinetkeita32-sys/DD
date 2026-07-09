@@ -243,6 +243,10 @@ tr:hover td { background: var(--hover); }
 .backup-status #backup-status-text.error { color: var(--danger); }
 
 /* === Bulk Delete === */
+.product-filters { display: flex; gap: 10px; padding: 12px 0; flex-wrap: wrap; align-items: center; }
+.product-filters .search-input, .product-filters .filter-select { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-card); color: var(--text); }
+.product-filters .search-input:focus, .product-filters .filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.product-filters .filter-select { min-width: 130px; cursor: pointer; }
 .bulk-delete-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--danger-light); border-radius: var(--radius) var(--radius) 0 0; border: 1px solid #fecaca; border-bottom: none; font-size: 13px; font-weight: 600; color: #991b1b; }
 .bulk-delete-bar .btn { flex-shrink: 0; }
 

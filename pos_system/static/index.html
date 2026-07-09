@@ -111,6 +111,16 @@
           <button id="add-product-btn" class="btn btn-primary" data-i18n="product.add">Add Product</button>
         </div>
       </div>
+      <div class="product-filters">
+        <input type="text" id="products-search" class="search-input" placeholder="Search products..." data-i18n-placeholder="pos.search" style="flex:1;min-width:150px">
+        <select id="products-category-filter" class="filter-select"><option value="">All Categories</option></select>
+        <select id="products-stock-filter" class="filter-select">
+          <option value="">All Stock</option>
+          <option value="in">In Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="out">Out of Stock</option>
+        </select>
+      </div>
       <div class="bulk-delete-bar" id="bulk-delete-bar" style="display:none">
         <span id="bulk-delete-count"></span>
         <button class="btn btn-danger btn-sm" id="bulk-delete-btn" data-i18n="product.bulk_delete">Delete Selected</button>

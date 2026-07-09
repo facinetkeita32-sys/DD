@@ -81,6 +81,12 @@ let App = {
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
     document.getElementById('manage-cats-btn').onclick = () => this.showCategoryListModal()
+    const psearch = document.getElementById('products-search')
+    if (psearch) psearch.oninput = () => this.renderProductsTable()
+    const pcat = document.getElementById('products-category-filter')
+    if (pcat) pcat.onchange = () => this.renderProductsTable()
+    const pstock = document.getElementById('products-stock-filter')
+    if (pstock) pstock.onchange = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
@@ -722,7 +728,28 @@ let App = {
   renderProductsTable() {
     const tbody = document.getElementById('products-tbody')
     const selected = new Set(window._selectedProductIds || [])
-    if (!this.products.length) {
+    const catSelect = document.getElementById('products-category-filter')
+    if (catSelect && !catSelect.dataset.populated) {
+      catSelect.innerHTML = '<option value="">All Categories</option>' + (this.productCategories || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+      catSelect.dataset.populated = '1'
+    }
+
+    const search = (document.getElementById('products-search')?.value || '').toLowerCase()
+    const catFilter = document.getElementById('products-category-filter')?.value || ''
+    const stockFilter = document.getElementById('products-stock-filter')?.value || ''
+
+    let filtered = this.products.filter(p => {
+      if (search && !(p.name || '').toLowerCase().includes(search) && !(p.barcode || '').toLowerCase().includes(search)) return false
+      if (catFilter && (p.categ_id?.id || 0) != catFilter) return false
+      const qty = p.available_qty || 0
+      const threshold = this.lowStockThreshold || 5
+      if (stockFilter === 'in' && qty <= threshold) return false
+      if (stockFilter === 'low' && (qty > threshold || qty <= 0)) return false
+      if (stockFilter === 'out' && qty > 0) return false
+      return true
+    })
+
+    if (!filtered.length) {
       tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
       document.getElementById('select-all-products').checked = false
       this._updateBulkDeleteBar()
@@ -731,8 +758,9 @@ let App = {
     const threshold = this.lowStockThreshold || 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
-    const allSelected = this.products.length > 0 && this.products.every(p => selected.has(p.id))
-    tbody.innerHTML = this.products.map(p => {
+    const allSelected = filtered.length > 0 && filtered.every(p => selected.has(p.id))
+    this._filteredProducts = filtered
+    tbody.innerHTML = filtered.map(p => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
       const isOut = qty <= 0
@@ -788,12 +816,14 @@ let App = {
         else { const i = ids.indexOf(cb.value); if (i >= 0) ids.splice(i, 1) }
         window._selectedProductIds = ids
         this._updateBulkDeleteBar()
-        document.getElementById('select-all-products').checked = this.products.length > 0 && this.products.every(p => ids.includes(p.id))
+        const fp = this._filteredProducts || this.products
+        document.getElementById('select-all-products').checked = fp.length > 0 && fp.every(p => ids.includes(p.id))
       }
     })
     document.getElementById('select-all-products').onchange = () => {
       const checked = document.getElementById('select-all-products').checked
-      const ids = checked ? this.products.map(p => p.id) : []
+      const fp = this._filteredProducts || this.products
+      const ids = checked ? fp.map(p => p.id) : []
       window._selectedProductIds = ids
       this._updateBulkDeleteBar()
       tbody.querySelectorAll('.product-checkbox').forEach(cb => { cb.checked = checked })

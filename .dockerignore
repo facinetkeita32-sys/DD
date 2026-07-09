@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+*.db
+.git
+.gitignore
+*.md
+.env
+venv
+.vscode
+dist
+build
+*.spec
+cookies.txt

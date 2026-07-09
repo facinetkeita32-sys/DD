@@ -24,8 +24,7 @@ FIELD_MAP = {
 
 def _get_pg_conn():
     import psycopg2
-    from psycopg2.extras import RealDictCursor
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=RealDictCursor)
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     conn.autocommit = True
     return conn
 
@@ -135,10 +134,10 @@ def load_table(conn, table):
     if _use_pg:
         cur = conn.cursor()
         cur.execute(f'SELECT * FROM "{table}" ORDER BY id')
-        rows = cur.fetchall()
-        return [dict(r) for r in rows]
-    cur = conn.execute(f'SELECT * FROM "{table}" ORDER BY id')
-    return [dict(r) for r in cur.fetchall()]
+    else:
+        cur = conn.execute(f'SELECT * FROM "{table}" ORDER BY id')
+    cols = [desc[0] for desc in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
 def insert_m2m(conn, rel, col1, col2, obj_id, target_ids):

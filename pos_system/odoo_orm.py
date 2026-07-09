@@ -1,16 +1,22 @@
 import json
 import os
 import sys
-import sqlite3
 import threading
 from datetime import datetime
 from collections import OrderedDict
 from flask import g
 
+from . import db
+
 _db_cache = {}
 _db_lock = threading.Lock()
 
 def _get_db_path():
+    env_db = os.environ.get('DB_PATH') or os.environ.get('RENDER_DISK_PATH')
+    if env_db:
+        p = os.path.join(env_db, 'pos_data.db') if os.path.isdir(env_db) else env_db
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        return p
     if getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(os.path.abspath(sys.executable))
         return os.path.join(exe_dir, 'pos_data.db')
@@ -19,96 +25,71 @@ def _get_db_path():
 DB_PATH = _get_db_path()
 
 
-
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=OFF")
-    return conn
-
-
-FIELD_TO_SQLITE = {
-    'Char': 'TEXT',
-    'Text': 'TEXT',
-    'Integer': 'INTEGER',
-    'Float': 'REAL',
-    'Boolean': 'INTEGER',
-    'Date': 'TEXT',
-    'DateTime': 'TEXT',
-    'Many2one': 'INTEGER',
-    'Selection': 'TEXT',
-    'One2many': None,
-    'Many2many': None,
-}
+    return db.get_conn()
 
 
 def _sql_type(field):
-    tname = type(field).__name__
-    return FIELD_TO_SQLITE.get(tname, 'TEXT')
+    return db.sql_type(type(field).__name__)
 
 
 def _ensure_table(model_class):
     conn = get_conn()
     try:
         table = model_class._name
-        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
-        if cur.fetchone():
+        exists = table in db.get_tables(conn)
+        if exists:
             _migrate_table(conn, model_class)
             return
 
-        cols = ['id INTEGER PRIMARY KEY AUTOINCREMENT']
+        pk = 'id SERIAL PRIMARY KEY' if db._use_pg else 'id INTEGER PRIMARY KEY AUTOINCREMENT'
+        cols = [pk]
         for fname, field in model_class._fields.items():
             if fname == 'id':
                 continue
             st = _sql_type(field)
             if st is None:
                 continue
-            nullable = '' if getattr(field, 'required', False) else ''
+            nullable = ' NOT NULL' if getattr(field, 'required', False) else ''
             cols.append(f'"{fname}" {st}{nullable}')
         cols.append('"create_date" TEXT')
         cols.append('"write_date" TEXT')
         cols.append('"create_uid" INTEGER')
         cols.append('"write_uid" INTEGER')
 
-        conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ({", ".join(cols)})')
-        conn.commit()
+        db.create_table(conn, table, cols)
 
         for fname, field in model_class._fields.items():
             if isinstance(field, Many2many):
                 rel = field.rel or f'{table}_{field.comodel_name}_rel'
                 col1 = field.column1 or f'{table}_id'
                 col2 = field.column2 or f'{field.comodel_name}_id'
-                conn.execute(f'CREATE TABLE IF NOT EXISTS "{rel}" ("{col1}" INTEGER, "{col2}" INTEGER, PRIMARY KEY ("{col1}", "{col2}"))')
-                conn.commit()
+                db.create_m2m_table(conn, rel, col1, col2)
     finally:
         conn.close()
 
 
 def _migrate_table(conn, model_class):
     table = model_class._name
-    cur = conn.execute(f'PRAGMA table_info("{table}")')
-    existing = {row[1] for row in cur.fetchall()}
+    existing = db.get_table_columns(conn, table)
     for fname, field in model_class._fields.items():
         if fname == 'id' or fname in existing:
             continue
         st = _sql_type(field)
         if st is None:
             continue
-        conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{fname}" {st}')
+        db.add_column(conn, table, fname, st)
 
 
 def _load_cache():
     global _db_cache
     conn = get_conn()
     try:
-        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence']
+        tables = db.get_tables(conn)
         for table in tables:
             _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
-            cur2 = conn.execute(f'SELECT * FROM "{table}" ORDER BY id')
-            for row in cur2.fetchall():
-                data = dict(row)
+            rows = db.load_table(conn, table)
+            for data in rows:
                 rid = data.pop('id')
                 _db_cache[table]['_data'][rid] = data
                 if rid > _db_cache[table]['_seq']:
@@ -122,8 +103,7 @@ def _persist_write(cls, obj_id):
     data = dict(_db_cache[table]['_data'][obj_id])
     conn = get_conn()
     try:
-        cols = []
-        vals = []
+        cols = {}
         for k, v in data.items():
             if k == 'id':
                 continue
@@ -132,20 +112,11 @@ def _persist_write(cls, obj_id):
                 continue
             if isinstance(v, bool):
                 v = 1 if v else 0
-            cols.append(k)
-            vals.append(v)
+            cols[k] = v
         if not cols:
             return
-        qcols = [f'"{c}"' for c in cols]
-        existing = conn.execute(f'SELECT id FROM "{table}" WHERE id=?', (obj_id,)).fetchone()
-        if existing:
-            set_clause = ', '.join([f'{q}=?' for q in qcols])
-            conn.execute(f'UPDATE "{table}" SET {set_clause} WHERE id=?', vals + [obj_id])
-        else:
-            all_cols = '"id",' + ','.join(qcols)
-            all_ph = '?,' + ','.join(['?' for _ in cols])
-            conn.execute(f'INSERT INTO "{table}" ({all_cols}) VALUES ({all_ph})', [obj_id] + vals)
-        conn.commit()
+        db.insert_or_update(conn, table, cols, obj_id)
+        db.commit(conn)
     except Exception as e:
         import traceback
         print(f'SQL ERROR ({table}): {e}')
@@ -159,8 +130,8 @@ def _persist_delete(cls, obj_id):
     table = cls._name
     conn = get_conn()
     try:
-        conn.execute(f'DELETE FROM "{table}" WHERE id=?', (obj_id,))
-        conn.commit()
+        db.delete_row(conn, table, obj_id)
+        db.commit(conn)
     finally:
         conn.close()
 
@@ -172,10 +143,8 @@ def _persist_m2m(cls, obj_id, field_name, target_ids):
     col2 = field.column2 or f'{field.comodel_name}_id'
     conn = get_conn()
     try:
-        conn.execute(f'DELETE FROM "{rel}" WHERE "{col1}"=?', (obj_id,))
-        for tid in target_ids:
-            conn.execute(f'INSERT OR IGNORE INTO "{rel}" ("{col1}", "{col2}") VALUES (?,?)', (obj_id, int(tid)))
-        conn.commit()
+        db.insert_m2m(conn, rel, col1, col2, obj_id, target_ids)
+        db.commit(conn)
     finally:
         conn.close()
 
@@ -187,8 +156,7 @@ def _load_m2m(cls, obj_id, field_name):
     col2 = field.column2 or f'{field.comodel_name}_id'
     conn = get_conn()
     try:
-        cur = conn.execute(f'SELECT "{col2}" FROM "{rel}" WHERE "{col1}"=?', (obj_id,))
-        return [row[0] for row in cur.fetchall()]
+        return db.load_m2m(conn, rel, col1, col2, obj_id)
     finally:
         conn.close()
 

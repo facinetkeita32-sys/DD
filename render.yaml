@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: shop-with-dd-pos
+    runtime: python
+    repo: https://github.com/facinetkeita32-sys/DD
+    plan: starter
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn pos_system.main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"

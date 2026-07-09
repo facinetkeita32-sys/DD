@@ -1,0 +1,11 @@
+pos_data.db
+cookies.txt
+*.pyc
+__pycache__/
+dist/
+build/
+*.spec
+*.egg-info/
+.env
+.venv/
+venv/

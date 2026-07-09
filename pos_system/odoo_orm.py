@@ -1,0 +1,627 @@
+import json
+import os
+import sys
+import sqlite3
+import threading
+from datetime import datetime
+from collections import OrderedDict
+from flask import g
+
+_db_cache = {}
+_db_lock = threading.Lock()
+
+def _get_db_path():
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        return os.path.join(exe_dir, 'pos_data.db')
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'pos_data.db')
+
+DB_PATH = _get_db_path()
+
+
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=OFF")
+    return conn
+
+
+FIELD_TO_SQLITE = {
+    'Char': 'TEXT',
+    'Text': 'TEXT',
+    'Integer': 'INTEGER',
+    'Float': 'REAL',
+    'Boolean': 'INTEGER',
+    'Date': 'TEXT',
+    'DateTime': 'TEXT',
+    'Many2one': 'INTEGER',
+    'Selection': 'TEXT',
+    'One2many': None,
+    'Many2many': None,
+}
+
+
+def _sql_type(field):
+    tname = type(field).__name__
+    return FIELD_TO_SQLITE.get(tname, 'TEXT')
+
+
+def _ensure_table(model_class):
+    conn = get_conn()
+    try:
+        table = model_class._name
+        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+        if cur.fetchone():
+            _migrate_table(conn, model_class)
+            return
+
+        cols = ['id INTEGER PRIMARY KEY AUTOINCREMENT']
+        for fname, field in model_class._fields.items():
+            if fname == 'id':
+                continue
+            st = _sql_type(field)
+            if st is None:
+                continue
+            nullable = '' if getattr(field, 'required', False) else ''
+            cols.append(f'"{fname}" {st}{nullable}')
+        cols.append('"create_date" TEXT')
+        cols.append('"write_date" TEXT')
+        cols.append('"create_uid" INTEGER')
+        cols.append('"write_uid" INTEGER')
+
+        conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ({", ".join(cols)})')
+        conn.commit()
+
+        for fname, field in model_class._fields.items():
+            if isinstance(field, Many2many):
+                rel = field.rel or f'{table}_{field.comodel_name}_rel'
+                col1 = field.column1 or f'{table}_id'
+                col2 = field.column2 or f'{field.comodel_name}_id'
+                conn.execute(f'CREATE TABLE IF NOT EXISTS "{rel}" ("{col1}" INTEGER, "{col2}" INTEGER, PRIMARY KEY ("{col1}", "{col2}"))')
+                conn.commit()
+    finally:
+        conn.close()
+
+
+def _migrate_table(conn, model_class):
+    table = model_class._name
+    cur = conn.execute(f'PRAGMA table_info("{table}")')
+    existing = {row[1] for row in cur.fetchall()}
+    for fname, field in model_class._fields.items():
+        if fname == 'id' or fname in existing:
+            continue
+        st = _sql_type(field)
+        if st is None:
+            continue
+        conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{fname}" {st}')
+
+
+def _load_cache():
+    global _db_cache
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence']
+        for table in tables:
+            _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
+            cur2 = conn.execute(f'SELECT * FROM "{table}" ORDER BY id')
+            for row in cur2.fetchall():
+                data = dict(row)
+                rid = data.pop('id')
+                _db_cache[table]['_data'][rid] = data
+                if rid > _db_cache[table]['_seq']:
+                    _db_cache[table]['_seq'] = rid
+    finally:
+        conn.close()
+
+
+def _persist_write(cls, obj_id):
+    table = cls._name
+    data = dict(_db_cache[table]['_data'][obj_id])
+    conn = get_conn()
+    try:
+        cols = []
+        vals = []
+        for k, v in data.items():
+            if k == 'id':
+                continue
+            field = cls._fields.get(k)
+            if field and isinstance(field, (One2many, Many2many)):
+                continue
+            if isinstance(v, bool):
+                v = 1 if v else 0
+            cols.append(k)
+            vals.append(v)
+        if not cols:
+            return
+        qcols = [f'"{c}"' for c in cols]
+        existing = conn.execute(f'SELECT id FROM "{table}" WHERE id=?', (obj_id,)).fetchone()
+        if existing:
+            set_clause = ', '.join([f'{q}=?' for q in qcols])
+            conn.execute(f'UPDATE "{table}" SET {set_clause} WHERE id=?', vals + [obj_id])
+        else:
+            all_cols = '"id",' + ','.join(qcols)
+            all_ph = '?,' + ','.join(['?' for _ in cols])
+            conn.execute(f'INSERT INTO "{table}" ({all_cols}) VALUES ({all_ph})', [obj_id] + vals)
+        conn.commit()
+    except Exception as e:
+        import traceback
+        print(f'SQL ERROR ({table}): {e}')
+        traceback.print_exc()
+        raise
+    finally:
+        conn.close()
+
+
+def _persist_delete(cls, obj_id):
+    table = cls._name
+    conn = get_conn()
+    try:
+        conn.execute(f'DELETE FROM "{table}" WHERE id=?', (obj_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _persist_m2m(cls, obj_id, field_name, target_ids):
+    field = cls._fields[field_name]
+    rel = field.rel or f'{cls._name}_{field.comodel_name}_rel'
+    col1 = field.column1 or f'{cls._name}_id'
+    col2 = field.column2 or f'{field.comodel_name}_id'
+    conn = get_conn()
+    try:
+        conn.execute(f'DELETE FROM "{rel}" WHERE "{col1}"=?', (obj_id,))
+        for tid in target_ids:
+            conn.execute(f'INSERT OR IGNORE INTO "{rel}" ("{col1}", "{col2}") VALUES (?,?)', (obj_id, int(tid)))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _load_m2m(cls, obj_id, field_name):
+    field = cls._fields[field_name]
+    rel = field.rel or f'{cls._name}_{field.comodel_name}_rel'
+    col1 = field.column1 or f'{cls._name}_id'
+    col2 = field.column2 or f'{field.comodel_name}_id'
+    conn = get_conn()
+    try:
+        cur = conn.execute(f'SELECT "{col2}" FROM "{rel}" WHERE "{col1}"=?', (obj_id,))
+        return [row[0] for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+
+class Field:
+    def __init__(self, string=None, default=None, required=False, readonly=False, help=None):
+        self.string = string
+        self.default = default
+        self.required = required
+        self.readonly = readonly
+        self.help = help
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        import sys
+        _mod = sys.modules[__name__]
+        _env = _mod.env
+        val = obj._data.get(self.name, self._get_default())
+        if isinstance(self, Many2one) and val:
+            records = _env[self.comodel_name].browse(val)
+            return records[0] if records else False
+        if isinstance(self, One2many):
+            return _env[self.comodel_name].search([(self.inverse_field, '=', obj.id)])
+        if isinstance(self, Many2many):
+            return obj._get_m2m(self.name)
+        return val
+
+    def __set__(self, obj, value):
+        obj._data[self.name] = self.convert(value)
+
+    def _get_default(self):
+        d = self.default() if callable(self.default) else self.default
+        return d
+
+    def convert(self, value):
+        return value
+
+
+class Char(Field):
+    def __init__(self, size=None, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
+    def convert(self, value):
+        if value is not None:
+            return str(value)[:self.size] if self.size else str(value)
+        return value
+
+
+class Text(Field):
+    def convert(self, value):
+        return str(value) if value is not None else value
+
+
+class Integer(Field):
+    def convert(self, value):
+        return int(value) if value is not None else value
+
+
+class Float(Field):
+    def __init__(self, digits=None, **kwargs):
+        super().__init__(**kwargs)
+        self.digits = digits
+
+    def convert(self, value):
+        return float(value) if value is not None else 0.0
+
+
+class Boolean(Field):
+    def convert(self, value):
+        return bool(value) if value is not None else False
+
+
+class Date(Field):
+    def convert(self, value):
+        if isinstance(value, str):
+            return value
+        return value.strftime('%Y-%m-%d') if value else None
+
+
+class DateTime(Field):
+    def convert(self, value):
+        if isinstance(value, str):
+            return value
+        return value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+
+
+class Many2one(Field):
+    def __init__(self, comodel_name, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+
+    def convert(self, value):
+        if value is None or value == 0:
+            return False
+        return int(value)
+
+
+class One2many(Field):
+    def __init__(self, comodel_name, inverse_field, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+        self.inverse_field = inverse_field
+
+
+class Many2many(Field):
+    def __init__(self, comodel_name, rel=None, column1=None, column2=None, **kwargs):
+        super().__init__(**kwargs)
+        self.comodel_name = comodel_name
+        self.rel = rel
+        self.column1 = column1
+        self.column2 = column2
+
+
+class Selection(Field):
+    def __init__(self, selection, **kwargs):
+        super().__init__(**kwargs)
+        self.selection = selection
+
+    def convert(self, value):
+        return str(value) if value else value
+
+
+class BaseModel(type):
+    def __new__(cls, name, bases, attrs):
+        new_class = super().__new__(cls, name, bases, attrs)
+        if name != 'Model':
+            fields = {}
+            for attr_name, attr_value in attrs.items():
+                if isinstance(attr_value, Field):
+                    fields[attr_name] = attr_value
+            new_class._fields = fields
+            model_name = getattr(new_class, '_name', name.lower())
+            new_class._name = model_name
+            _db_cache.setdefault(model_name, {'_seq': 0, '_data': OrderedDict()})
+            _ensure_table(new_class)
+        return new_class
+
+
+class Model(metaclass=BaseModel):
+    _name = None
+    _description = None
+    _rec_name = 'name'
+    _order = 'id'
+
+    id = Integer(string='ID', readonly=True)
+    create_date = DateTime(string='Created on', readonly=True)
+    write_date = DateTime(string='Last Updated on', readonly=True)
+    create_uid = Many2one('res.users', string='Created by', readonly=True)
+    write_uid = Many2one('res.users', string='Last Updated by', readonly=True)
+
+    def __init__(self, **kwargs):
+        self._data = {}
+        for fname, field in self._fields.items():
+            if isinstance(field, (One2many, Many2many)):
+                continue
+            if field.default is not None:
+                default = field.default() if callable(field.default) else field.default
+                self._data[fname] = field.convert(default) if default is not None else field.convert(None)
+            else:
+                if isinstance(field, (Many2one, Boolean)):
+                    self._data[fname] = False
+                elif isinstance(field, Float):
+                    self._data[fname] = 0.0
+                elif isinstance(field, Integer):
+                    self._data[fname] = 0
+                elif isinstance(field, (Char, Text, Selection)):
+                    self._data[fname] = ''
+                else:
+                    self._data[fname] = None
+        for k, v in kwargs.items():
+            if k in self._fields and not isinstance(self._fields[k], (One2many, Many2many)):
+                self._data[k] = self._fields[k].convert(v)
+
+    def __setattr__(self, name, value):
+        if '_fields' in self.__class__.__dict__ and name in self._fields:
+            field = self._fields[name]
+            if isinstance(field, Many2one) and hasattr(value, 'id'):
+                value = value.id
+            self._data[name] = field.convert(value)
+        else:
+            super().__setattr__(name, value)
+
+    def _get_m2m(self, name):
+        field = self._fields[name]
+        col2 = field.column2 or f'{field.comodel_name}_id'
+        ids = _load_m2m(self.__class__, self.id, name)
+        return self.env[field.comodel_name].browse(ids)
+
+    @classmethod
+    def _get_user_id(cls):
+        try:
+            return getattr(g, 'user_id', False)
+        except Exception:
+            return False
+
+    def write(self, vals):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        for fname, value in vals.items():
+            if fname in self._fields and not self._fields[fname].readonly:
+                field = self._fields[fname]
+                self._data[fname] = field.convert(value)
+        self._data['write_date'] = now
+        self._data['write_uid'] = self._get_user_id()
+        self._save()
+        return True
+
+    def _save(self):
+        tbl = _db_cache[self._name]
+        tbl['_data'][self.id] = dict(self._data)
+        _persist_write(self.__class__, self.id)
+
+    def unlink(self):
+        tbl = _db_cache[self._name]
+        if self.id in tbl['_data']:
+            del tbl['_data'][self.id]
+        _persist_delete(self.__class__, self.id)
+        return True
+
+    def read(self, fields=None):
+        result = {'id': self.id}
+        fnames = fields if fields else list(self._fields.keys())
+        for fname in fnames:
+            if fname in self._fields:
+                val = self._data.get(fname)
+                if isinstance(self._fields[fname], Many2one) and val:
+                    comodel = self._fields[fname].comodel_name
+                    if comodel in _db_cache:
+                        name = _db_cache[comodel]['_data'].get(val, {}).get(self._rec_name, '')
+                        result[fname] = [val, str(name)]
+                    else:
+                        result[fname] = val
+                else:
+                    result[fname] = val
+        return result
+
+    def name_get(self):
+        name = self._data.get(self._rec_name, f'[{self._name} {self.id}]')
+        return (self.id, str(name))
+
+    @classmethod
+    def create(cls, vals):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        tbl = _db_cache[cls._name]
+        tbl['_seq'] += 1
+        new_id = tbl['_seq']
+        data = {'id': new_id}
+        for fname, field in cls._fields.items():
+            if fname == 'id':
+                continue
+            if fname in vals:
+                data[fname] = field.convert(vals[fname])
+            elif field.default is not None:
+                default = field.default() if callable(field.default) else field.default
+                data[fname] = field.convert(default) if default is not None else field.convert(None)
+            else:
+                data[fname] = field.convert(None)
+        data['create_date'] = now
+        data['write_date'] = now
+        uid = cls._get_user_id()
+        data['create_uid'] = uid
+        data['write_uid'] = uid
+        tbl['_data'][new_id] = data
+        _persist_write(cls, new_id)
+        obj = cls(**data)
+        obj.id = new_id
+        return obj
+
+    @classmethod
+    def search(cls, domain=None, order=None, limit=None, offset=0):
+        domain = domain or []
+        tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
+        results = []
+        for rid, rdata in tbl['_data'].items():
+            if cls._match_domain(rdata, domain):
+                obj = cls(**rdata)
+                obj.id = rid
+                results.append(obj)
+        order = order or cls._order
+        if order:
+            reverse = False
+            order_field = order
+            if order.startswith('-'):
+                reverse = True
+                order_field = order[1:]
+            results.sort(key=lambda x: x._data.get(order_field, ''), reverse=reverse)
+        if offset:
+            results = results[offset:]
+        if limit:
+            results = results[:limit]
+        return results
+
+    @classmethod
+    def browse(cls, ids):
+        if isinstance(ids, int):
+            ids = [ids]
+        tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
+        results = []
+        for rid in ids:
+            if rid in tbl['_data']:
+                obj = cls(**tbl['_data'][rid])
+                obj.id = rid
+                results.append(obj)
+        return results
+
+    @classmethod
+    def search_count(cls, domain=None):
+        return len(cls.search(domain))
+
+    @classmethod
+    def _match_domain(cls, data, domain):
+        if not domain:
+            return True
+
+        def _is_condition(item):
+            return isinstance(item, (list, tuple)) and len(item) == 3
+
+        stack = []
+        i = len(domain) - 1
+        while i >= 0:
+            item = domain[i]
+            if _is_condition(item):
+                field, operator, value = item
+                actual = data.get(field)
+                result = cls._eval_condition(actual, operator, value)
+                stack.append(result)
+            elif item == '!':
+                if stack:
+                    stack.append(not stack.pop())
+            elif item == '|':
+                if len(stack) >= 2:
+                    r1 = stack.pop()
+                    r2 = stack.pop()
+                    stack.append(r1 or r2)
+            elif item == '&' or (isinstance(item, str) and item not in ('|', '!')):
+                if len(stack) >= 2:
+                    r1 = stack.pop()
+                    r2 = stack.pop()
+                    stack.append(r1 and r2)
+            else:
+                stack.append(True)
+            i -= 1
+
+        if not stack:
+            return True
+        return all(stack)
+
+    @classmethod
+    def _eval_condition(cls, actual, operator, value):
+        if operator == '=':
+            return actual == value
+        elif operator == '!=':
+            return actual != value
+        elif operator == '>':
+            return actual is not None and actual > value
+        elif operator == '<':
+            return actual is not None and actual < value
+        elif operator == '>=':
+            return actual is not None and actual >= value
+        elif operator == '<=':
+            return actual is not None and actual <= value
+        elif operator == 'in':
+            return actual in value if isinstance(value, (list, tuple)) else actual == value
+        elif operator == 'not in':
+            return actual not in value if isinstance(value, (list, tuple)) else actual != value
+        elif operator == 'like':
+            return value.lower() in str(actual).lower()
+        elif operator == 'ilike':
+            return value.lower() in str(actual).lower()
+        elif operator == 'child_of':
+            return cls._check_child_of(data, field, value)  # noqa: F821
+        return True
+
+    @classmethod
+    def _check_child_of(cls, data, field, value):
+        parent_field = f'{field}_id'
+        current = data.get(parent_field)
+        visited = set()
+        while current:
+            if current == value:
+                return True
+            if current in visited:
+                break
+            visited.add(current)
+            parent_data = _db_cache.get(cls._name, {}).get('_data', {}).get(current, {})
+            current = parent_data.get(parent_field)
+        return False
+
+    @classmethod
+    def _get_table(cls):
+        return _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
+
+    def _get_data_dict(self):
+        return self._data
+
+    @classmethod
+    def get_all(cls):
+        tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
+        results = []
+        for rid in sorted(tbl['_data'].keys()):
+            obj = cls(**tbl['_data'][rid])
+            obj.id = rid
+            results.append(obj)
+        return results
+
+    @classmethod
+    def clear(cls):
+        if cls._name in _db_cache:
+            _db_cache[cls._name] = {'_seq': 0, '_data': OrderedDict()}
+        conn = get_conn()
+        try:
+            conn.execute(f'DELETE FROM "{cls._name}"')
+            conn.commit()
+        finally:
+            conn.close()
+
+
+class Environment:
+    def __init__(self):
+        self._models = {}
+
+    def __getitem__(self, model_name):
+        if model_name not in self._models:
+            for klass in Model.__subclasses__():
+                if klass._name == model_name:
+                    self._models[model_name] = klass
+                    break
+        return self._models.get(model_name)
+
+
+env = Environment()

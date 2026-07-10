@@ -260,15 +260,6 @@
 
   "payment.validate": "Valider le Paiement",
 
-  "product.use_batches": "Utiliser Lots",
-  "product.manage_lots": "Gérer les Lots",
-  "lot.name": "Lot #",
-  "lot.qty": "Qté",
-  "lot.available": "Disponible",
-  "lot.cost": "Coût",
-  "lot.expiration": "Expiration",
-  "lot.add": "+ Ajouter Lot",
-
   "scanner.title": "Scanner Code-barres",
   "scanner.starting": "Démarrage de la caméra...",
   "scanner.ready": "Pointez la caméra vers un code-barres",

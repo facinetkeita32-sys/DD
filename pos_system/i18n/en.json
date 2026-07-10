@@ -260,15 +260,6 @@
 
   "payment.validate": "Validate Payment",
 
-  "product.use_batches": "Use Batches/Lots",
-  "product.manage_lots": "Manage Batches",
-  "lot.name": "Batch#",
-  "lot.qty": "Qty",
-  "lot.available": "Available",
-  "lot.cost": "Cost",
-  "lot.expiration": "Expiry",
-  "lot.add": "+ Add Batch",
-
   "scanner.title": "Barcode Scanner",
   "scanner.starting": "Starting camera...",
   "scanner.ready": "Point camera at a barcode",

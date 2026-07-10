@@ -7,7 +7,6 @@ from flask import Blueprint, request, jsonify, g, session, Response
 from ..odoo_orm import env, _db_cache as _db, get_conn
 from .. import db
 from ..models.login_log import LoginLog
-from ..models.stock_lot import StockLot
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -751,6 +750,7 @@ def create_order():
     if session_id:
         data['session_id'] = session_id
     try:
+        ProductProduct()._reload_from_db()
         order = PosOrder().create(data)
         total = 0
         for line_data in lines_data:
@@ -765,7 +765,10 @@ def create_order():
             prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
             qty = line._data.get('qty', 0) or 0
             if prod_id and qty:
-                StockLot.deduct_fefo(prod_id, qty)
+                products = ProductProduct().browse([prod_id])
+                if products:
+                    cur_qty = products[0]._data.get('available_qty', 0) or 0
+                    products[0].write({'available_qty': max(0, cur_qty - qty)})
 
         delivery_cost = float(data.get('delivery_cost', 0) or 0)
         order_discount_pct = float(data.get('discount', 0) or 0)
@@ -810,12 +813,16 @@ def cancel_order(order_id):
     order = orders[0]
     if order.state in ('cancelled',):
         return error_response('Order is already cancelled')
+    ProductProduct()._reload_from_db()
     lines = PosOrderLine().search([('order_id', '=', order.id)])
     for line in lines:
         prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
         qty = line._data.get('qty', 0) or 0
         if prod_id and qty:
-            StockLot.restore_qty(prod_id, qty)
+            products = ProductProduct().browse([prod_id])
+            if products:
+                cur_qty = products[0]._data.get('available_qty', 0) or 0
+                products[0].write({'available_qty': cur_qty + qty})
     orders[0].action_cancel()
     log_activity('cancel', 'Order: %s' % order.name)
     return success_response(message='Order cancelled')
@@ -847,59 +854,6 @@ def validate_payment(order_id):
     log_activity('validate_payment', 'Order: %s' % order.name)
     return success_response(model_to_dict(order), 'Payment validated')
 
-
-# === BATCHES / LOTS ===
-
-@api_bp.route('/products/<int:product_id>/lots', methods=['GET'])
-@login_required
-def get_product_lots(product_id):
-    lots = StockLot().search([('product_id', '=', product_id)])
-    return success_response(serialize_model(StockLot, lots))
-
-
-@api_bp.route('/products/<int:product_id>/lots', methods=['POST'])
-@login_required
-@permission_required('product.write')
-def create_product_lot(product_id):
-    data = request.get_json() or {}
-    data['product_id'] = product_id
-    try:
-        lot = StockLot().create(data)
-        StockLot.recompute_product_qty(product_id)
-        log_activity('create', 'Lot: %s' % lot.name)
-        return success_response(model_to_dict(lot), 'Lot created')
-    except Exception as e:
-        return error_response(str(e))
-
-
-@api_bp.route('/lots/<int:lot_id>', methods=['PUT'])
-@login_required
-@permission_required('product.write')
-def update_lot(lot_id):
-    lots = StockLot().browse([lot_id])
-    if not lots:
-        return error_response('Lot not found', 404)
-    data = request.get_json() or {}
-    lots[0].write(data)
-    StockLot.recompute_product_qty(lots[0]._data.get('product_id'))
-    log_activity('update', 'Lot ID: %s' % lot_id)
-    return success_response(model_to_dict(lots[0]), 'Lot updated')
-
-
-@api_bp.route('/lots/<int:lot_id>', methods=['DELETE'])
-@login_required
-@permission_required('product.write')
-def delete_lot(lot_id):
-    lots = StockLot().browse([lot_id])
-    if not lots:
-        return error_response('Lot not found', 404)
-    pid = lots[0]._data.get('product_id')
-    name = lots[0].name
-    lots[0].unlink()
-    if pid:
-        StockLot.recompute_product_qty(pid)
-    log_activity('delete', 'Lot: %s' % name)
-    return success_response(message='Lot deleted')
 
 
 # === RECEIPTS ===

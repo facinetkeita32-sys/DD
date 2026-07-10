@@ -207,7 +207,7 @@ let App = {
       const [confRes, curRes, prodRes, pcatRes, custRes, pmRes, compRes, dzRes] = await Promise.all([
         this.api('GET', '/config'),
         this.api('GET', '/currencies'),
-        this.api('GET', '/products?light=true'),
+        this.api('GET', '/products?light=true&refresh=1'),
         this.api('GET', '/product-categories'),
         this.api('GET', '/customers'),
         this.api('GET', '/payment-methods'),
@@ -946,8 +946,6 @@ let App = {
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
-      <div class="form-group"><label><input type="checkbox" id="prod-use-batches" ${product && product.use_batches ? 'checked' : ''}> <span data-i18n="product.use_batches">Use Batches/Lots</span></label></div>
-      ${product && product.id ? '<div class="form-group"><button class="btn btn-sm btn-secondary" id="prod-manage-lots" data-i18n="product.manage_lots">Manage Batches</button></div>' : ''}
       <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" value="${product ? this._esc(product.barcode || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
       <div class="form-group">
@@ -1008,11 +1006,6 @@ let App = {
     }
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
-    const manageLotsBtn = document.getElementById('prod-manage-lots')
-    if (manageLotsBtn) {
-      manageLotsBtn.onclick = () => this.showLotsModal(product.id)
-    }
-
     document.getElementById('prod-save').onclick = async () => {
       const catVal = document.getElementById('prod-category').value
       const data = {
@@ -1020,7 +1013,6 @@ let App = {
         list_price: parseFloat(document.getElementById('prod-price').value) || 0,
         cost_price: parseFloat(document.getElementById('prod-cost').value) || 0,
         available_qty: parseFloat(document.getElementById('prod-qty').value) || 0,
-        use_batches: document.getElementById('prod-use-batches').checked,
         barcode: document.getElementById('prod-barcode').value,
         expiration_date: document.getElementById('prod-expiration').value || false,
       }
@@ -1955,88 +1947,6 @@ let App = {
     await this.api('DELETE', `/product-categories/${id}`)
     this.productCategories = this.productCategories.filter(c => c.id !== id)
     this.renderAll()
-  },
-
-  // === BATCHES / LOTS ===
-
-  async showLotsModal(productId) {
-    const product = this.products.find(p => p.id === productId)
-    if (!product) return
-    let lots = []
-    try {
-      const res = await this.api('GET', `/products/${productId}/lots`)
-      lots = res.data || []
-    } catch(e) { lots = [] }
-    const rows = lots.map((l, i) => `<tr>
-      <td><input class="lot-name" value="${this._esc(l.name || '')}"></td>
-      <td><input class="lot-qty" type="number" step="0.01" value="${l.qty || 0}"></td>
-      <td><input class="lot-avail" type="number" step="0.01" value="${l.qty_available || 0}"></td>
-      <td><input class="lot-cost" type="number" step="100" value="${l.cost_price || 0}"></td>
-      <td><input class="lot-exp" type="date" value="${(l.expiration_date || '').substring(0, 10)}"></td>
-      <td><button class="btn btn-sm btn-danger lot-del" data-id="${l.id}">${I18n.t('common.delete', 'Del')}</button></td>
-    </tr>`).join('')
-    const html = `<h3>${I18n.t('product.manage_lots', 'Manage Batches')} — ${this._esc(product.name)}</h3>
-      <table class="table">
-        <thead><tr><th data-i18n="lot.name">Batch#</th><th data-i18n="lot.qty">Qty</th><th data-i18n="lot.available">Available</th><th data-i18n="lot.cost">Cost</th><th data-i18n="lot.expiration">Expiry</th><th></th></tr></thead>
-        <tbody id="lots-tbody">${rows}</tbody>
-      </table>
-      <button class="btn btn-sm btn-secondary" id="lot-add-row" data-i18n="lot.add">+ Add Batch</button>
-      <div class="btn-group" style="margin-top:8px">
-        <button class="btn btn-primary" id="lot-save" data-i18n="common.save">Save</button>
-        <button class="btn btn-secondary" id="lot-cancel" data-i18n="common.close">Close</button>
-      </div>`
-    this.showModal(html)
-    document.getElementById('lot-add-row').onclick = () => {
-      const tbody = document.getElementById('lots-tbody')
-      const tr = document.createElement('tr')
-      tr.innerHTML = '<td><input class="lot-name"></td><td><input class="lot-qty" type="number" step="0.01" value="0"></td><td><input class="lot-avail" type="number" step="0.01" value="0"></td><td><input class="lot-cost" type="number" step="100" value="0"></td><td><input class="lot-exp" type="date"></td><td><button class="btn btn-sm btn-danger lot-del">Del</button></td>'
-      tr.querySelector('.lot-del').onclick = () => tr.remove()
-      tbody.appendChild(tr)
-    }
-    document.getElementById('lots-tbody').querySelectorAll('.lot-del').forEach(btn => {
-      btn.onclick = async () => {
-        if (btn.dataset.id) {
-          await this.api('DELETE', `/lots/${btn.dataset.id}`)
-        }
-        btn.closest('tr').remove()
-      }
-    })
-    document.getElementById('lot-save').onclick = async () => {
-      const tbody = document.getElementById('lots-tbody')
-      const newRows = []
-      const updateRows = []
-      tbody.querySelectorAll('tr').forEach(tr => {
-        const inputs = tr.querySelectorAll('input')
-        const delBtn = tr.querySelector('.lot-del')
-        if (!inputs[0].value.trim()) return
-        const data = {
-          name: inputs[0].value.trim(),
-          qty: parseFloat(inputs[1].value) || 0,
-          qty_available: parseFloat(inputs[2].value) || 0,
-          cost_price: parseFloat(inputs[3].value) || 0,
-          expiration_date: inputs[4].value || false,
-        }
-        if (delBtn && delBtn.dataset.id) {
-          data.id = parseInt(delBtn.dataset.id)
-          updateRows.push(data)
-        } else {
-          newRows.push(data)
-        }
-      })
-      try {
-        for (const r of newRows) {
-          await this.api('POST', `/products/${productId}/lots`, r)
-        }
-        for (const r of updateRows) {
-          await this.api('PUT', `/lots/${r.id}`, r)
-        }
-        this.closeModal()
-        const res = await this.api('GET', '/products?light=true&refresh=1')
-        this.products = res.data || []
-        this.renderAll()
-      } catch(e) { alert('Error: ' + e.message) }
-    }
-    document.getElementById('lot-cancel').onclick = () => this.closeModal()
   },
 
   // === ACTIVITY LOG ===

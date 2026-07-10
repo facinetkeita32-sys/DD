@@ -27,7 +27,6 @@ class ProductProduct(Model):
     tax_ids = Many2many('pos.tax', string='Taxes')
     pos_categ_ids = Many2many('pos.category', string='POS Categories')
     track_serial = Boolean(string='Track by Serial Number', default=False)
-    use_batches = Boolean(string='Use Batches/Lots', default=False)
     is_favorite = Boolean(string='Favorite', default=False)
     color = Integer(string='Color Index', default=0)
     expiration_date = Date(string='Expiration Date')

@@ -188,6 +188,11 @@ tr.row-expiring td { background: #fffbeb; }
 .cart-total #cart-total-amount { font-size: 24px; color: var(--primary); width:100%; }
 .cart-total .total-breakdown { width: 100%; display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: var(--text-secondary); }
 .cart-total .total-breakdown span { display: flex; gap: 4px; }
+.cart-discount-row { display:flex; align-items:center; gap:8px; padding:8px 0; font-size:13px; font-weight:500; flex-wrap:wrap; }
+.cart-discount-row > span { color:var(--text-secondary); white-space:nowrap; }
+.cart-discount-row #cart-discount-btns { display:flex; gap:4px; flex-wrap:wrap; }
+.cart-discount-row #cart-discount-btns .btn { min-width:48px; padding:4px 10px; font-size:12px; font-weight:600; }
+.cart-discount-row #cart-discount-label { font-weight:700; color:var(--danger); font-size:14px; }
 .cart-discount-row { width:100%; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; padding:4px 0; }
 .cart-discount-row label { color:var(--text-secondary); white-space:nowrap; }
 .cart-discount-row input { padding:4px 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:13px; width:60px; text-align:center; }

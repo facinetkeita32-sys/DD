@@ -41,6 +41,7 @@
   "pos.new_order": "New Order",
   "pos.barcode": "Scan barcode...",
   "pos.added": "added",
+  "pos.off": "OFF",
 
   "payment.title": "Payment",
   "payment.method": "Payment Method",
@@ -150,6 +151,7 @@
   "common.confirm": "Confirm",
   "common.yes": "Yes",
   "common.no": "No",
+  "common.none": "None",
   "common.back": "Back",
   "common.change": "change",
   "common.next": "Next",

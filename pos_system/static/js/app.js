@@ -544,6 +544,26 @@ let App = {
       subtotal = subtotal * (1 - discPct / 100)
     }
 
+    const discRow = document.getElementById('cart-discount-row')
+    const discBtns = document.getElementById('cart-discount-btns')
+    const discLabel = document.getElementById('cart-discount-label')
+    if (discRow && discBtns) {
+      discRow.style.display = 'flex'
+      const presets = [0, 5, 10, 15, 20, 25]
+      discBtns.innerHTML = presets.map(p =>
+        `<button class="btn btn-sm ${p === this._cartDiscountPct ? 'btn-primary' : 'btn-secondary'}" data-pct="${p}">${p > 0 ? p + '%' : I18n.t('common.none', 'None')}</button>`
+      ).join('')
+      discBtns.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => {
+          this._cartDiscountPct = parseInt(btn.dataset.pct)
+          this.renderCart()
+        }
+      })
+      if (discLabel) {
+        discLabel.textContent = discPct > 0 ? `${discPct}% ${I18n.t('pos.off', 'OFF')}` : ''
+      }
+    }
+
     if (zones.length && deliveryEl) {
       deliveryEl.style.display = 'block'
       // Save contact field values before re-render
@@ -583,17 +603,8 @@ let App = {
       totalHtml += `<span style="font-size:13px;color:var(--text-secondary)">${I18n.t('delivery.cost', 'Delivery')}: <strong>${this.currencyFormat(dzCost)}</strong></span>`
     }
     totalHtml += `</div>
-      <div class="cart-discount-row">
-        <label data-i18n="pos.discount">Discount %</label>
-        <input type="number" id="cart-discount-input" value="${this._cartDiscountPct || 0}" min="0" max="100" step="1" style="width:60px" data-i18n-placeholder="pos.discount">
-      </div>
       <span class="total-amount">${this.currencyFormat(grandTotal)}</span>`
     totalEl.innerHTML = totalHtml
-
-    document.getElementById('cart-discount-input').onchange = () => {
-      this._cartDiscountPct = parseFloat(document.getElementById('cart-discount-input').value) || 0
-      this.renderCart()
-    }
 
     container.querySelectorAll('.cart-qty-input').forEach(inp => {
       inp.onchange = () => this.updateCartQty(parseInt(inp.dataset.index), inp.value)

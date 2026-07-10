@@ -41,6 +41,7 @@
   "pos.new_order": "Nouvelle Commande",
   "pos.barcode": "Scan code-barres...",
   "pos.added": "ajouté",
+  "pos.off": "RÉDUCTION",
 
   "payment.title": "Paiement",
   "payment.method": "Moyen de Paiement",
@@ -150,6 +151,7 @@
   "common.confirm": "Confirmer",
   "common.yes": "Oui",
   "common.no": "Non",
+  "common.none": "Aucun",
   "common.back": "Retour",
   "common.change": "changer",
   "common.next": "Suivant",

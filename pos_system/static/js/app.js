@@ -1218,19 +1218,21 @@ let App = {
       const orders = res.data || []
       const tbody = document.getElementById('orders-tbody')
       if (!orders.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
         return
       }
       tbody.innerHTML = orders.map(o => {
         const items = (o.lines || []).map(l =>
           `${l.product_name || 'Product'} x${l.qty}`
         ).join(', ') || '-'
+        const payMethods = (o.payments || []).map(p => p.payment_method_name || '').filter(Boolean).join(', ') || '-'
         return `<tr>
           <td>${o.name || o.id}</td>
           <td>${(o.date_order || '').substring(0, 19)}</td>
           <td>${o.partner_name || '-'}</td>
           <td>${o.user_name || ''}</td>
           <td style="max-width:200px;white-space:normal">${items}</td>
+          <td>${payMethods}</td>
           <td>${this.currencyFormat(o.amount_total)}</td>
           <td><span class="status-badge status-${o.state}">${o.state}</span></td>
           <td><button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button></td>

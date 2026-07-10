@@ -97,8 +97,26 @@ def _load_cache():
                 _db_cache[table]['_data'][rid] = data
                 if rid > _db_cache[table]['_seq']:
                     _db_cache[table]['_seq'] = rid
+        _migrate_data(conn)
     finally:
         conn.close()
+
+
+def _migrate_data(conn):
+    if not db._use_pg:
+        return
+    table = 'pos.order'
+    if table not in _db_cache:
+        return
+    dirty = False
+    for rid, data in list(_db_cache[table]['_data'].items()):
+        if data.get('state') == 'draft':
+            _db_cache[table]['_data'][rid]['state'] = 'paid'
+            dirty = True
+    if dirty:
+        cur = conn.cursor()
+        cur.execute(f'UPDATE "{table}" SET "state"=\'paid\' WHERE "state"=\'draft\'')
+        db.commit(conn)
 
 
 def _persist_write(cls, obj_id):

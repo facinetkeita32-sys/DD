@@ -21,13 +21,12 @@ class PosOrder(Model):
     amount_paid = Float(string='Amount Paid', digits=(16, 2), default=0.0)
     amount_change = Float(string='Change', digits=(16, 2), default=0.0)
     state = Selection([
-        ('draft', 'Draft'),
         ('pending', 'Pending Payment'),
         ('paid', 'Paid'),
         ('done', 'Done'),
         ('cancelled', 'Cancelled'),
         ('refunded', 'Refunded'),
-    ], string='Status', default='draft')
+    ], string='Status', default='paid')
     delivery_zone_id = Many2one('delivery.zone', string='Delivery Zone')
     delivery_cost = Float(string='Delivery Cost', digits=(16, 2), default=0.0)
     delivery_contact_name = Char(string='Delivery Contact Name')

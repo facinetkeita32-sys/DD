@@ -476,9 +476,20 @@ class Model(metaclass=BaseModel):
             ids = [ids]
         tbl = _db_cache.get(cls._name, {'_data': OrderedDict()})
         results = []
+        missing = []
         for rid in ids:
             if rid in tbl['_data']:
                 obj = cls(**tbl['_data'][rid])
+                obj.id = rid
+                results.append(obj)
+            else:
+                missing.append(rid)
+        if missing and db._use_pg:
+            rows = db.load_rows(get_conn(), cls._name, missing)
+            for data in rows:
+                rid = data.pop('id')
+                tbl['_data'][rid] = data
+                obj = cls(**data)
                 obj.id = rid
                 results.append(obj)
         return results

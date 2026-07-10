@@ -143,6 +143,18 @@ def delete_row(conn, table, obj_id):
         conn.execute(f'DELETE FROM "{table}" WHERE id=?', (obj_id,))
 
 
+def load_rows(conn, table, ids):
+    if _use_pg:
+        cur = conn.cursor()
+        params = ','.join(['%s'] * len(ids))
+        cur.execute(f'SELECT * FROM "{table}" WHERE id IN ({params})', ids)
+    else:
+        params = ','.join(['?'] * len(ids))
+        cur = conn.execute(f'SELECT * FROM "{table}" WHERE id IN ({params})', ids)
+    cols = [desc[0] for desc in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
 def load_table(conn, table):
     if _use_pg:
         cur = conn.cursor()

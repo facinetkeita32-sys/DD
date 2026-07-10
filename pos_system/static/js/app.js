@@ -935,19 +935,13 @@ let App = {
     const existingImg = product ? (product.image || '') : ''
     const cats = this.productCategories || []
     const catOpts = cats.map(c => `<option value="${c.id}" ${product && product.categ_id && product.categ_id.id === c.id ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')
-    const posCats = this.categories || []
-    const userPosCats = product ? (product.pos_categ_ids || []) : []
-    const posCatCbs = posCats.map(c => {
-      const checked = userPosCats.includes(c.id) ? 'checked' : ''
-      return `<label class="pos-cat-checkbox"><input type="checkbox" class="pos-cat-cb" value="${c.id}" ${checked}> ${this._esc(c.name)}</label>`
-    }).join('')
     let html = `<h3>${title}</h3>
       <div class="form-group"><label data-i18n="product.name">Name</label><input id="prod-name" value="${product ? this._esc(product.name || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.category">Category</label>
         <select id="prod-category"><option value="">${I18n.t('common.none', 'None')}</option>${catOpts}</select>
         <button class="btn btn-sm btn-secondary" id="prod-add-cat" style="margin-top:4px" data-i18n="category.add">+ Add Category</button>
       </div>
-      ${posCats.length ? `<div class="form-group"><label data-i18n="product.pos_categories">POS Categories</label><div class="pos-cat-grid">${posCatCbs}</div></div>` : ''}
+
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
@@ -1014,12 +1008,7 @@ let App = {
         expiration_date: document.getElementById('prod-expiration').value || false,
       }
       if (catVal) data.categ_id = parseInt(catVal)
-      const posCatCbs = document.querySelectorAll('.pos-cat-cb:checked')
-      if (posCatCbs.length) {
-        data.pos_categ_ids = Array.from(posCatCbs).map(cb => parseInt(cb.value))
-      } else {
-        data.pos_categ_ids = []
-      }
+
       if (this._newImageBase64 !== undefined) {
         data.image = this._newImageBase64
       }

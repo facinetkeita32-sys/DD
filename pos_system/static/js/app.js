@@ -545,24 +545,7 @@ let App = {
       subtotal = subtotal * (1 - discPct / 100)
     }
 
-    const discRow = document.getElementById('cart-discount-row')
-    const discBtns = document.getElementById('cart-discount-btns')
-    const discLabel = document.getElementById('cart-discount-label')
-    if (discRow && discBtns) {
-      const presets = [0, 5, 10, 15, 20, 25]
-      discBtns.innerHTML = presets.map(p =>
-        `<button class="btn btn-sm ${p === this._cartDiscountPct ? 'btn-primary' : 'btn-secondary'}" data-pct="${p}">${p > 0 ? p + '%' : I18n.t('common.none', 'None')}</button>`
-      ).join('')
-      discBtns.querySelectorAll('button').forEach(btn => {
-        btn.onclick = () => {
-          this._cartDiscountPct = parseInt(btn.dataset.pct)
-          this.renderCart()
-        }
-      })
-      if (discLabel) {
-        discLabel.textContent = discPct > 0 ? `${discPct}% ${I18n.t('pos.off', 'OFF')}` : ''
-      }
-    }
+    // — no separate DOM element for discount row anymore, it's built into totalHtml below
 
     if (zones.length && deliveryEl) {
       deliveryEl.style.display = 'block'
@@ -597,14 +580,30 @@ let App = {
       : 0
     const grandTotal = subtotal + dzCost
 
-    let totalHtml = `<div class="total-breakdown">
+    const discBtns = [0, 5, 10, 15, 20, 25].map(p =>
+      `<button class="btn btn-sm ${p === this._cartDiscountPct ? 'btn-primary' : 'btn-secondary'}" data-pct="${p}" style="min-width:44px;font-size:12px;font-weight:600;padding:4px 8px">${p > 0 ? p + '%' : 'None'}</button>`
+    ).join('')
+    const discLabel = discPct > 0 ? `<span style="font-weight:700;color:var(--danger);font-size:14px;margin-left:8px">${discPct}% OFF</span>` : ''
+    let totalHtml = `<div class="total-breakdown" style="width:100%">
       <span>${I18n.t('pos.subtotal', 'Subtotal')}: <strong>${this.currencyFormat(subtotal)}</strong></span>`
     if (dzCost > 0) {
       totalHtml += `<span style="font-size:13px;color:var(--text-secondary)">${I18n.t('delivery.cost', 'Delivery')}: <strong>${this.currencyFormat(dzCost)}</strong></span>`
     }
     totalHtml += `</div>
-      <span class="total-amount">${this.currencyFormat(grandTotal)}</span>`
+      <div style="width:100%;display:flex;align-items:center;gap:6px;padding:6px 0;flex-wrap:wrap;border-top:1px solid var(--border);margin-top:4px">
+        <span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${I18n.t('pos.discount', 'Discount')}:</span>
+        ${discBtns}
+        ${discLabel}
+      </div>
+      <span class="total-amount" style="font-size:24px;color:var(--primary);width:100%">${this.currencyFormat(grandTotal)}</span>`
     totalEl.innerHTML = totalHtml
+
+    totalEl.querySelectorAll('[data-pct]').forEach(btn => {
+      btn.onclick = () => {
+        this._cartDiscountPct = parseInt(btn.dataset.pct)
+        this.renderCart()
+      }
+    })
 
     container.querySelectorAll('.cart-qty-input').forEach(inp => {
       inp.onchange = () => this.updateCartQty(parseInt(inp.dataset.index), inp.value)

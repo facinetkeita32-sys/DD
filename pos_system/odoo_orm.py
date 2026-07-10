@@ -73,12 +73,15 @@ def _migrate_table(conn, model_class):
     table = model_class._name
     existing = db.get_table_columns(conn, table)
     for fname, field in model_class._fields.items():
-        if fname == 'id' or fname in existing:
+        if fname == 'id':
             continue
-        st = _sql_type(field)
-        if st is None:
-            continue
-        db.add_column(conn, table, fname, st)
+        if fname not in existing:
+            st = _sql_type(field)
+            if st is None:
+                continue
+            db.add_column(conn, table, fname, st)
+        elif db._use_pg and isinstance(field, Boolean):
+            db.ensure_bool_column_type(conn, table, fname)
 
 
 def _load_cache():

@@ -12,7 +12,7 @@ FIELD_MAP = {
     'Text': ('TEXT', 'TEXT'),
     'Integer': ('INTEGER', 'INTEGER'),
     'Float': ('REAL', 'DOUBLE PRECISION'),
-    'Boolean': ('INTEGER', 'BOOLEAN'),
+    'Boolean': ('INTEGER', 'INTEGER'),
     'Date': ('TEXT', 'DATE'),
     'DateTime': ('TEXT', 'TIMESTAMP'),
     'Many2one': ('INTEGER', 'INTEGER'),
@@ -85,6 +85,16 @@ def create_m2m_table(conn, table, col1, col2):
         conn.cursor().execute(f'CREATE TABLE IF NOT EXISTS "{table}" ("{col1}" INTEGER, "{col2}" INTEGER, PRIMARY KEY ("{col1}", "{col2}"))')
     else:
         conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ("{col1}" INTEGER, "{col2}" INTEGER, PRIMARY KEY ("{col1}", "{col2}"))')
+
+
+def ensure_bool_column_type(conn, table, name):
+    if not _use_pg:
+        return
+    cur = conn.cursor()
+    cur.execute("SELECT data_type FROM information_schema.columns WHERE table_name=%s AND column_name=%s", (table, name))
+    row = cur.fetchone()
+    if row and row[0].upper() == 'BOOLEAN':
+        cur.execute(f'ALTER TABLE "{table}" ALTER COLUMN "{name}" TYPE INTEGER USING (CASE WHEN "{name}" THEN 1 ELSE 0 END)')
 
 
 def add_column(conn, table, name, col_type):

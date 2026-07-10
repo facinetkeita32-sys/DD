@@ -1,3 +1,4 @@
+console.log('POS App v2.3 - discount buttons enabled')
 let App = {
   user: null,
   permissions: null,
@@ -548,7 +549,6 @@ let App = {
     const discBtns = document.getElementById('cart-discount-btns')
     const discLabel = document.getElementById('cart-discount-label')
     if (discRow && discBtns) {
-      discRow.style.display = 'flex'
       const presets = [0, 5, 10, 15, 20, 25]
       discBtns.innerHTML = presets.map(p =>
         `<button class="btn btn-sm ${p === this._cartDiscountPct ? 'btn-primary' : 'btn-secondary'}" data-pct="${p}">${p > 0 ? p + '%' : I18n.t('common.none', 'None')}</button>`

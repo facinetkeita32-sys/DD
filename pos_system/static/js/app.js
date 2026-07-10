@@ -327,7 +327,7 @@ let App = {
 
   async refreshAndRenderProducts() {
     try {
-      const res = await this.api('GET', '/products?light=true')
+      const res = await this.api('GET', '/products?light=true&refresh=1')
       this.products = res.data || []
     } catch(e) {}
     this.renderProducts()
@@ -1036,7 +1036,7 @@ let App = {
           await this.api('POST', '/products', data)
         }
         this.closeModal()
-        const res = await this.api('GET', '/products?light=true')
+        const res = await this.api('GET', '/products?light=true&refresh=1')
         this.products = res.data || []
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }
@@ -1146,7 +1146,7 @@ let App = {
           ${I18n.t('product.import_errors', 'Errors')}: ${(d.errors || []).length}
           ${(d.errors || []).length ? '<br><small>' + d.errors.slice(0, 5).join('<br>') + '</small>' : ''}
         `
-        const prodRes = await this.api('GET', '/products?light=true')
+        const prodRes = await this.api('GET', '/products?light=true&refresh=1')
         this.products = prodRes.data || []
         this.renderAll()
       } catch(e) {
@@ -1206,7 +1206,7 @@ let App = {
         if (res.data) {
           this.products = res.data
         } else {
-          const prodRes = await this.api('GET', '/products?light=true')
+          const prodRes = await this.api('GET', '/products?light=true&refresh=1')
           this.products = prodRes.data || []
         }
         window._selectedProductIds = []
@@ -2031,7 +2031,7 @@ let App = {
           await this.api('PUT', `/lots/${r.id}`, r)
         }
         this.closeModal()
-        const res = await this.api('GET', '/products?light=true')
+        const res = await this.api('GET', '/products?light=true&refresh=1')
         this.products = res.data || []
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }

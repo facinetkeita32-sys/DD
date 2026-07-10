@@ -489,6 +489,23 @@ class Model(metaclass=BaseModel):
         return results
 
     @classmethod
+    def _reload_from_db(cls):
+        if not db._use_pg:
+            return
+        conn = get_conn()
+        try:
+            tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
+            rows = db.load_table(conn, cls._name)
+            tbl['_data'].clear()
+            for data in rows:
+                rid = data.pop('id')
+                tbl['_data'][rid] = data
+                if rid > tbl['_seq']:
+                    tbl['_seq'] = rid
+        finally:
+            conn.close()
+
+    @classmethod
     def browse(cls, ids):
         if isinstance(ids, int):
             ids = [ids]

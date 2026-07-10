@@ -277,6 +277,8 @@ def get_products():
         domain.append(('categ_id', '=', int(args['category_id'])))
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
+    if args.get('refresh'):
+        ProductProduct()._reload_from_db()
     products = ProductProduct().search(domain, limit=200)
     data = serialize_model(ProductProduct, products)
     if args.get('light'):

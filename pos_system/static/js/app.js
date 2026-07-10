@@ -207,7 +207,7 @@ let App = {
       const [confRes, curRes, prodRes, pcatRes, custRes, pmRes, compRes, dzRes] = await Promise.all([
         this.api('GET', '/config'),
         this.api('GET', '/currencies'),
-        this.api('GET', '/products'),
+        this.api('GET', '/products?light=true'),
         this.api('GET', '/product-categories'),
         this.api('GET', '/customers'),
         this.api('GET', '/payment-methods'),
@@ -327,7 +327,7 @@ let App = {
 
   async refreshAndRenderProducts() {
     try {
-      const res = await this.api('GET', '/products')
+      const res = await this.api('GET', '/products?light=true')
       this.products = res.data || []
     } catch(e) {}
     this.renderProducts()
@@ -377,9 +377,7 @@ let App = {
           cls += ' expiring-soon'
         }
       }
-      const imgHtml = p.image
-        ? `<img class="prod-img" src="data:image/png;base64,${p.image}" alt="${p.name}" loading="lazy">`
-        : `<div class="prod-img-placeholder">📦</div>`
+      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
         ${badge}
@@ -722,10 +720,13 @@ let App = {
         changeMsg = `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
       }
       this.clearCart()
-      const prodRes = await this.api('GET', '/products')
-      this.products = prodRes.data || []
+      for (const item of lines) {
+        const prod = this.products.find(p => p.id === item.product_id)
+        if (prod && prod.available_qty !== undefined) {
+          prod.available_qty = Math.max(0, (prod.available_qty || 0) - item.qty)
+        }
+      }
       this.renderProducts()
-      this.renderProductsTable()
       this.renderOrdersTable()
       this.renderDashboard()
 
@@ -846,7 +847,7 @@ let App = {
       const checked = selected.has(p.id) ? 'checked' : ''
       return `<tr class="${rowCls + expCls}">
         <td><input type="checkbox" class="product-checkbox" value="${p.id}" ${checked} ${canDelete ? '' : 'disabled'}></td>
-        <td>${p.image ? `<img class="prod-table-img" src="data:image/png;base64,${p.image}" alt="">` : `<span class="prod-table-img-placeholder">📦</span>`}</td>
+        <td><img class="prod-table-img" src="/api/products/${p.id}/image" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="prod-table-img-placeholder" style="display:none">📦</span></td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>
@@ -932,7 +933,7 @@ let App = {
   showProductModal(id) {
     const product = id ? this.products.find(p => p.id === id) : null
     const title = product ? I18n.t('product.edit', 'Edit Product') : I18n.t('product.add', 'Add Product')
-    const existingImg = product ? (product.image || '') : ''
+    const existingImg = '' // loaded async below if editing
     const cats = this.productCategories || []
     const catOpts = cats.map(c => `<option value="${c.id}" ${product && product.categ_id && product.categ_id.id === c.id ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')
     let html = `<h3>${title}</h3>
@@ -952,22 +953,22 @@ let App = {
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
         <div class="image-upload-row">
-          <div class="image-upload-area ${existingImg ? 'has-image' : ''}" id="image-upload-area">
+          <div class="image-upload-area" id="image-upload-area">
             <div id="image-upload-prompt">${I18n.t('product.upload_image', 'Upload Image')}</div>
-            <img id="image-preview" class="image-preview" style="${existingImg ? 'display:block' : 'display:none'}" src="${existingImg ? 'data:image/png;base64,' + existingImg : ''}">
+            <img id="image-preview" class="image-preview" style="display:none">
             <input type="file" id="image-file-input" accept="image/*" style="display:none">
           </div>
           <button class="btn btn-sm btn-secondary camera-btn" id="camera-btn" title="Capture from camera" data-i18n-title="product.camera">📷</button>
           <input type="file" id="camera-file-input" accept="image/*" capture="environment" style="display:none">
         </div>
-        ${existingImg ? `<button class="btn btn-sm btn-danger" id="remove-image-btn" style="margin-top:4px">${I18n.t('common.delete', 'Remove')}</button>` : ''}
+        ${product && product.id ? `<button class="btn btn-sm btn-danger" id="remove-image-btn" style="margin-top:4px;display:none">${I18n.t('common.delete', 'Remove')}</button>` : ''}
       </div>
       <div class="btn-group">
         <button class="btn btn-primary" id="prod-save">${I18n.t('common.save', 'Save')}</button>
         <button class="btn btn-secondary" id="prod-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
       </div>`
     this.showModal(html)
-    this._newImageBase64 = existingImg
+    this._newImageBase64 = ''
 
     document.getElementById('image-upload-area').onclick = () => document.getElementById('image-file-input').click()
     document.getElementById('image-file-input').onchange = (e) => { this._handleImageFile(e, 'image-file-input') }
@@ -989,6 +990,22 @@ let App = {
       }
     }
 
+    if (product && product.id) {
+      const img = new Image()
+      img.onload = () => {
+        document.getElementById('image-preview').src = img.src
+        document.getElementById('image-preview').style.display = 'block'
+        document.getElementById('image-upload-area').classList.add('has-image')
+        document.getElementById('image-upload-prompt').textContent = I18n.t('product.upload_image', 'Change Image')
+        const rm = document.getElementById('remove-image-btn')
+        if (rm) rm.style.display = 'inline-block'
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+        canvas.getContext('2d').drawImage(img, 0, 0)
+        this._newImageBase64 = canvas.toDataURL('image/png').split(',')[1]
+      }
+      img.src = `/api/products/${product.id}/image`
+    }
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
     const manageLotsBtn = document.getElementById('prod-manage-lots')
@@ -1019,7 +1036,7 @@ let App = {
           await this.api('POST', '/products', data)
         }
         this.closeModal()
-        const res = await this.api('GET', '/products')
+        const res = await this.api('GET', '/products?light=true')
         this.products = res.data || []
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }
@@ -1129,7 +1146,7 @@ let App = {
           ${I18n.t('product.import_errors', 'Errors')}: ${(d.errors || []).length}
           ${(d.errors || []).length ? '<br><small>' + d.errors.slice(0, 5).join('<br>') + '</small>' : ''}
         `
-        const prodRes = await this.api('GET', '/products')
+        const prodRes = await this.api('GET', '/products?light=true')
         this.products = prodRes.data || []
         this.renderAll()
       } catch(e) {
@@ -1189,7 +1206,7 @@ let App = {
         if (res.data) {
           this.products = res.data
         } else {
-          const prodRes = await this.api('GET', '/products')
+          const prodRes = await this.api('GET', '/products?light=true')
           this.products = prodRes.data || []
         }
         window._selectedProductIds = []
@@ -2014,7 +2031,7 @@ let App = {
           await this.api('PUT', `/lots/${r.id}`, r)
         }
         this.closeModal()
-        const res = await this.api('GET', '/products')
+        const res = await this.api('GET', '/products?light=true')
         this.products = res.data || []
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }

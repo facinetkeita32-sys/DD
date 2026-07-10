@@ -278,7 +278,27 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=200)
-    return success_response(serialize_model(ProductProduct, products))
+    data = serialize_model(ProductProduct, products)
+    if args.get('light'):
+        for d in data:
+            d.pop('image', None)
+    return success_response(data)
+
+
+@api_bp.route('/products/<int:product_id>/image', methods=['GET'])
+def get_product_image(product_id):
+    products = ProductProduct().browse([product_id])
+    if not products:
+        return '', 404
+    img = products[0]._data.get('image', '') or ''
+    if not img:
+        return '', 404
+    try:
+        import base64
+        raw = base64.b64decode(img)
+        return Response(raw, mimetype='image/png')
+    except Exception:
+        return '', 404
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])

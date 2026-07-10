@@ -636,7 +636,7 @@ def get_orders():
         domain.append(('session_id', '=', int(args['session_id'])))
     if args.get('status'):
         domain.append(('state', '=', args['status']))
-    orders = PosOrder().search(domain, order='id desc', limit=100)
+    orders = PosOrder().search(domain, order='-id', limit=100)
     result = []
     for order in orders:
         d = model_to_dict(order)
@@ -913,7 +913,7 @@ def get_receipt_pdf(order_id):
 
 @api_bp.route('/sessions', methods=['GET'])
 def get_sessions():
-    sessions = PosSession().search([], order='id desc')
+    sessions = PosSession().search([], order='-id')
     result = []
     for s in sessions:
         d = model_to_dict(s)
@@ -1270,7 +1270,7 @@ def get_activity_log():
         domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
     offset = args.get('offset', 0, type=int)
     limit = args.get('limit', 50, type=int)
-    logs = LoginLog().search(domain, order='timestamp desc', offset=offset, limit=limit)
+    logs = LoginLog().search(domain, order='-timestamp', offset=offset, limit=limit)
     total = LoginLog().search_count(domain)
     result = []
     for log in logs:
@@ -1300,7 +1300,7 @@ def export_activity_log():
     if args.get('date_to'):
         domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
     total = LoginLog().search_count(domain)
-    logs = LoginLog().search(domain, order='timestamp desc')
+    logs = LoginLog().search(domain, order='-timestamp')
     lines = ['timestamp,user,action,model,message']
     for log in logs:
         d = model_to_dict(log)

@@ -495,11 +495,15 @@ class Model(metaclass=BaseModel):
         conn = get_conn()
         try:
             tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
-            rows = db.load_table(conn, cls._name)
-            tbl['_data'].clear()
+            rows = db.load_table(conn, cls._name, exclude='image' if cls._name == 'product.product' else None)
             for data in rows:
                 rid = data.pop('id')
-                tbl['_data'][rid] = data
+                if rid in tbl['_data']:
+                    old = tbl['_data'][rid]
+                    for k, v in data.items():
+                        old[k] = v
+                else:
+                    tbl['_data'][rid] = data
                 if rid > tbl['_seq']:
                     tbl['_seq'] = rid
         finally:

@@ -155,12 +155,23 @@ def load_rows(conn, table, ids):
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
-def load_table(conn, table):
+def load_table(conn, table, exclude=None):
+    cols_str = '*'
+    if exclude:
+        if _use_pg:
+            cur = conn.cursor()
+            cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name=%s", (table,))
+            all_cols = [r[0] for r in cur.fetchall() if r[0] != exclude]
+        else:
+            cur = conn.execute(f'PRAGMA table_info("{table}")')
+            all_cols = [r[1] for r in cur.fetchall() if r[1] != exclude]
+        if all_cols:
+            cols_str = ', '.join(f'"{c}"' for c in all_cols)
     if _use_pg:
         cur = conn.cursor()
-        cur.execute(f'SELECT * FROM "{table}" ORDER BY id')
+        cur.execute(f'SELECT {cols_str} FROM "{table}" ORDER BY id')
     else:
-        cur = conn.execute(f'SELECT * FROM "{table}" ORDER BY id')
+        cur = conn.execute(f'SELECT {cols_str} FROM "{table}" ORDER BY id')
     cols = [desc[0] for desc in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 

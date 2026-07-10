@@ -4,7 +4,8 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
-from ..odoo_orm import env, _db_cache as _db
+from ..odoo_orm import env, _db_cache as _db, get_conn
+from .. import db
 from ..models.login_log import LoginLog
 from ..models.stock_lot import StockLot
 from ..models.res_users import ResUsers
@@ -293,6 +294,14 @@ def get_product_image(product_id):
     if not products:
         return '', 404
     img = products[0]._data.get('image', '') or ''
+    if not img:
+        conn = get_conn()
+        try:
+            rows = db.load_rows(conn, 'product.product', [product_id])
+            if rows:
+                img = rows[0].get('image', '') or ''
+        finally:
+            conn.close()
     if not img:
         return '', 404
     try:

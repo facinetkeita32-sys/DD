@@ -117,8 +117,9 @@ a { text-decoration: none; color: var(--primary); cursor: pointer; }
 .product-card .prod-qty { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 .product-card.low-stock { border-color: var(--warning); background: linear-gradient(135deg, #fffbeb, #fff); }
 .product-card.low-stock .prod-price { color: var(--warning); }
-.product-card.out-of-stock { border-color: var(--danger); background: linear-gradient(135deg, #fef2f2, #fff); opacity: 0.75; }
+.product-card.out-of-stock { border-color: var(--danger); background: linear-gradient(135deg, #fef2f2, #fff); opacity: 0.75; cursor: not-allowed; }
 .product-card.out-of-stock .prod-price { color: var(--text-light); }
+.product-card.out-of-stock .prod-name { text-decoration: line-through; }
 .product-card.added-anim { animation: addedPulse 0.4s ease-out; }
 @keyframes addedPulse { 0% { transform: scale(1); } 50% { transform: scale(0.95); box-shadow: 0 0 0 3px var(--primary-glow); } 100% { transform: scale(1); } }
 .stock-badge { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
@@ -183,9 +184,13 @@ tr.row-expiring td { background: #fffbeb; }
 
 .cart-footer { padding: 16px 20px; border-top: 1px solid var(--border); background: linear-gradient(135deg, var(--bg-card), var(--bg)); }
 .cart-total { display: flex; justify-content: space-between; align-items: flex-end; flex-direction: column; gap: 4px; font-size: 22px; font-weight: 800; margin-bottom: 14px; letter-spacing: -0.3px; flex-wrap: wrap; }
-.cart-total .total-amount { font-size: 24px; color: var(--primary); }
+.cart-total .total-amount,
+.cart-total #cart-total-amount { font-size: 24px; color: var(--primary); width:100%; }
 .cart-total .total-breakdown { width: 100%; display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: var(--text-secondary); }
 .cart-total .total-breakdown span { display: flex; gap: 4px; }
+.cart-discount-row { width:100%; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; padding:4px 0; }
+.cart-discount-row label { color:var(--text-secondary); white-space:nowrap; }
+.cart-discount-row input { padding:4px 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:13px; width:60px; text-align:center; }
 .customer-icon { font-size: 16px; }
 .customer-hint { font-size: 10px; color: var(--text-light); font-weight: 400; }
 .cart-customer .customer-icon { margin-right: 2px; }

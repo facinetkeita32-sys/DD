@@ -76,6 +76,7 @@
   "product.not_found": "Produit non trouvé",
   "product.low_stock": "Faible",
   "product.out_of_stock": "Épuisé",
+  "product.insufficient_stock": "Stock insuffisant",
   "product.in_stock": "En Stock",
   "product.add": "Ajouter Produit",
   "product.edit": "Modifier Produit",

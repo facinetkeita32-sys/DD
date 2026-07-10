@@ -389,7 +389,10 @@ let App = {
       </div>`
     }).join('')
     grid.querySelectorAll('.product-card').forEach(card => {
-      card.onclick = () => this.addToCart(parseInt(card.dataset.id))
+      card.onclick = () => {
+        if (card.classList.contains('out-of-stock')) return
+        this.addToCart(parseInt(card.dataset.id))
+      }
     })
   },
 
@@ -436,8 +439,17 @@ let App = {
   addToCart(productId) {
     const product = this.products.find(p => p.id === productId)
     if (!product) return
+    const qtyOnHand = product.available_qty || 0
+    if (qtyOnHand <= 0) {
+      alert(I18n.t('product.out_of_stock', 'Out of stock'))
+      return
+    }
     const existing = this.cart.find(c => c.product_id === productId)
     if (existing) {
+      if (existing.qty + 1 > qtyOnHand) {
+        alert(I18n.t('product.insufficient_stock', 'Insufficient stock'))
+        return
+      }
       existing.qty += 1
     } else {
       this.cart.push({

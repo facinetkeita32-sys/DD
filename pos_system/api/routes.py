@@ -674,11 +674,12 @@ def get_orders():
         lines = PosOrderLine().search([('order_id', '=', order.id)])
         for line in lines:
             ld = model_to_dict(line)
-            pid = line._data.get('product_id', 0) or 0
-            if pid:
-                product = ProductProduct().browse([pid])
-                if product:
-                    ld['product_name'] = product[0]._data.get('name', '')
+            if not ld.get('product_name'):
+                pid = line._data.get('product_id', 0) or 0
+                if pid:
+                    product = ProductProduct().browse([pid])
+                    if product:
+                        ld['product_name'] = product[0]._data.get('name', '')
             lines_data.append(ld)
         d['lines'] = lines_data
         payments_data = []
@@ -717,11 +718,12 @@ def get_order(order_id):
     d['lines'] = []
     for line in lines:
         ld = model_to_dict(line)
-        pid = line._data.get('product_id', 0) or 0
-        if pid:
-            product = ProductProduct().browse([pid])
-            if product:
-                ld['product_name'] = product[0]._data.get('name', '')
+        if not ld.get('product_name'):
+            pid = line._data.get('product_id', 0) or 0
+            if pid:
+                product = ProductProduct().browse([pid])
+                if product:
+                    ld['product_name'] = product[0]._data.get('name', '')
         d['lines'].append(ld)
     payments = PosPayment().search([('order_id', '=', order.id)])
     d['payments'] = [model_to_dict(p) for p in payments]
@@ -1211,11 +1213,12 @@ def get_sales_report():
         d['lines'] = []
         for line in lines:
             ld = model_to_dict(line)
-            pid = line._data.get('product_id', 0) or 0
-            if pid:
-                product = ProductProduct().browse([pid])
-                if product:
-                    ld['product_name'] = product[0]._data.get('name', '')
+            if not ld.get('product_name'):
+                pid = line._data.get('product_id', 0) or 0
+                if pid:
+                    product = ProductProduct().browse([pid])
+                    if product:
+                        ld['product_name'] = product[0]._data.get('name', '')
             d['lines'].append(ld)
         pid = o._data.get('partner_id', 0) or 0
         if pid:

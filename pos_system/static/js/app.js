@@ -672,7 +672,8 @@ let App = {
 
   async confirmPayment(total) {
     const methodId = parseInt(document.getElementById('payment-method').value)
-    const tendered = parseFloat(document.getElementById('payment-tendered').value) || total
+    const raw = document.getElementById('payment-tendered').value
+    const tendered = raw === '' ? total : parseFloat(raw) || 0
     const change = Math.max(0, tendered - total)
 
     const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null

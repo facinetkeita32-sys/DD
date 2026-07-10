@@ -690,8 +690,10 @@ let App = {
 
     const discPct = this._cartDiscountPct || 0
 
+    const pmName = this.paymentMethods.find(pm => pm.id === methodId)?.name || ''
     const payments = [{
       payment_method_id: methodId,
+      payment_method_name: pmName,
       amount: tendered,
       is_change: change,
     }]

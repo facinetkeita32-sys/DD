@@ -686,11 +686,12 @@ def get_orders():
         payments = PosPayment().search([('order_id', '=', order.id)])
         for pmt in payments:
             pd_data = model_to_dict(pmt)
-            pmid = pmt._data.get('payment_method_id', 0) or 0
-            if pmid:
-                method = PosPaymentMethod().browse([pmid])
-                if method:
-                    pd_data['payment_method_name'] = method[0]._data.get('name', '')
+            if not pd_data.get('payment_method_name'):
+                pmid = pmt._data.get('payment_method_id', 0) or 0
+                if pmid:
+                    method = PosPaymentMethod().browse([pmid])
+                    if method:
+                        pd_data['payment_method_name'] = method[0]._data.get('name', '')
             payments_data.append(pd_data)
         d['payments'] = payments_data
         pid = order._data.get('partner_id', 0) or 0
@@ -844,9 +845,14 @@ def validate_payment(order_id):
     amount = float(data.get('amount', 0) or 0)
     payment_method_id = data.get('payment_method_id')
     if payment_method_id and amount > 0:
+        pm_name = ''
+        pms = PosPaymentMethod().browse([payment_method_id])
+        if pms:
+            pm_name = pms[0]._data.get('name', '')
         PosPayment().create({
             'order_id': order.id,
             'payment_method_id': payment_method_id,
+            'payment_method_name': pm_name,
             'amount': amount,
         })
     total_paid = sum(p.amount for p in PosPayment().search([('order_id', '=', order.id)]))

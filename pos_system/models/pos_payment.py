@@ -10,6 +10,7 @@ class PosPayment(Model):
 
     order_id = Many2one('pos.order', string='Order', required=True)
     payment_method_id = Many2one('pos.payment.method', string='Payment Method', required=True)
+    payment_method_name = Char(string='Payment Method Name')
     amount = Float(string='Amount', digits=(16, 2), required=True)
     payment_date = DateTime(string='Payment Date', default=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     reference = Char(string='Reference')

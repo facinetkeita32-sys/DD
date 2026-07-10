@@ -204,11 +204,10 @@ let App = {
 
   async loadInitData() {
     try {
-      const [confRes, curRes, prodRes, catRes, pcatRes, custRes, pmRes, compRes, dzRes] = await Promise.all([
+      const [confRes, curRes, prodRes, pcatRes, custRes, pmRes, compRes, dzRes] = await Promise.all([
         this.api('GET', '/config'),
         this.api('GET', '/currencies'),
         this.api('GET', '/products'),
-        this.api('GET', '/pos-categories'),
         this.api('GET', '/product-categories'),
         this.api('GET', '/customers'),
         this.api('GET', '/payment-methods'),
@@ -218,7 +217,7 @@ let App = {
       this.config = confRes.data
       this.currencies = curRes.data || []
       this.products = prodRes.data || []
-      this.categories = catRes.data || []
+
       this.productCategories = pcatRes.data || []
       this.customers = custRes.data || []
       this.paymentMethods = pmRes.data || []
@@ -312,7 +311,8 @@ let App = {
   renderCategories() {
     const container = document.getElementById('pos-categories')
     let html = `<button class="pos-cat-btn ${!this.currentCategory ? 'active' : ''}" data-cat-id="">${I18n.t('pos.category_all', 'All')}</button>`
-    this.categories.forEach(c => {
+    const cats = this.productCategories || []
+    cats.forEach(c => {
       html += `<button class="pos-cat-btn ${this.currentCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${c.name}</button>`
     })
     container.innerHTML = html
@@ -338,8 +338,8 @@ let App = {
     const search = (document.getElementById('pos-search').value || '').toLowerCase()
     let filtered = this.products.filter(p => {
       if (this.currentCategory) {
-        const cats = p.pos_categ_ids || []
-        if (!cats.includes(this.currentCategory)) return false
+        const catId = p.categ_id ? p.categ_id.id : null
+        if (catId !== this.currentCategory) return false
       }
       if (search) {
         return (p.name || '').toLowerCase().includes(search) ||

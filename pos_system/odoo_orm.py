@@ -421,7 +421,7 @@ class Model(metaclass=BaseModel):
                         comodel = field.comodel_name
                         if comodel in _db_cache:
                             name = _db_cache[comodel]['_data'].get(val, {}).get(self._rec_name, '')
-                            result[fname] = [val, str(name)]
+                            result[fname] = {'id': val, 'name': str(name)}
                         else:
                             result[fname] = val
                     else:

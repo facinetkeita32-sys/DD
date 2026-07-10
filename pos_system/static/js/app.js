@@ -539,7 +539,7 @@ let App = {
     const zones = this.deliveryZones || []
 
     // Cart-level discount
-    let discPct = parseFloat(document.getElementById('cart-discount-input')?.value) || 0
+    const discPct = this._cartDiscountPct || 0
     if (discPct > 0) {
       subtotal = subtotal * (1 - discPct / 100)
     }

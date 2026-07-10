@@ -649,9 +649,6 @@ let App = {
         <input type="number" id="payment-tendered" value="${total}" step="100">
       </div>
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
-      <div class="form-group">
-        <label><input type="checkbox" id="payment-pay-later"> <span data-i18n="payment.pay_later">Pay Later (Credit)</span></label>
-      </div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
@@ -661,17 +658,16 @@ let App = {
     document.getElementById('payment-tendered').oninput = () => {
       const tendered = parseFloat(document.getElementById('payment-tendered').value) || 0
       const change = tendered - total
-      document.getElementById('payment-change').textContent = change >= 0
-        ? `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
-        : `${this.currencyFormat(Math.abs(change))} ${I18n.t('common.remaining', 'remaining')}`
+      const el = document.getElementById('payment-change')
+      if (change >= 0) {
+        el.textContent = `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
+        el.style.color = ''
+      } else {
+        el.innerHTML = `${this.currencyFormat(Math.abs(change))} ${I18n.t('common.remaining', 'remaining')} &mdash; <span style="color:var(--warning)">${I18n.t('pos.pending_order_note', 'Order will be pending')}</span>`
+        el.style.color = ''
+      }
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
-    document.getElementById('payment-pay-later').onchange = () => {
-      const checked = document.getElementById('payment-pay-later').checked
-      document.getElementById('payment-tendered').disabled = checked
-      document.getElementById('payment-tendered').value = checked ? 0 : total
-      document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
-    }
     document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
   },
@@ -694,11 +690,10 @@ let App = {
     }))
 
     const discPct = this._cartDiscountPct || 0
-    const payLater = document.getElementById('payment-pay-later')?.checked || false
 
     const payments = [{
       payment_method_id: methodId,
-      amount: payLater ? 0 : total,
+      amount: tendered,
       is_change: change,
     }]
 
@@ -715,7 +710,6 @@ let App = {
       delivery_contact_phone: deliveryContactPhone,
       discount: discPct,
       discount_type: 'percent',
-      state: payLater ? 'pending' : 'paid',
     }
     if (dz) orderData.delivery_zone_id = dz.id
 
@@ -737,7 +731,7 @@ let App = {
 
       if (orderId) {
         const msg = changeMsg ? changeMsg + '\n\n' : ''
-        if (!payLater && confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
+        if (confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
           this.openPrintReceipt(orderId)
         }
       }

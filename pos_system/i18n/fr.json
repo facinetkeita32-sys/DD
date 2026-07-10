@@ -258,7 +258,6 @@
   "common.filter": "Filtrer",
   "common.all": "Toutes les Actions",
 
-  "payment.pay_later": "Payer Plus Tard (Crédit)",
   "payment.validate": "Valider le Paiement",
 
   "product.use_batches": "Utiliser Lots",
@@ -281,6 +280,7 @@
   "category.add": "Ajouter Catégorie",
 
   "order.state_pending": "Paiement en Attente",
+  "pos.pending_order_note": "La commande sera en attente",
 
   "dashboard.orders_pending": "Commandes en Attente"
 }

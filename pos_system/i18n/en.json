@@ -258,7 +258,6 @@
   "common.filter": "Filter",
   "common.all": "All Actions",
 
-  "payment.pay_later": "Pay Later (Credit)",
   "payment.validate": "Validate Payment",
 
   "product.use_batches": "Use Batches/Lots",
@@ -281,6 +280,7 @@
   "category.add": "Add Category",
 
   "order.state_pending": "Pending Payment",
+  "pos.pending_order_note": "Order will be pending",
 
   "dashboard.orders_pending": "Pending Orders"
 }

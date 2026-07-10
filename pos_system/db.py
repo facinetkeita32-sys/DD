@@ -88,10 +88,13 @@ def create_m2m_table(conn, table, col1, col2):
 
 
 def add_column(conn, table, name, col_type):
-    if _use_pg:
-        conn.cursor().execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {col_type}')
-    else:
-        conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {col_type}')
+    try:
+        if _use_pg:
+            conn.cursor().execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {col_type}')
+        else:
+            conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {col_type}')
+    except Exception:
+        pass  # column may already exist
 
 
 def insert_or_update(conn, table, data, obj_id):

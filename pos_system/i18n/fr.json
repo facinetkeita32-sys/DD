@@ -49,6 +49,7 @@
   "payment.tendered": "Montant Reçu",
   "payment.change": "Monnaie",
   "payment.confirm": "Confirmer le Paiement",
+  "payment.pay_later": "Payer Plus Tard",
   "payment.cancel": "Annuler",
 
   "order.title": "Commande",

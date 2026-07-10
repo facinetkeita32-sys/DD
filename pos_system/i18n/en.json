@@ -49,6 +49,7 @@
   "payment.tendered": "Amount Tendered",
   "payment.change": "Change",
   "payment.confirm": "Confirm Payment",
+  "payment.pay_later": "Pay Later",
   "payment.cancel": "Cancel",
 
   "order.title": "Order",

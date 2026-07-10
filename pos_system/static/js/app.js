@@ -649,6 +649,7 @@ let App = {
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
+        <button class="btn btn-warning btn-lg btn-block" id="payment-paylater" style="padding:12px 28px;font-size:16px">${I18n.t('payment.pay_later', 'Pay Later')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
       </div>`
 
@@ -668,6 +669,11 @@ let App = {
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
     document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
+    document.getElementById('payment-paylater').onclick = () => {
+      document.getElementById('payment-tendered').value = '0'
+      document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
+      this.confirmPayment(total)
+    }
   },
 
   async confirmPayment(total) {

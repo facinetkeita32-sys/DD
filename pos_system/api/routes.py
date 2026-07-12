@@ -306,7 +306,9 @@ def get_product_image(product_id):
     try:
         import base64
         raw = base64.b64decode(img)
-        return Response(raw, mimetype='image/png')
+        resp = Response(raw, mimetype='image/png')
+        resp.headers['Cache-Control'] = 'public, max-age=86400, immutable'
+        return resp
     except Exception:
         return '', 404
 

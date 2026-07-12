@@ -143,14 +143,25 @@ def delete_row(conn, table, obj_id):
         conn.execute(f'DELETE FROM "{table}" WHERE id=?', (obj_id,))
 
 
-def load_rows(conn, table, ids):
+def load_rows(conn, table, ids, exclude=None):
+    cols_str = '*'
+    if exclude:
+        if _use_pg:
+            cur = conn.cursor()
+            cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name=%s", (table,))
+            all_cols = [r[0] for r in cur.fetchall() if r[0] != exclude]
+        else:
+            cur = conn.execute(f'PRAGMA table_info("{table}")')
+            all_cols = [r[1] for r in cur.fetchall() if r[1] != exclude]
+        if all_cols:
+            cols_str = ', '.join(f'"{c}"' for c in all_cols)
     if _use_pg:
         cur = conn.cursor()
         params = ','.join(['%s'] * len(ids))
-        cur.execute(f'SELECT * FROM "{table}" WHERE id IN ({params})', ids)
+        cur.execute(f'SELECT {cols_str} FROM "{table}" WHERE id IN ({params})', ids)
     else:
         params = ','.join(['?'] * len(ids))
-        cur = conn.execute(f'SELECT * FROM "{table}" WHERE id IN ({params})', ids)
+        cur = conn.execute(f'SELECT {cols_str} FROM "{table}" WHERE id IN ({params})', ids)
     cols = [desc[0] for desc in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 

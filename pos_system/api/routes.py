@@ -755,7 +755,9 @@ def create_order():
     if session_id:
         data['session_id'] = session_id
     try:
-        ProductProduct()._reload_from_db()
+        prod_ids = [ld.get('product_id') for ld in lines_data if ld.get('product_id')]
+        if prod_ids:
+            ProductProduct()._reload_from_db(ids=prod_ids)
         order = PosOrder().create(data)
         total = 0
         for line_data in lines_data:
@@ -818,8 +820,11 @@ def cancel_order(order_id):
     order = orders[0]
     if order.state in ('cancelled',):
         return error_response('Order is already cancelled')
-    ProductProduct()._reload_from_db()
     lines = PosOrderLine().search([('order_id', '=', order.id)])
+    prod_ids = [line._data.get('product_id') or getattr(line.product_id, 'id', None) for line in lines if line._data.get('qty', 0) or 0]
+    prod_ids = [p for p in prod_ids if p]
+    if prod_ids:
+        ProductProduct()._reload_from_db(ids=prod_ids)
     for line in lines:
         prod_id = line._data.get('product_id') or getattr(line.product_id, 'id', None)
         qty = line._data.get('qty', 0) or 0

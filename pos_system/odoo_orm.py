@@ -490,23 +490,37 @@ class Model(metaclass=BaseModel):
         return results
 
     @classmethod
-    def _reload_from_db(cls):
+    def _reload_from_db(cls, ids=None):
         if not db._use_pg:
             return
         conn = get_conn()
         try:
             tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
-            rows = db.load_table(conn, cls._name, exclude='image' if cls._name == 'product.product' else None)
-            for data in rows:
-                rid = data.pop('id')
-                if rid in tbl['_data']:
-                    old = tbl['_data'][rid]
-                    for k, v in data.items():
-                        old[k] = v
-                else:
-                    tbl['_data'][rid] = data
-                if rid > tbl['_seq']:
-                    tbl['_seq'] = rid
+            exclude = 'image' if cls._name == 'product.product' else None
+            if ids:
+                for rid in ids:
+                    rows = db.load_rows(conn, cls._name, [rid], exclude=exclude)
+                    if rows:
+                        data = rows[0]
+                        data.pop('id')
+                        if rid in tbl['_data']:
+                            old = tbl['_data'][rid]
+                            for k, v in data.items():
+                                old[k] = v
+                        else:
+                            tbl['_data'][rid] = data
+            else:
+                rows = db.load_table(conn, cls._name, exclude=exclude)
+                for data in rows:
+                    rid = data.pop('id')
+                    if rid in tbl['_data']:
+                        old = tbl['_data'][rid]
+                        for k, v in data.items():
+                            old[k] = v
+                    else:
+                        tbl['_data'][rid] = data
+                    if rid > tbl['_seq']:
+                        tbl['_seq'] = rid
         finally:
             conn.close()
 

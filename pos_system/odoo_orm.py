@@ -91,7 +91,8 @@ def _load_cache():
         tables = db.get_tables(conn)
         for table in tables:
             _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
-            rows = db.load_table(conn, table)
+            exclude = 'image' if table == 'product.product' else None
+            rows = db.load_table(conn, table, exclude=exclude)
             for data in rows:
                 rid = data.pop('id')
                 _db_cache[table]['_data'][rid] = data

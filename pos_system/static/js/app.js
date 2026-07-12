@@ -667,12 +667,18 @@ let App = {
       }
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
-    document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
+    document.getElementById('payment-confirm').onclick = async () => {
+      document.getElementById('payment-confirm').disabled = true
+      await this.confirmPayment(total)
+      document.getElementById('payment-confirm').disabled = false
+    }
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
-    document.getElementById('payment-paylater').onclick = () => {
+    document.getElementById('payment-paylater').onclick = async () => {
+      document.getElementById('payment-paylater').disabled = true
       document.getElementById('payment-tendered').value = '0'
       document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
-      this.confirmPayment(total)
+      await this.confirmPayment(total)
+      document.getElementById('payment-paylater').disabled = false
     }
   },
 
@@ -1016,6 +1022,7 @@ let App = {
     document.getElementById('prod-add-cat').onclick = () => this.showCategoryModal()
 
     document.getElementById('prod-save').onclick = async () => {
+      document.getElementById('prod-save').disabled = true
       const catVal = document.getElementById('prod-category').value
       const data = {
         name: document.getElementById('prod-name').value,
@@ -1040,7 +1047,7 @@ let App = {
         const res = await this.api('GET', '/products?light=true&refresh=1')
         this.products = res.data || []
         this.renderAll()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('prod-save').disabled = false; alert('Error: ' + e.message) }
     }
     document.getElementById('prod-cancel').onclick = () => this.closeModal()
   },
@@ -1333,15 +1340,15 @@ let App = {
       </div>`
     this.showModal(html)
     document.getElementById('vp-confirm').onclick = async () => {
+      document.getElementById('vp-confirm').disabled = true
       const methodId = parseInt(document.getElementById('vp-method').value)
       const amount = parseFloat(document.getElementById('vp-amount').value) || 0
       try {
         await this.api('POST', `/orders/${orderId}/validate-payment`, { payment_method_id: methodId, amount })
         this.closeModal()
-        const res = await this.api('GET', '/orders')
         this.renderOrdersTable()
         this.renderDashboard()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('vp-confirm').disabled = false; alert('Error: ' + e.message) }
     }
     document.getElementById('vp-cancel').onclick = () => this.closeModal()
   },
@@ -1394,6 +1401,7 @@ let App = {
       </div>`
     this.showModal(html)
     document.getElementById('c-save').onclick = async () => {
+      document.getElementById('c-save').disabled = true
       const data = {
         name: document.getElementById('c-name').value,
         phone: document.getElementById('c-phone').value,
@@ -1409,7 +1417,7 @@ let App = {
         const res = await this.api('GET', '/customers')
         this.customers = res.data || []
         this.renderAll()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('c-save').disabled = false; alert('Error: ' + e.message) }
     }
     document.getElementById('c-cancel').onclick = () => this.closeModal()
   },

@@ -300,6 +300,10 @@ def get_product_image(product_id):
             rows = db.load_rows(conn, 'product.product', [product_id])
             if rows:
                 img = rows[0].get('image', '') or ''
+                if img:
+                    from ..odoo_orm import _db_cache
+                    cache = _db_cache.setdefault('product.product', {'_seq': 0, '_data': {}})
+                    cache['_data'].setdefault(product_id, {})['image'] = img
         finally:
             conn.close()
     if not img:

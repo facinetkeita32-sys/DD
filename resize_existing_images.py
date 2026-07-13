@@ -29,11 +29,12 @@ try:
         try:
             new_img = resize_image_b64(img)
             save_image(rid, new_img)
-            if _use_pg:
-                c = conn.cursor()
-                c.execute('UPDATE "product.product" SET "image"=\'\' WHERE id=%s', (rid,))
-            else:
-                conn.execute('UPDATE "product.product" SET "image"=\'\' WHERE id=?', (rid,))
+            if new_img != img:
+                if _use_pg:
+                    c = conn.cursor()
+                    c.execute('UPDATE "product.product" SET "image"=%s WHERE id=%s', (new_img, rid))
+                else:
+                    conn.execute('UPDATE "product.product" SET "image"=? WHERE id=?', (new_img, rid))
             migrated += 1
             new_len = len(new_img)
             saved = old_len - new_len

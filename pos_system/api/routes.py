@@ -340,14 +340,12 @@ def get_product(product_id):
 @permission_required('product.create')
 def create_product():
     data = request.get_json() or {}
-    img_b64 = None
     if data.get('image'):
-        img_b64 = resize_image_b64(data['image'])
-    data.pop('image', None)
+        data['image'] = resize_image_b64(data['image'])
     try:
         product = ProductProduct().create(data)
-        if img_b64:
-            image_storage.save_image(product.id, img_b64)
+        if data.get('image'):
+            image_storage.save_image(product.id, data['image'])
         log_activity('create', 'Product: %s' % data.get('name', ''))
         return success_response(model_to_dict(product), 'Product created')
     except Exception as e:
@@ -362,14 +360,12 @@ def update_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     data = request.get_json() or {}
-    img_b64 = None
     if data.get('image'):
-        img_b64 = resize_image_b64(data['image'])
-    data.pop('image', None)
+        data['image'] = resize_image_b64(data['image'])
     products[0].write(data)
-    if img_b64 is not None:
-        image_storage.save_image(product_id, img_b64)
-    elif 'image' in data:
+    if data.get('image'):
+        image_storage.save_image(product_id, data['image'])
+    else:
         image_storage.delete_image(product_id)
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0]), 'Product updated')

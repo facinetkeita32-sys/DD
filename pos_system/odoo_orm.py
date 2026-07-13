@@ -406,7 +406,8 @@ class Model(metaclass=BaseModel):
     def _save(self):
         tbl = _db_cache[self._name]
         tbl['_data'][self.id] = dict(self._data)
-        redis_cache.set(self._name, self.id, dict(self._data))
+        rdata = {k: v for k, v in self._data.items() if k != 'image'} if self._name == 'product.product' else dict(self._data)
+        redis_cache.set(self._name, self.id, rdata)
         _persist_write(self.__class__, self.id)
 
     def unlink(self):
@@ -465,7 +466,8 @@ class Model(metaclass=BaseModel):
         data['create_uid'] = uid
         data['write_uid'] = uid
         tbl['_data'][new_id] = data
-        redis_cache.set(cls._name, new_id, dict(data))
+        rdata = {k: v for k, v in data.items() if k != 'image'} if cls._name == 'product.product' else dict(data)
+        redis_cache.set(cls._name, new_id, rdata)
         _persist_write(cls, new_id)
         obj = cls(**data)
         obj.id = new_id
@@ -504,6 +506,7 @@ class Model(metaclass=BaseModel):
         if not db._use_pg:
             return
         tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
+        exclude = 'image' if cls._name == 'product.product' else None
         if ids:
             for rid in ids:
                 data = redis_cache.get(cls._name, rid)
@@ -518,7 +521,7 @@ class Model(metaclass=BaseModel):
                 else:
                     conn = get_conn()
                     try:
-                        rows = db.load_rows(conn, cls._name, [rid])
+                        rows = db.load_rows(conn, cls._name, [rid], exclude=exclude)
                         if rows:
                             data = rows[0]
                             data.pop('id')
@@ -539,7 +542,7 @@ class Model(metaclass=BaseModel):
             else:
                 conn = get_conn()
                 try:
-                    rows = db.load_table(conn, cls._name)
+                    rows = db.load_table(conn, cls._name, exclude=exclude)
                     for data in rows:
                         rid = data.pop('id')
                         if rid in tbl['_data']:

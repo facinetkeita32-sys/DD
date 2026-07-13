@@ -26,12 +26,13 @@ def get_order_data(order_id):
     d['lines'] = []
     for line in lines:
         ld = {'_data': line._data}
-        pid = line._data.get('product_id', 0) or 0
-        pname = 'Product'
-        if pid:
-            product = ProductProduct().browse([pid])
-            if product:
-                pname = product[0]._data.get('name', 'Product')
+        pname = line._data.get('product_name', '') or ''
+        if not pname:
+            pid = line._data.get('product_id', 0) or 0
+            if pid:
+                product = ProductProduct().browse([pid])
+                if product:
+                    pname = product[0]._data.get('name', 'Product')
         ld['product_name'] = pname
         d['lines'].append(ld)
 
@@ -39,12 +40,13 @@ def get_order_data(order_id):
     d['payments'] = []
     for pmt in payments:
         pd_data = {'_data': pmt._data}
-        pmid = pmt._data.get('payment_method_id', 0) or 0
-        pname = 'Cash'
-        if pmid:
-            method = PosPaymentMethod().browse([pmid])
-            if method:
-                pname = method[0]._data.get('name', 'Cash')
+        pname = pmt._data.get('payment_method_name', '') or ''
+        if not pname:
+            pmid = pmt._data.get('payment_method_id', 0) or 0
+            if pmid:
+                method = PosPaymentMethod().browse([pmid])
+                if method:
+                    pname = method[0]._data.get('name', 'Cash')
         pd_data['payment_method_name'] = pname
         d['payments'].append(pd_data)
 

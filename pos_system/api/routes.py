@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, g, session, Response
 from ..odoo_orm import env, _db_cache as _db, get_conn
 from .. import db
 from ..models.login_log import LoginLog
+from ..image_utils import resize_image_b64
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -326,6 +327,8 @@ def get_product(product_id):
 @permission_required('product.create')
 def create_product():
     data = request.get_json() or {}
+    if data.get('image'):
+        data['image'] = resize_image_b64(data['image'])
     try:
         product = ProductProduct().create(data)
         log_activity('create', 'Product: %s' % data.get('name', ''))
@@ -342,6 +345,8 @@ def update_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     data = request.get_json() or {}
+    if data.get('image'):
+        data['image'] = resize_image_b64(data['image'])
     products[0].write(data)
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0]), 'Product updated')

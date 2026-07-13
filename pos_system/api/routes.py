@@ -342,6 +342,7 @@ def create_product():
     data = request.get_json() or {}
     if data.get('image'):
         data['image'] = resize_image_b64(data['image'])
+        data['image_version'] = 1
     try:
         product = ProductProduct().create(data)
         if data.get('image'):
@@ -362,10 +363,12 @@ def update_product(product_id):
     data = request.get_json() or {}
     if data.get('image'):
         data['image'] = resize_image_b64(data['image'])
+        cur_v = products[0]._data.get('image_version', 0) or 0
+        data['image_version'] = cur_v + 1
     products[0].write(data)
     if data.get('image'):
         image_storage.save_image(product_id, data['image'])
-    else:
+    elif 'image' in data:
         image_storage.delete_image(product_id)
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0]), 'Product updated')

@@ -377,7 +377,7 @@ let App = {
           cls += ' expiring-soon'
         }
       }
-      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
+      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
         ${badge}
@@ -862,7 +862,7 @@ let App = {
       const checked = selected.has(p.id) ? 'checked' : ''
       return `<tr class="${rowCls + expCls}">
         <td><input type="checkbox" class="product-checkbox" value="${p.id}" ${checked} ${canDelete ? '' : 'disabled'}></td>
-        <td><img class="prod-table-img" src="/api/products/${p.id}/image" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="prod-table-img-placeholder" style="display:none">📦</span></td>
+        <td><img class="prod-table-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="prod-table-img-placeholder" style="display:none">📦</span></td>
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>

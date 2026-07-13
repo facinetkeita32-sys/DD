@@ -8,6 +8,7 @@ from ..odoo_orm import env, _db_cache as _db, get_conn
 from .. import db
 from ..models.login_log import LoginLog
 from ..image_utils import resize_image_b64
+from .. import image_storage
 from ..models.res_users import ResUsers
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
@@ -118,6 +119,11 @@ def log_activity(action, details='', model='', message=''):
             'model': model, 'message': message,
             'ip_address': ip,
         }), daemon=True).start()
+
+
+@api_bp.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
 
 
 # === AUTH ===
@@ -293,6 +299,11 @@ def get_product_image(product_id):
     products = ProductProduct().browse([product_id])
     if not products:
         return '', 404
+    raw = image_storage.get_image(product_id)
+    if raw:
+        resp = Response(raw, mimetype='image/jpeg')
+        resp.headers['Cache-Control'] = 'public, max-age=86400, immutable'
+        return resp
     img = products[0]._data.get('image', '') or ''
     if not img:
         conn = get_conn()
@@ -301,9 +312,7 @@ def get_product_image(product_id):
             if rows:
                 img = rows[0].get('image', '') or ''
                 if img:
-                    from ..odoo_orm import _db_cache
-                    cache = _db_cache.setdefault('product.product', {'_seq': 0, '_data': {}})
-                    cache['_data'].setdefault(product_id, {})['image'] = img
+                    image_storage.save_image(product_id, img)
         finally:
             conn.close()
     if not img:
@@ -331,10 +340,14 @@ def get_product(product_id):
 @permission_required('product.create')
 def create_product():
     data = request.get_json() or {}
+    img_b64 = None
     if data.get('image'):
-        data['image'] = resize_image_b64(data['image'])
+        img_b64 = resize_image_b64(data['image'])
+    data.pop('image', None)
     try:
         product = ProductProduct().create(data)
+        if img_b64:
+            image_storage.save_image(product.id, img_b64)
         log_activity('create', 'Product: %s' % data.get('name', ''))
         return success_response(model_to_dict(product), 'Product created')
     except Exception as e:
@@ -349,9 +362,15 @@ def update_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     data = request.get_json() or {}
+    img_b64 = None
     if data.get('image'):
-        data['image'] = resize_image_b64(data['image'])
+        img_b64 = resize_image_b64(data['image'])
+    data.pop('image', None)
     products[0].write(data)
+    if img_b64 is not None:
+        image_storage.save_image(product_id, img_b64)
+    elif 'image' in data:
+        image_storage.delete_image(product_id)
     log_activity('update', 'Product ID: %s' % product_id)
     return success_response(model_to_dict(products[0]), 'Product updated')
 

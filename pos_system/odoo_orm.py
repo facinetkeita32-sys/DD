@@ -7,6 +7,7 @@ from collections import OrderedDict
 from flask import g
 
 from . import db
+from . import redis_cache
 
 _db_cache = {}
 _db_lock = threading.Lock()
@@ -91,13 +92,19 @@ def _load_cache():
         tables = db.get_tables(conn)
         for table in tables:
             _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
-            exclude = 'image' if table == 'product.product' else None
-            rows = db.load_table(conn, table, exclude=exclude)
-            for data in rows:
-                rid = data.pop('id')
-                _db_cache[table]['_data'][rid] = data
-                if rid > _db_cache[table]['_seq']:
-                    _db_cache[table]['_seq'] = rid
+            cached = redis_cache.all_records(table)
+            if cached:
+                _db_cache[table]['_data'] = cached
+                _db_cache[table]['_seq'] = max(cached.keys()) if cached else 0
+            else:
+                rows = db.load_table(conn, table)
+                for data in rows:
+                    rid = data.pop('id')
+                    _db_cache[table]['_data'][rid] = data
+                    if rid > _db_cache[table]['_seq']:
+                        _db_cache[table]['_seq'] = rid
+                for rid, rdata in _db_cache[table]['_data'].items():
+                    redis_cache.set(table, rid, dict(rdata))
         _migrate_data(conn)
     finally:
         conn.close()
@@ -113,6 +120,7 @@ def _migrate_data(conn):
     for rid, data in list(_db_cache[table]['_data'].items()):
         if data.get('state') == 'draft':
             _db_cache[table]['_data'][rid]['state'] = 'paid'
+            redis_cache.set(table, rid, dict(_db_cache[table]['_data'][rid]))
             dirty = True
     if dirty:
         cur = conn.cursor()
@@ -398,6 +406,7 @@ class Model(metaclass=BaseModel):
     def _save(self):
         tbl = _db_cache[self._name]
         tbl['_data'][self.id] = dict(self._data)
+        redis_cache.set(self._name, self.id, dict(self._data))
         _persist_write(self.__class__, self.id)
 
     def unlink(self):
@@ -456,6 +465,7 @@ class Model(metaclass=BaseModel):
         data['create_uid'] = uid
         data['write_uid'] = uid
         tbl['_data'][new_id] = data
+        redis_cache.set(cls._name, new_id, dict(data))
         _persist_write(cls, new_id)
         obj = cls(**data)
         obj.id = new_id
@@ -493,36 +503,57 @@ class Model(metaclass=BaseModel):
     def _reload_from_db(cls, ids=None):
         if not db._use_pg:
             return
-        conn = get_conn()
-        try:
-            tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
-            exclude = 'image' if cls._name == 'product.product' else None
-            if ids:
-                for rid in ids:
-                    rows = db.load_rows(conn, cls._name, [rid], exclude=exclude)
-                    if rows:
-                        data = rows[0]
-                        data.pop('id')
-                        if rid in tbl['_data']:
-                            old = tbl['_data'][rid]
-                            for k, v in data.items():
-                                old[k] = v
-                        else:
-                            tbl['_data'][rid] = data
-            else:
-                rows = db.load_table(conn, cls._name, exclude=exclude)
-                for data in rows:
-                    rid = data.pop('id')
+        tbl = _db_cache.setdefault(cls._name, {'_seq': 0, '_data': OrderedDict()})
+        if ids:
+            for rid in ids:
+                data = redis_cache.get(cls._name, rid)
+                if data:
+                    data = dict(data)
                     if rid in tbl['_data']:
                         old = tbl['_data'][rid]
                         for k, v in data.items():
                             old[k] = v
                     else:
                         tbl['_data'][rid] = data
-                    if rid > tbl['_seq']:
-                        tbl['_seq'] = rid
-        finally:
-            conn.close()
+                else:
+                    conn = get_conn()
+                    try:
+                        rows = db.load_rows(conn, cls._name, [rid])
+                        if rows:
+                            data = rows[0]
+                            data.pop('id')
+                            if rid in tbl['_data']:
+                                old = tbl['_data'][rid]
+                                for k, v in data.items():
+                                    old[k] = v
+                            else:
+                                tbl['_data'][rid] = data
+                            redis_cache.set(cls._name, rid, dict(tbl['_data'][rid]))
+                    finally:
+                        conn.close()
+        else:
+            cached = redis_cache.all_records(cls._name)
+            if cached:
+                tbl['_data'] = cached
+                tbl['_seq'] = max(cached.keys()) if cached else 0
+            else:
+                conn = get_conn()
+                try:
+                    rows = db.load_table(conn, cls._name)
+                    for data in rows:
+                        rid = data.pop('id')
+                        if rid in tbl['_data']:
+                            old = tbl['_data'][rid]
+                            for k, v in data.items():
+                                old[k] = v
+                        else:
+                            tbl['_data'][rid] = data
+                        if rid > tbl['_seq']:
+                            tbl['_seq'] = rid
+                    for rid, rdata in tbl['_data'].items():
+                        redis_cache.set(cls._name, rid, dict(rdata))
+                finally:
+                    conn.close()
 
     @classmethod
     def browse(cls, ids):

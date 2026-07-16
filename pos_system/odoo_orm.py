@@ -97,14 +97,16 @@ def _load_cache():
                 _db_cache[table]['_data'] = cached
                 _db_cache[table]['_seq'] = max(cached.keys()) if cached else 0
             else:
-                rows = db.load_table(conn, table)
+                exclude = 'image' if table == 'product.product' else None
+                rows = db.load_table(conn, table, exclude=exclude)
                 for data in rows:
                     rid = data.pop('id')
                     _db_cache[table]['_data'][rid] = data
                     if rid > _db_cache[table]['_seq']:
                         _db_cache[table]['_seq'] = rid
                 for rid, rdata in _db_cache[table]['_data'].items():
-                    redis_cache.set(table, rid, dict(rdata))
+                    rdata_to_save = {k: v for k, v in rdata.items() if k != 'image'} if table == 'product.product' else dict(rdata)
+                    redis_cache.set(table, rid, rdata_to_save)
         _migrate_data(conn)
     finally:
         conn.close()

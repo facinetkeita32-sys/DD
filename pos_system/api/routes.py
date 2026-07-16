@@ -689,6 +689,8 @@ def get_customer(customer_id):
 @api_bp.route('/orders', methods=['GET'])
 def get_orders():
     PosOrder()._reload_from_db()
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
     domain = []
     args = request.args
     if args.get('session_id'):
@@ -740,6 +742,8 @@ def get_orders():
 @api_bp.route('/orders/<int:order_id>', methods=['GET'])
 def get_order(order_id):
     PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
     orders = PosOrder().browse([order_id])
     if not orders:
         return error_response('Order not found', 404)
@@ -843,6 +847,7 @@ def create_order():
 @permission_required('order.cancel')
 def cancel_order(order_id):
     PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
     orders = PosOrder().browse([order_id])
     if not orders:
         return error_response('Order not found', 404)
@@ -872,6 +877,7 @@ def cancel_order(order_id):
 @permission_required('order.write')
 def validate_payment(order_id):
     PosOrder()._reload_from_db(ids=[order_id])
+    PosPayment()._reload_from_db()
     orders = PosOrder().browse([order_id])
     if not orders:
         return error_response('Order not found', 404)
@@ -906,6 +912,8 @@ def validate_payment(order_id):
 @api_bp.route('/receipt/<int:order_id>/html', methods=['GET'])
 def get_receipt_html(order_id):
     PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
     from ..services.receipt_service import generate_receipt_html
     lang = session.get('lang', request.args.get('lang', 'en'))
     if lang not in ('en', 'fr'):
@@ -919,6 +927,8 @@ def get_receipt_html(order_id):
 @api_bp.route('/receipt/<int:order_id>/pdf', methods=['GET'])
 def get_receipt_pdf(order_id):
     PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
     from ..services.receipt_service import generate_receipt_pdf
     lang = session.get('lang', request.args.get('lang', 'en'))
     if lang not in ('en', 'fr'):
@@ -1113,6 +1123,7 @@ def delete_delivery_zone(zone_id):
 @login_required
 def get_dashboard():
     PosOrder()._reload_from_db()
+    ProductProduct()._reload_from_db()
     today = datetime.now().strftime('%Y-%m-%d')
     today_orders = PosOrder().search([('date_order', 'like', today)])
     total_sales = sum(o.amount_total for o in today_orders)
@@ -1154,6 +1165,7 @@ def get_dashboard():
 @permission_required('report.read')
 def export_sales_report_csv():
     PosOrder()._reload_from_db()
+    PosOrderLine()._reload_from_db()
     period = request.args.get('period', 'daily')
     fmt = request.args.get('format', 'csv')
     now = datetime.now()

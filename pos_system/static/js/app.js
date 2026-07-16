@@ -345,12 +345,17 @@ let App = {
       return true
     })
     const grid = document.getElementById('pos-product-grid')
+    const threshold = this.lowStockThreshold || 5
+    const existing = {}
+    grid.querySelectorAll('.product-card').forEach(c => { existing[c.dataset.id] = c })
+
     if (!filtered.length) {
       grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</div>`
       return
     }
-    const threshold = this.lowStockThreshold || 5
-    grid.innerHTML = filtered.map((p, idx) => {
+
+    const fragment = document.createDocumentFragment()
+    filtered.forEach((p, idx) => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
       const isOut = qty <= 0
@@ -374,22 +379,37 @@ let App = {
           cls += ' expiring-soon'
         }
       }
-      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="${p.name}" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
-      return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
-        <div class="prod-img-wrap">${imgHtml}</div>
-        ${badge}
-        ${expWarn}
-        <div class="prod-name">${p.name || ''}</div>
-        <div class="prod-price">${this.currencyFormat(p.list_price)}</div>
-        <div class="prod-qty">${qty > 0 ? `${qty} ${I18n.t('product.qty', 'in stock')}` : I18n.t('product.out_of_stock', 'Out of stock')}</div>
-      </div>`
-    }).join('')
-    grid.querySelectorAll('.product-card').forEach(card => {
-      card.onclick = () => {
-        if (card.classList.contains('out-of-stock')) return
-        this.addToCart(parseInt(card.dataset.id))
+
+      const key = String(p.id)
+      let card = existing[key]
+      if (card && card.parentNode) {
+        card.className = cls
+        const badgeEl = card.querySelector('.stock-badge')
+        if (badgeEl) { if (badge) badgeEl.outerHTML = badge }
+        else if (badge) card.querySelector('.prod-img-wrap')?.insertAdjacentHTML('afterend', badge)
+        const expEl = card.querySelector('.prod-exp-badge')
+        if (expEl) { if (expWarn) expEl.outerHTML = expWarn }
+        else if (expWarn) { const ref = card.querySelector('.prod-name'); if (ref) ref.insertAdjacentHTML('beforebegin', expWarn) }
+        const nameEl = card.querySelector('.prod-name')
+        if (nameEl) nameEl.textContent = p.name || ''
+        const priceEl = card.querySelector('.prod-price')
+        if (priceEl) priceEl.textContent = this.currencyFormat(p.list_price)
+        const qtyEl = card.querySelector('.prod-qty')
+        if (qtyEl) qtyEl.textContent = qty > 0 ? `${qty} ${I18n.t('product.qty', 'in stock')}` : I18n.t('product.out_of_stock', 'Out of stock')
+        delete existing[key]
+      } else {
+        const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="${p.name}" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
+        const div = document.createElement('div')
+        div.className = cls
+        div.dataset.id = String(p.id)
+        div.innerHTML = `<div class="prod-img-wrap">${imgHtml}</div>${badge}${expWarn}<div class="prod-name">${p.name || ''}</div><div class="prod-price">${this.currencyFormat(p.list_price)}</div><div class="prod-qty">${qty > 0 ? `${qty} ${I18n.t('product.qty', 'in stock')}` : I18n.t('product.out_of_stock', 'Out of stock')}</div>`
+        div.onclick = () => { if (!div.classList.contains('out-of-stock')) this.addToCart(p.id) }
+        fragment.appendChild(div)
       }
     })
+
+    Object.keys(existing).forEach(id => existing[id].remove())
+    grid.appendChild(fragment)
   },
 
   handleBarcodeScan(barcode) {

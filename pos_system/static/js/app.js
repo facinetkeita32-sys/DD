@@ -15,7 +15,6 @@ let App = {
   cartCustomer: null,
   currentCategory: null,
   _cartDiscountPct: 0,
-  session: null,
   company: null,
 
   async init() {
@@ -95,7 +94,7 @@ let App = {
     const pstock = document.getElementById('products-stock-filter')
     if (pstock) pstock.onchange = () => this.renderProductsTable()
     document.getElementById('add-customer-btn').onclick = () => this.showCustomerModal()
-    document.getElementById('open-session-btn').onclick = () => this.openSession()
+
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
     document.getElementById('bulk-delete-btn').onclick = () => this.bulkDeleteProducts()
@@ -244,7 +243,6 @@ let App = {
     this.renderProductsTable()
     this.renderOrdersTable()
     this.renderCustomersTable()
-    this.renderSessionsTable()
     this.renderDashboard()
     this.renderSettings()
     this.renderUsersTable()
@@ -279,7 +277,6 @@ let App = {
     if (name === 'products') this.refreshAndRenderProducts()
     if (name === 'orders') this.renderOrdersTable()
     if (name === 'customers') this.renderCustomersTable()
-    if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
     if (name === 'reports') this.generateReport()
     if (name === 'activity') this.renderActivity()
@@ -1420,79 +1417,6 @@ let App = {
       } catch(e) { document.getElementById('c-save').disabled = false; alert('Error: ' + e.message) }
     }
     document.getElementById('c-cancel').onclick = () => this.closeModal()
-  },
-
-  // === SESSIONS ===
-
-  async renderSessionsTable() {
-    try {
-      const res = await this.api('GET', '/sessions')
-      const sessions = res.data || []
-      const tbody = document.getElementById('sessions-tbody')
-      tbody.innerHTML = sessions.map(s => `
-        <tr>
-          <td>${s.name || s.id}</td>
-          <td>${s.user_name || ''}</td>
-          <td>${this.currencyFormat(s.cash_register_balance_start || 0)}</td>
-          <td>${this.currencyFormat(s.cash_register_balance_end || 0)}</td>
-          <td>${this.currencyFormat(s.total_sales || 0)}</td>
-          <td>${s.total_orders || 0}</td>
-          <td><span class="status-badge status-${s.state}">${s.state}</span></td>
-          <td>${s.state === 'opened' ? `<button class="btn btn-sm btn-warning close-session" data-id="${s.id}">${I18n.t('session.close', 'Close')}</button>` : '-'}</td>
-        </tr>
-      `).join('')
-
-      tbody.querySelectorAll('.close-session').forEach(btn => {
-        btn.onclick = () => this.closeSession(parseInt(btn.dataset.id))
-      })
-
-      const status = document.getElementById('session-status')
-      const openSession = sessions.find(s => s.state === 'opened')
-      const canOpen = this.hasAction('session.open')
-      const canClose = this.hasAction('session.close')
-      if (openSession) {
-        status.className = 'session-status opened'
-        status.textContent = `✅ ${I18n.t('dashboard.session_opened', 'Session Open')} - ${openSession.name}`
-        document.getElementById('open-session-btn').style.display = 'none'
-      } else {
-        status.className = 'session-status closed'
-        status.textContent = `🔴 ${I18n.t('dashboard.session_closed', 'Session Closed')}`
-        document.getElementById('open-session-btn').style.display = canOpen ? '' : 'none'
-      }
-      tbody.querySelectorAll('.close-session').forEach(btn => {
-        btn.style.display = canClose ? '' : 'none'
-      })
-      if (!canOpen) document.getElementById('open-session-btn').style.display = 'none'
-    } catch(e) { console.error(e) }
-  },
-
-  async openSession() {
-    const cash = prompt(I18n.t('session.start_cash', 'Opening Cash amount:'), '0')
-    if (cash === null) return
-    try {
-      await this.api('POST', '/sessions', {
-        cash_register_balance_start: parseFloat(cash) || 0,
-      })
-      const sesRes = await this.api('GET', '/sessions')
-      const sessions = sesRes.data || []
-      const latest = sessions[0]
-      if (latest) {
-        await this.api('POST', `/sessions/${latest.id}/open`)
-      }
-      this.renderSessionsTable()
-    } catch(e) { alert('Error: ' + e.message) }
-  },
-
-  async closeSession(id) {
-    const cash = prompt(I18n.t('session.end_cash', 'Closing Cash amount:'), '0')
-    if (cash === null) return
-    try {
-      await this.api('POST', `/sessions/${id}/close`, {
-        cash_register_balance_end: parseFloat(cash) || 0,
-      })
-      this.renderSessionsTable()
-      this.renderDashboard()
-    } catch(e) { alert('Error: ' + e.message) }
   },
 
   // === DASHBOARD ===

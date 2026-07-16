@@ -377,7 +377,7 @@ let App = {
           cls += ' expiring-soon'
         }
       }
-      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
+      const imgHtml = `<img class="prod-img" src="/api/products/${p.id}/image?v=${p.image_version || 0}" alt="${p.name}" onerror="this.style.display='none';this.parentElement.querySelector('.prod-img-placeholder').style.display='flex'"><div class="prod-img-placeholder" style="display:none">📦</div>`
       return `<div class="${cls}" data-id="${p.id}" style="animation-delay:${(idx % 20) * 20}ms">
         <div class="prod-img-wrap">${imgHtml}</div>
         ${badge}

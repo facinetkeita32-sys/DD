@@ -537,7 +537,12 @@ class Model(metaclass=BaseModel):
         else:
             cached = redis_cache.all_records(cls._name)
             if cached:
+                old_data = tbl['_data']
                 tbl['_data'] = cached
+                if exclude:
+                    for rid, rdata in tbl['_data'].items():
+                        if rid in old_data and exclude in old_data[rid]:
+                            rdata[exclude] = old_data[rid][exclude]
                 tbl['_seq'] = max(cached.keys()) if cached else 0
             else:
                 conn = get_conn()

@@ -307,11 +307,22 @@ def get_product_image(product_id):
     if not img:
         conn = get_conn()
         try:
-            rows = db.load_rows(conn, 'product.product', [product_id])
-            if rows:
-                img = rows[0].get('image', '') or ''
-                if img:
-                    image_storage.save_image(product_id, img)
+            if db._use_pg:
+                cur = conn.cursor()
+                cur.execute('SELECT "image" FROM "product.product" WHERE id=%s', (product_id,))
+                row = cur.fetchone()
+                if row:
+                    img = row[0] or ''
+            else:
+                cur = conn.execute('SELECT "image" FROM "product.product" WHERE id=?', (product_id,))
+                row = cur.fetchone()
+                if row:
+                    img = row[0] or ''
+            if img:
+                products[0]._data['image'] = img
+                image_storage.save_image(product_id, img)
+        except Exception as e:
+            print(f'Image DB fallback error for product {product_id}: {e}')
         finally:
             conn.close()
     if not img:
@@ -322,7 +333,8 @@ def get_product_image(product_id):
         resp = Response(raw, mimetype='image/png')
         resp.headers['Cache-Control'] = 'public, max-age=86400, immutable'
         return resp
-    except Exception:
+    except Exception as e:
+        print(f'Image decode error for product {product_id}: {e}')
         return '', 404
 
 

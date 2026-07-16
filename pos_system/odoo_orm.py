@@ -511,6 +511,7 @@ class Model(metaclass=BaseModel):
         exclude = 'image' if cls._name == 'product.product' else None
         if ids:
             for rid in ids:
+                old_image = tbl['_data'][rid].get('image') if rid in tbl['_data'] and exclude else None
                 data = redis_cache.get(cls._name, rid)
                 if data:
                     data = dict(data)
@@ -533,9 +534,12 @@ class Model(metaclass=BaseModel):
                                     old[k] = v
                             else:
                                 tbl['_data'][rid] = data
-                            redis_cache.set(cls._name, rid, dict(tbl['_data'][rid]))
+                            rdata_to_save = {k: v for k, v in tbl['_data'][rid].items() if k != exclude} if exclude else dict(tbl['_data'][rid])
+                            redis_cache.set(cls._name, rid, rdata_to_save)
                     finally:
                         conn.close()
+                if old_image:
+                    tbl['_data'][rid]['image'] = old_image
         else:
             cached = redis_cache.all_records(cls._name)
             if cached:
@@ -561,7 +565,8 @@ class Model(metaclass=BaseModel):
                         if rid > tbl['_seq']:
                             tbl['_seq'] = rid
                     for rid, rdata in tbl['_data'].items():
-                        redis_cache.set(cls._name, rid, dict(rdata))
+                        rdata_to_save = {k: v for k, v in rdata.items() if k != exclude} if exclude else dict(rdata)
+                        redis_cache.set(cls._name, rid, rdata_to_save)
                 finally:
                     conn.close()
 
@@ -580,13 +585,17 @@ class Model(metaclass=BaseModel):
             else:
                 missing.append(rid)
         if missing and db._use_pg:
-            rows = db.load_rows(get_conn(), cls._name, missing)
-            for data in rows:
-                rid = data.pop('id')
-                tbl['_data'][rid] = data
-                obj = cls(**data)
-                obj.id = rid
-                results.append(obj)
+            conn = get_conn()
+            try:
+                rows = db.load_rows(conn, cls._name, missing)
+                for data in rows:
+                    rid = data.pop('id')
+                    tbl['_data'][rid] = data
+                    obj = cls(**data)
+                    obj.id = rid
+                    results.append(obj)
+            finally:
+                conn.close()
         return results
 
     @classmethod

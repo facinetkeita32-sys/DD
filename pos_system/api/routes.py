@@ -295,15 +295,19 @@ def get_products():
 
 @api_bp.route('/products/<int:product_id>/image', methods=['GET'])
 def get_product_image(product_id):
-    products = ProductProduct().browse([product_id])
-    if not products:
-        return '', 404
-    raw = image_storage.get_image(product_id)
+    from ..image_storage import get_image as disk_get, save_image as disk_save
+    raw = disk_get(product_id)
     if raw:
         resp = Response(raw, mimetype='image/jpeg')
         resp.headers['Cache-Control'] = 'public, max-age=86400, immutable'
         return resp
+    products = ProductProduct().browse([product_id])
+    if not products:
+        print(f'IMG product {product_id}: not in browse')
+        return '', 404
     img = products[0]._data.get('image', '') or ''
+    if img:
+        print(f'IMG product {product_id}: from cache, len={len(img)}')
     if not img:
         conn = get_conn()
         try:
@@ -320,22 +324,78 @@ def get_product_image(product_id):
                     img = row[0] or ''
             if img:
                 products[0]._data['image'] = img
-                image_storage.save_image(product_id, img)
+                disk_save(product_id, img)
+                print(f'IMG product {product_id}: from DB, len={len(img)} type={type(img).__name__}')
+            else:
+                print(f'IMG product {product_id}: DB returned empty')
         except Exception as e:
-            print(f'Image DB fallback error for product {product_id}: {e}')
+            print(f'IMG product {product_id}: DB error: {e}')
         finally:
             conn.close()
     if not img:
+        print(f'IMG product {product_id}: returning 404')
         return '', 404
     try:
         import base64
         raw = base64.b64decode(img)
-        resp = Response(raw, mimetype='image/png')
+        from PIL import Image as PILImage
+        from io import BytesIO
+        try:
+            buf = BytesIO(raw)
+            pil_img = PILImage.open(buf)
+            mime = 'image/png' if pil_img.format == 'PNG' else 'image/jpeg'
+        except Exception:
+            mime = 'image/png'
+        resp = Response(raw, mimetype=mime)
         resp.headers['Cache-Control'] = 'public, max-age=86400, immutable'
+        print(f'IMG product {product_id}: serving {len(raw)} bytes as {mime}')
         return resp
     except Exception as e:
-        print(f'Image decode error for product {product_id}: {e}')
+        print(f'IMG product {product_id}: decode error: {e}')
         return '', 404
+
+
+@api_bp.route('/products/<int:product_id>/image-debug', methods=['GET'])
+def debug_product_image(product_id):
+    import base64
+    products = ProductProduct().browse([product_id])
+    info = {'id': product_id, 'in_browse': bool(products)}
+    if products:
+        from_cache = products[0]._data.get('image', '') or ''
+        info['in_cache'] = bool(from_cache)
+        info['cache_len'] = len(from_cache) if from_cache else 0
+        ver = products[0]._data.get('image_version', None)
+        info['image_version'] = ver
+    conn = get_conn()
+    try:
+        if db._use_pg:
+            cur = conn.cursor()
+            cur.execute('SELECT "image" FROM "product.product" WHERE id=%s', (product_id,))
+            row = cur.fetchone()
+        else:
+            cur = conn.execute('SELECT "image" FROM "product.product" WHERE id=?', (product_id,))
+            row = cur.fetchone()
+        if row:
+            img = row[0] or ''
+            info['in_db'] = bool(img)
+            info['db_len'] = len(img) if img else 0
+            if img:
+                try:
+                    raw = base64.b64decode(img)
+                    info['decode_bytes'] = len(raw)
+                except Exception as e:
+                    info['decode_error'] = str(e)
+        else:
+            info['in_db'] = False
+    except Exception as e:
+        info['db_error'] = str(e)
+    finally:
+        conn.close()
+    from ..image_storage import get_image as disk_get, STORAGE_DIR as disk_path
+    disk = disk_get(product_id)
+    info['on_disk'] = bool(disk)
+    info['disk_path'] = disk_path
+    return success_response(info)
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])

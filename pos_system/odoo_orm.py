@@ -93,7 +93,7 @@ def _load_cache():
         for table in tables:
             _db_cache.setdefault(table, {'_seq': 0, '_data': OrderedDict()})
             cached = redis_cache.all_records(table)
-            if cached:
+            if cached and table != 'product.product':
                 _db_cache[table]['_data'] = cached
                 _db_cache[table]['_seq'] = max(cached.keys()) if cached else 0
             else:

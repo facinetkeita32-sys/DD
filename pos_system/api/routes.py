@@ -908,7 +908,19 @@ def create_order():
             'amount_due': grand_total - paid_total if is_pending else 0,
             'state': 'pending' if is_pending else 'paid',
         })
-        log_activity('create', 'Order: %s' % order.name)
+        line_summaries = []
+        for line_data in lines_data:
+            pid = line_data.get('product_id')
+            qty = line_data.get('qty', 0) or 0
+            pname = ''
+            if pid:
+                prods = ProductProduct().browse([pid])
+                if prods:
+                    pname = prods[0]._data.get('name', '')
+            line_summaries.append('%s x%s' % (pname or 'Item', qty))
+        items_str = ', '.join(line_summaries) if line_summaries else 'No items'
+        log_activity('create', 'Order: %s' % order.name, model='pos.order',
+                     message='Sold: %s | Total: %s GNF' % (items_str, '{:,.0f}'.format(grand_total)))
         return success_response(model_to_dict(order), 'Order created')
     except Exception as e:
         return error_response(str(e))
@@ -974,7 +986,8 @@ def validate_payment(order_id):
     change = max(0, total_paid - order.amount_total)
     new_state = 'paid' if total_paid >= order.amount_total else 'pending'
     order.write({'amount_paid': total_paid, 'amount_change': change, 'state': new_state})
-    log_activity('validate_payment', 'Order: %s' % order.name)
+    log_activity('validate_payment', 'Order: %s' % order.name, model='pos.order',
+                 message='Payment received: %s GNF' % '{:,.0f}'.format(amount))
     return success_response(model_to_dict(order), 'Payment validated')
 
 

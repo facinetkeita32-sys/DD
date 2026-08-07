@@ -24,7 +24,10 @@ FIELD_MAP = {
 
 def _get_pg_conn():
     import psycopg2
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    kwargs = {}
+    if 'localhost' not in DATABASE_URL and '127.0.0.1' not in DATABASE_URL:
+        kwargs['sslmode'] = 'require'
+    conn = psycopg2.connect(DATABASE_URL, **kwargs)
     conn.autocommit = True
     return conn
 

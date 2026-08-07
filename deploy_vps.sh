@@ -89,20 +89,27 @@ nginx -t
 systemctl enable nginx
 systemctl restart nginx
 
-echo "==> Starting app"
 systemctl daemon-reload
 systemctl enable shopdd
-systemctl start shopdd
 
 echo ""
 echo "======================================================"
-echo " DEPLOYMENT DONE"
+echo " SERVER SETUP DONE - APP NOT STARTED YET"
 echo "======================================================"
-echo " 1. Add HTTPS with:  certbot --nginx -d $DOMAIN"
-echo " 2. Then restore your data from Supabase:"
-echo "    psql \"postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME\" < dump.sql"
-echo " 3. Restart the app after restoring data:"
-echo "    systemctl restart shopdd"
+echo " IMPORTANT: restore your data from Supabase BEFORE"
+echo " starting the app (otherwise demo data is seeded)."
+echo ""
+echo " 1. On this VPS, dump your Supabase database:"
+echo "    pg_dump \"postgresql://postgres.YOURREF:YOURPASS@db.YOURREF.supabase.co:5432/postgres\" --no-owner -f dump.sql"
+echo ""
+echo " 2. Restore it into the local database:"
+echo "    pg_restore --dbname=\"postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME\" --no-owner dump.sql"
+echo "    (or if dump.sql is plain text, use: psql \"postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME\" < dump.sql)"
+echo ""
+echo " 3. Start the app:"
+echo "    systemctl start shopdd"
+echo ""
+echo " 4. Add HTTPS:  certbot --nginx -d $DOMAIN"
 echo ""
 echo " Check logs:  journalctl -u shopdd -f"
 echo "======================================================"

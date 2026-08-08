@@ -81,6 +81,8 @@ let App = {
     document.getElementById('scanner-close').onclick = () => this.closeScanner()
     document.getElementById('activity-filter-btn').onclick = () => this.renderActivity()
     document.getElementById('activity-export-btn').onclick = () => this.exportActivityLog()
+    const _ar = document.getElementById('activity-refresh-btn')
+    if (_ar) _ar.onclick = () => this.renderActivity()
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
@@ -1963,7 +1965,9 @@ let App = {
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`
       }).join('')}</tbody></table></div>`
-    } catch(e) { container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}</p>` }
+    } catch(e) {
+      container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}: ${this._esc(e.message || e)}</p>`
+    }
   },
 
   async exportActivityLog() {

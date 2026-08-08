@@ -1383,69 +1383,79 @@ def get_sales_report():
 
 # === ACTIVITY LOG ===
 
+def _activity_log_rows(args, limit=50, offset=0):
+    """Query login.log directly from the DB (bypasses the in-memory ORM cache)."""
+    p = db._param
+    where = []
+    params = []
+    if args.get('action'):
+        where.append(f'"action" = {p}')
+        params.append(args['action'])
+    if args.get('model'):
+        where.append(f'"model" = {p}')
+        params.append(args['model'])
+    if args.get('user_id'):
+        where.append(f'"user_id" = {p}')
+        params.append(int(args['user_id']))
+    if args.get('search'):
+        where.append(f'LOWER("message") LIKE LOWER({p})')
+        params.append('%' + args['search'] + '%')
+    if args.get('date_from'):
+        where.append(f'"timestamp" >= {p}')
+        params.append(args['date_from'] + ' 00:00:00')
+    if args.get('date_to'):
+        where.append(f'"timestamp" <= {p}')
+        params.append(args['date_to'] + ' 23:59:59')
+    where_sql = (' WHERE ' + ' AND '.join(where)) if where else ''
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(f'SELECT COUNT(*) FROM "login.log"{where_sql}', params)
+        total = cur.fetchone()[0]
+        cur.execute(
+            f'SELECT * FROM "login.log"{where_sql} ORDER BY "timestamp" DESC, "id" DESC LIMIT {p} OFFSET {p}',
+            params + [limit, offset])
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+    finally:
+        conn.close()
+    for r in rows:
+        uid = r.get('user_id') or 0
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                r['user_name'] = user[0]._data.get('name', '')
+    return total, rows
+
+
 @api_bp.route('/activity-log', methods=['GET'])
 @login_required
 def get_activity_log():
     args = request.args
-    domain = []
-    if args.get('action'):
-        domain.append(('action', '=', args['action']))
-    if args.get('model'):
-        domain.append(('model', '=', args['model']))
-    if args.get('user_id'):
-        domain.append(('user_id', '=', int(args['user_id'])))
-    if args.get('search'):
-        domain.append(('message', 'ilike', args['search']))
-    if args.get('date_from'):
-        domain.append(('timestamp', '>=', args['date_from'] + ' 00:00:00'))
-    if args.get('date_to'):
-        domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
     offset = args.get('offset', 0, type=int)
     limit = args.get('limit', 50, type=int)
-    logs = LoginLog().search(domain, order='-timestamp', offset=offset, limit=limit)
-    total = LoginLog().search_count(domain)
-    result = []
-    for log in logs:
-        d = model_to_dict(log)
-        uid = log._data.get('user_id', 0) or 0
-        if uid:
-            user = ResUsers().browse([uid])
-            if user:
-                d['user_name'] = user[0]._data.get('name', '')
-        result.append(d)
-    return success_response({'total': total, 'data': result})
+    total, rows = _activity_log_rows(args, limit=limit, offset=offset)
+    for r in rows:
+        ts = r.get('timestamp')
+        if ts is not None and not isinstance(ts, str):
+            r['timestamp'] = ts.strftime('%Y-%m-%d %H:%M:%S')
+    return success_response({'total': total, 'data': rows})
 
 
 @api_bp.route('/activity-log/export', methods=['GET'])
 @login_required
 def export_activity_log():
     args = request.args
-    domain = []
-    if args.get('action'):
-        domain.append(('action', '=', args['action']))
-    if args.get('model'):
-        domain.append(('model', '=', args['model']))
-    if args.get('search'):
-        domain.append(('message', 'ilike', args['search']))
-    if args.get('date_from'):
-        domain.append(('timestamp', '>=', args['date_from'] + ' 00:00:00'))
-    if args.get('date_to'):
-        domain.append(('timestamp', '<=', args['date_to'] + ' 23:59:59'))
-    total = LoginLog().search_count(domain)
-    logs = LoginLog().search(domain, order='-timestamp')
+    total, rows = _activity_log_rows(args, limit=100000, offset=0)
     lines = ['timestamp,user,action,model,message']
-    for log in logs:
-        d = model_to_dict(log)
-        uid = log._data.get('user_id', 0) or 0
-        uname = ''
-        if uid:
-            user = ResUsers().browse([uid])
-            if user:
-                uname = user[0]._data.get('name', '')
-        ts = d.get('timestamp', '')
-        action = d.get('action', '')
-        model = d.get('model', '')
-        msg = (d.get('message', '') or '').replace('"', '""')
+    for r in rows:
+        ts = r.get('timestamp')
+        if ts is not None and not isinstance(ts, str):
+            ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+        uname = (r.get('user_name') or '').replace('"', '""')
+        action = r.get('action') or ''
+        model = r.get('model') or ''
+        msg = (r.get('message') or '').replace('"', '""')
         lines.append(f'{ts},"{uname}",{action},{model},"{msg}"')
     csv = '\r\n'.join(lines)
     from flask import Response as FlaskResponse

@@ -321,7 +321,10 @@
     </div>
 
     <div id="screen-activity" class="content-screen">
-      <div class="screen-header"><h2 data-i18n="activity.title">Activity Log</h2></div>
+      <div class="screen-header">
+        <h2 data-i18n="activity.title">Activity Log</h2>
+        <button class="btn btn-sm btn-secondary" id="activity-refresh-btn" data-i18n="common.refresh">Refresh</button>
+      </div>
       <div id="activity-toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <input type="text" id="activity-search" placeholder="Search..." style="flex:1;min-width:120px">
         <select id="activity-filter-action">
@@ -333,6 +336,7 @@
           <option value="delete">Delete</option>
           <option value="cancel">Cancel</option>
           <option value="validate_payment">Payment</option>
+          <option value="bulk_update">Bulk Update</option>
           <option value="bulk_delete">Bulk Delete</option>
           <option value="import">Import</option>
           <option value="sync">Sync</option>

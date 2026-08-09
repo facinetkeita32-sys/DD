@@ -116,9 +116,9 @@ a { text-decoration: none; color: var(--primary); cursor: pointer; }
 .product-card .prod-price { color: #000080; font-weight: 800; font-size: 17px; letter-spacing: -0.3px; }
 .product-card .prod-qty { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 .product-card.low-stock { border-color: var(--warning); background: linear-gradient(135deg, #fffbeb, #fff); }
-.product-card.low-stock .prod-price { color: var(--warning); }
+.product-card.low-stock .prod-price { color: #000080; }
 .product-card.out-of-stock { border-color: var(--danger); background: linear-gradient(135deg, #fef2f2, #fff); opacity: 0.75; cursor: not-allowed; }
-.product-card.out-of-stock .prod-price { color: var(--text-light); }
+.product-card.out-of-stock .prod-price { color: #000080; }
 .product-card.out-of-stock .prod-name { text-decoration: line-through; }
 .product-card.added-anim { animation: addedPulse 0.4s ease-out; }
 @keyframes addedPulse { 0% { transform: scale(1); } 50% { transform: scale(0.95); box-shadow: 0 0 0 3px var(--primary-glow); } 100% { transform: scale(1); } }

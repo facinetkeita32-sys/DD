@@ -1,4 +1,4 @@
-console.log('POS App v2.14')
+console.log('POS App v2.15')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.14'
+    document.getElementById('app-version').textContent = 'v2.15'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -96,6 +96,8 @@ let App = {
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
     const mcPay = document.getElementById('mc-pay-btn')
     if (mcPay) mcPay.onclick = () => this.showPaymentModal()
+    const mcCartLink = document.getElementById('mc-cart-link')
+    if (mcCartLink) mcCartLink.onclick = () => this.scrollToCart()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
@@ -474,6 +476,7 @@ let App = {
       alert(I18n.t('product.out_of_stock', 'Out of stock'))
       return
     }
+    const firstItem = this.cart.length === 0
     const existing = this.cart.find(c => c.product_id === productId)
     if (existing) {
       if (existing.qty + 1 > qtyOnHand) {
@@ -491,6 +494,10 @@ let App = {
       })
     }
     this.renderCart()
+    // On phones, scroll the cart into view when the first item is added
+    if (firstItem && window.matchMedia('(max-width: 768px)').matches) {
+      this.scrollToCart()
+    }
     // Brief pulse animation on the clicked card
     const card = document.querySelector(`.product-card[data-id="${productId}"]`)
     if (card) {
@@ -652,6 +659,13 @@ let App = {
     document.body.classList.toggle('has-mobile-bar', hasItems)
     const totalEl = document.getElementById('mc-total-amount')
     if (totalEl) totalEl.textContent = this.currencyFormat(grandTotal)
+    const countEl = document.getElementById('mc-cart-count')
+    if (countEl) countEl.textContent = String(this.cart.reduce((s, i) => s + i.qty, 0))
+  },
+
+  scrollToCart() {
+    const cart = document.querySelector('.pos-cart')
+    if (cart) cart.scrollIntoView({ behavior: 'smooth', block: 'start' })
   },
 
   // === PAYMENT MODAL ===

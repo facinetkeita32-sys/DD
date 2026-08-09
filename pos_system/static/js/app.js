@@ -1,4 +1,4 @@
-console.log('POS App v2.15')
+console.log('POS App v2.16')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.15'
+    document.getElementById('app-version').textContent = 'v2.16'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -494,6 +494,7 @@ let App = {
       })
     }
     this.renderCart()
+    this.showToast(`🛒 ${product.name} ${I18n.t('pos.added', 'added')}`)
     // On phones, scroll the cart into view when the first item is added
     if (firstItem && window.matchMedia('(max-width: 768px)').matches) {
       this.scrollToCart()
@@ -666,6 +667,15 @@ let App = {
   scrollToCart() {
     const cart = document.querySelector('.pos-cart')
     if (cart) cart.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  },
+
+  showToast(msg) {
+    const toast = document.getElementById('toast')
+    if (!toast) return
+    toast.textContent = msg
+    toast.classList.add('show')
+    clearTimeout(this._toastTimer)
+    this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2200)
   },
 
   // === PAYMENT MODAL ===

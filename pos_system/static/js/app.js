@@ -1,4 +1,4 @@
-console.log('POS App v2.7 - click target logger')
+console.log('POS App v2.8 - force activity visible')
 let App = {
   user: null,
   permissions: null,
@@ -1975,6 +1975,11 @@ let App = {
         </tr>`
       }).join('')
       const scrEl = document.getElementById('screen-activity')
+      if (scrEl) {
+        scrEl.classList.add('active')
+        scrEl.style.display = 'block'
+        scrEl.style.opacity = '1'
+      }
       const diag = `screen:${scrEl ? scrEl.className : 'MISSING'} · rows:${logs.length} · total:${total} · win:${window.innerWidth}x${window.innerHeight}`
       console.log('renderActivity diag:', diag)
       container.innerHTML = `<div style="font-size:11px;color:var(--text-light);margin-bottom:6px;font-family:monospace">${diag}</div>

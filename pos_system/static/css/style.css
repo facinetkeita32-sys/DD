@@ -347,8 +347,8 @@ tr:hover td { background: var(--hover); }
 @media (max-width: 768px) {
   .pos-layout { flex-direction: column; height: auto; }
   .pos-products { flex: none; }
-  .pos-cart { width: 100%; height: auto; max-height: 50vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-  .cart-items { max-height: 200px; }
+  .pos-cart { width: 100%; height: auto; max-height: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .cart-items { max-height: none; }
   .product-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
   .dashboard-cards { grid-template-columns: repeat(2, 1fr); }
   .modal { min-width: unset; width: 95vw; padding: 20px; max-height: 92vh; }
@@ -391,7 +391,7 @@ tr:hover td { background: var(--hover); }
   .modal { padding: 16px; width: 98vw; }
   .login-box { padding: 24px 16px; width: 100vw; border-radius: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
   .login-container::before, .login-container::after { display: none; }
-  .pos-cart { max-height: 45vh; }
+  .pos-cart { max-height: none; }
   .cart-item { padding: 10px 14px; }
   .cart-header, .cart-footer, .cart-delivery { padding: 12px 14px; }
   .cart-item-actions input { width: 42px; }

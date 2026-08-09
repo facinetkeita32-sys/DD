@@ -1,4 +1,4 @@
-console.log('POS App v2.11 - on-screen status badge')
+console.log('POS App v2.12 - fix activity screen nesting')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.11 · init'
+    document.getElementById('app-version').textContent = 'v2.12 · init'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -284,7 +284,7 @@ let App = {
   showScreen(name) {
     console.log('SHOWSCREEN', name, 'hasScreen=', this.hasScreen(name))
     const vb = document.getElementById('app-version')
-    if (vb) vb.textContent = 'v2.11 · ' + name
+    if (vb) vb.textContent = 'v2.12 · ' + name
     if (!this.hasScreen(name)) return
     this.applyNavPermissions()
     document.querySelectorAll('.content-screen').forEach(s => s.classList.remove('active'))

@@ -302,6 +302,20 @@ tr:hover td { background: var(--hover); }
   .nav-user { display: none; }
 }
 
+/* === Mobile checkout bar === */
+.mobile-checkout-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: none; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0,0,0,.12); z-index: 120;
+}
+.mobile-checkout-bar.visible { display: flex; }
+.mobile-checkout-bar .mc-total { font-size: 18px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.mobile-checkout-bar .mc-total #mc-total-amount { color: var(--primary); font-weight: 800; }
+.mobile-checkout-bar #mc-pay-btn { flex: 1; max-width: 220px; }
+@media (min-width: 769px) { .mobile-checkout-bar { display: none !important; } }
+
 /* === Responsive === */
 @media (max-width: 1024px) {
   .pos-cart { width: 340px; }
@@ -335,6 +349,7 @@ tr:hover td { background: var(--hover); }
   .product-card .prod-img, .product-card .prod-img-placeholder, .prod-img-wrap { height: 70px; }
   .product-card .prod-price { font-size: 15px; }
   .content-screen { padding: 16px; }
+  body.has-mobile-bar .content-screen { padding-bottom: 80px; }
   .dash-card .dash-value { font-size: 22px; }
   .dash-card { padding: 16px; }
   table { font-size: 12px; }

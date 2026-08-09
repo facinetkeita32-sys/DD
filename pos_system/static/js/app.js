@@ -1,4 +1,4 @@
-console.log('POS App v2.13')
+console.log('POS App v2.14')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.13'
+    document.getElementById('app-version').textContent = 'v2.14'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -94,6 +94,8 @@ let App = {
     const _ar = document.getElementById('activity-refresh-btn')
     if (_ar) _ar.onclick = () => this.renderActivity()
     document.getElementById('pay-btn').onclick = () => this.showPaymentModal()
+    const mcPay = document.getElementById('mc-pay-btn')
+    if (mcPay) mcPay.onclick = () => this.showPaymentModal()
     document.getElementById('cart-clear').onclick = () => this.clearCart()
     document.getElementById('add-product-btn').onclick = () => this.showProductModal()
     document.getElementById('bulk-import-btn').onclick = () => this.showBulkImportModal()
@@ -540,6 +542,7 @@ let App = {
       const totalEl2 = document.getElementById('cart-total-amount')
       if (totalEl2) totalEl2.innerHTML = `<span class="total-amount">${this.currencyFormat(0)}</span>`
       if (deliveryEl) deliveryEl.style.display = 'none'
+      this.syncMobileBar(0)
       return
     }
 
@@ -624,6 +627,7 @@ let App = {
       </div>
       <span class="total-amount" style="font-size:24px;color:var(--primary);width:100%">${this.currencyFormat(grandTotal)}</span>`
     totalEl.innerHTML = totalHtml
+    this.syncMobileBar(grandTotal)
 
     totalEl.querySelectorAll('[data-pct]').forEach(btn => {
       btn.onclick = () => {
@@ -638,6 +642,16 @@ let App = {
     container.querySelectorAll('.cart-item-remove').forEach(el => {
       el.onclick = () => this.removeFromCart(parseInt(el.dataset.index))
     })
+  },
+
+  syncMobileBar(grandTotal) {
+    const bar = document.getElementById('mobile-checkout-bar')
+    if (!bar) return
+    const hasItems = this.cart.length > 0
+    bar.classList.toggle('visible', hasItems)
+    document.body.classList.toggle('has-mobile-bar', hasItems)
+    const totalEl = document.getElementById('mc-total-amount')
+    if (totalEl) totalEl.textContent = this.currencyFormat(grandTotal)
   },
 
   // === PAYMENT MODAL ===

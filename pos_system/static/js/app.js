@@ -1,4 +1,4 @@
-console.log('POS App v2.8 - force activity visible')
+console.log('POS App v2.9 - crash-proof activity table')
 let App = {
   user: null,
   permissions: null,
@@ -1966,10 +1966,11 @@ let App = {
       }
       const rowsHtml = logs.map(l => {
         const al = actionLabels[l.action] || { label: l.action, cls: 'badge badge-secondary' }
+        const msg = (l.message || l.details || '-').substring(0, 100)
         return `<tr>
           <td>${this._esc(l.user_name || '')}</td>
           <td><span class="${al.cls}">${al.label}</span></td>
-          <td style="font-size:13px;color:var(--text-light)">${this._esc(l.message || l.details || '-')}</td>
+          <td style="font-size:13px;color:var(--text-light);overflow-wrap:break-word">${this._esc(msg)}</td>
           <td>${(l.timestamp || '').substring(0, 19)}</td>
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`
@@ -1979,17 +1980,20 @@ let App = {
         scrEl.classList.add('active')
         scrEl.style.display = 'block'
         scrEl.style.opacity = '1'
+        scrEl.style.animation = 'none'
       }
       const diag = `screen:${scrEl ? scrEl.className : 'MISSING'} · rows:${logs.length} · total:${total} · win:${window.innerWidth}x${window.innerHeight}`
       console.log('renderActivity diag:', diag)
       container.innerHTML = `<div style="font-size:11px;color:var(--text-light);margin-bottom:6px;font-family:monospace">${diag}</div>
         <div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>
-        <div style="max-height:500px;overflow-y:auto"><table><thead><tr>
-        <th>${I18n.t('activity.user', 'User')}</th>
-        <th>${I18n.t('activity.action', 'Action')}</th>
+        <div style="max-height:500px;overflow:auto;max-width:100%">
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse">
+        <thead><tr>
+        <th style="width:110px">${I18n.t('activity.user', 'User')}</th>
+        <th style="width:90px">${I18n.t('activity.action', 'Action')}</th>
         <th>${I18n.t('activity.details', 'Details')}</th>
-        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
-        <th>${I18n.t('activity.ip', 'IP')}</th>
+        <th style="width:150px">${I18n.t('activity.timestamp', 'Timestamp')}</th>
+        <th style="width:110px">${I18n.t('activity.ip', 'IP')}</th>
       </tr></thead><tbody>${rowsHtml}</tbody></table></div>`
     } catch(e) {
       console.error('renderActivity error:', e)

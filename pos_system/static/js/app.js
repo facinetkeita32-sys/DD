@@ -1,4 +1,4 @@
-console.log('POS App v2.5 - activity diag')
+console.log('POS App v2.6 - nav delegation')
 let App = {
   user: null,
   permissions: null,
@@ -50,8 +50,10 @@ let App = {
       }
     })
 
-    document.querySelectorAll('.nav-link').forEach(link => {
-      link.onclick = () => {
+    document.addEventListener('click', (e) => {
+      const link = e.target && e.target.closest ? e.target.closest('.nav-link') : null
+      if (link && link.dataset.screen) {
+        console.log('NAV CLICK', link.dataset.screen)
         navLinks.classList.remove('open')
         this.showScreen(link.dataset.screen)
       }
@@ -269,10 +271,12 @@ let App = {
   },
 
   showScreen(name) {
+    console.log('SHOWSCREEN', name, 'hasScreen=', this.hasScreen(name))
     if (!this.hasScreen(name)) return
     this.applyNavPermissions()
     document.querySelectorAll('.content-screen').forEach(s => s.classList.remove('active'))
     document.getElementById('screen-' + name)?.classList.add('active')
+    console.log('SHOWSCREEN activated', name, document.getElementById('screen-' + name)?.className)
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'))
     document.querySelector(`.nav-link[data-screen="${name}"]`)?.classList.add('active')
     if (name === 'pos') this.refreshAndRenderProducts()

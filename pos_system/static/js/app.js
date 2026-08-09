@@ -1,4 +1,4 @@
-console.log('POS App v2.12 - fix activity screen nesting')
+console.log('POS App v2.13')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.12 · init'
+    document.getElementById('app-version').textContent = 'v2.13'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -60,11 +60,8 @@ let App = {
     })
 
     document.addEventListener('click', (e) => {
-      const t = e.target
-      console.log('CLICK target:', t && t.tagName, JSON.stringify(t && (t.className || '')), JSON.stringify((t && t.textContent || '').trim().slice(0, 24)))
-      const link = t && t.closest ? t.closest('.nav-link') : null
+      const link = e.target && e.target.closest ? e.target.closest('.nav-link') : null
       if (link && link.dataset.screen) {
-        console.log('NAV CLICK', link.dataset.screen)
         navLinks.classList.remove('open')
         this.showScreen(link.dataset.screen)
       }
@@ -282,14 +279,10 @@ let App = {
   },
 
   showScreen(name) {
-    console.log('SHOWSCREEN', name, 'hasScreen=', this.hasScreen(name))
-    const vb = document.getElementById('app-version')
-    if (vb) vb.textContent = 'v2.12 · ' + name
     if (!this.hasScreen(name)) return
     this.applyNavPermissions()
     document.querySelectorAll('.content-screen').forEach(s => s.classList.remove('active'))
     document.getElementById('screen-' + name)?.classList.add('active')
-    console.log('SHOWSCREEN activated', name, document.getElementById('screen-' + name)?.className)
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'))
     document.querySelector(`.nav-link[data-screen="${name}"]`)?.classList.add('active')
     if (name === 'pos') this.refreshAndRenderProducts()
@@ -1987,15 +1980,9 @@ let App = {
         </tr>`
       }).join('')
       const scrEl = document.getElementById('screen-activity')
-      if (scrEl) {
-        scrEl.classList.add('active')
-        scrEl.style.display = 'block'
-        scrEl.style.opacity = '1'
-        scrEl.style.animation = 'none'
-      }
-      const diag = `screen:${scrEl ? scrEl.className : 'MISSING'} · rows:${logs.length} · total:${total} · win:${window.innerWidth}x${window.innerHeight}`
-      console.log('renderActivity diag:', diag)
-      container.innerHTML = `<div style="font-size:11px;color:var(--text-light);margin-bottom:6px;font-family:monospace">${diag}</div>
+      if (scrEl) scrEl.classList.add('active')
+      console.log('renderActivity: rendered', logs.length, 'of', total)
+      container.innerHTML = `
         <div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>
         <div style="max-height:500px;overflow:auto;max-width:100%">
         <table style="width:100%;table-layout:fixed;border-collapse:collapse">

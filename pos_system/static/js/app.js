@@ -1,4 +1,4 @@
-console.log('POS App v2.16')
+console.log('POS App v2.17')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.16'
+    document.getElementById('app-version').textContent = 'v2.17'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -2017,8 +2017,6 @@ let App = {
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`
       }).join('')
-      const scrEl = document.getElementById('screen-activity')
-      if (scrEl) scrEl.classList.add('active')
       console.log('renderActivity: rendered', logs.length, 'of', total)
       container.innerHTML = `
         <div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>

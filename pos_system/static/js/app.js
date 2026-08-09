@@ -1,4 +1,4 @@
-console.log('POS App v2.4 - activity rebuilt')
+console.log('POS App v2.5 - activity diag')
 let App = {
   user: null,
   permissions: null,
@@ -1968,7 +1968,11 @@ let App = {
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`
       }).join('')
-      container.innerHTML = `<div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>
+      const scrEl = document.getElementById('screen-activity')
+      const diag = `screen:${scrEl ? scrEl.className : 'MISSING'} · rows:${logs.length} · total:${total} · win:${window.innerWidth}x${window.innerHeight}`
+      console.log('renderActivity diag:', diag)
+      container.innerHTML = `<div style="font-size:11px;color:var(--text-light);margin-bottom:6px;font-family:monospace">${diag}</div>
+        <div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>
         <div style="max-height:500px;overflow-y:auto"><table><thead><tr>
         <th>${I18n.t('activity.user', 'User')}</th>
         <th>${I18n.t('activity.action', 'Action')}</th>

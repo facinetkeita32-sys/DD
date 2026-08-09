@@ -1,4 +1,4 @@
-console.log('POS App v2.9 - crash-proof activity table')
+console.log('POS App v2.10 - version badge')
 let App = {
   user: null,
   permissions: null,
@@ -18,6 +18,7 @@ let App = {
   company: null,
 
   async init() {
+    document.getElementById('app-version').textContent = 'v2.10'
     await I18n.init('en')
     this.bindEvents()
     this.checkLogin()

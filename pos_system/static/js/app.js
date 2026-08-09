@@ -1,4 +1,4 @@
-console.log('POS App v2.6 - nav delegation')
+console.log('POS App v2.7 - click target logger')
 let App = {
   user: null,
   permissions: null,
@@ -51,7 +51,9 @@ let App = {
     })
 
     document.addEventListener('click', (e) => {
-      const link = e.target && e.target.closest ? e.target.closest('.nav-link') : null
+      const t = e.target
+      console.log('CLICK target:', t && t.tagName, JSON.stringify(t && (t.className || '')), JSON.stringify((t && t.textContent || '').trim().slice(0, 24)))
+      const link = t && t.closest ? t.closest('.nav-link') : null
       if (link && link.dataset.screen) {
         console.log('NAV CLICK', link.dataset.screen)
         navLinks.classList.remove('open')

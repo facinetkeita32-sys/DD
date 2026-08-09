@@ -1,4 +1,4 @@
-console.log('POS App v2.10 - version badge')
+console.log('POS App v2.11 - on-screen status badge')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,15 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.10'
+    document.getElementById('app-version').textContent = 'v2.11 · init'
+    window.addEventListener('error', (e) => {
+      const vb = document.getElementById('app-version')
+      if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
+    })
+    window.addEventListener('unhandledrejection', (e) => {
+      const vb = document.getElementById('app-version')
+      if (vb) vb.textContent = 'REJ: ' + String(e.reason && e.reason.message || e.reason || '').slice(0, 40)
+    })
     await I18n.init('en')
     this.bindEvents()
     this.checkLogin()
@@ -275,6 +283,8 @@ let App = {
 
   showScreen(name) {
     console.log('SHOWSCREEN', name, 'hasScreen=', this.hasScreen(name))
+    const vb = document.getElementById('app-version')
+    if (vb) vb.textContent = 'v2.11 · ' + name
     if (!this.hasScreen(name)) return
     this.applyNavPermissions()
     document.querySelectorAll('.content-screen').forEach(s => s.classList.remove('active'))

@@ -1,4 +1,4 @@
-console.log('POS App v2.3 - discount buttons enabled')
+console.log('POS App v2.4 - activity rebuilt')
 let App = {
   user: null,
   permissions: null,
@@ -1918,19 +1918,29 @@ let App = {
 
   async renderActivity() {
     const container = document.getElementById('activity-log-container')
-    if (!container) return
+    if (!container) {
+      console.error('renderActivity: #activity-log-container not found')
+      return
+    }
+    container.innerHTML = `<p style="color:var(--text-light);padding:20px">Loading...</p>`
     try {
-      const search = document.getElementById('activity-search')?.value || ''
-      const action = document.getElementById('activity-filter-action')?.value || ''
-      const dateFrom = document.getElementById('activity-date-from')?.value || ''
-      const dateTo = document.getElementById('activity-date-to')?.value || ''
+      const searchEl = document.getElementById('activity-search')
+      const actionEl = document.getElementById('activity-filter-action')
+      const fromEl = document.getElementById('activity-date-from')
+      const toEl = document.getElementById('activity-date-to')
+      const search = searchEl ? searchEl.value : ''
+      const action = actionEl ? actionEl.value : ''
+      const dateFrom = fromEl ? fromEl.value : ''
+      const dateTo = toEl ? toEl.value : ''
       let query = '/activity-log?limit=200'
       if (search) query += '&search=' + encodeURIComponent(search)
       if (action) query += '&action=' + encodeURIComponent(action)
       if (dateFrom) query += '&date_from=' + encodeURIComponent(dateFrom)
       if (dateTo) query += '&date_to=' + encodeURIComponent(dateTo)
+      console.log('renderActivity: fetching', query)
       const res = await this.api('GET', query)
-      const data = res.data || {}
+      console.log('renderActivity: got response', res && res.success, res && res.data && res.data.total)
+      const data = res && res.data ? res.data : {}
       const logs = data.data || []
       const total = data.total || 0
       if (!logs.length) {
@@ -1948,14 +1958,7 @@ let App = {
         'bulk_update': { label: 'Bulk Update', cls: 'badge badge-info' },
         'import': { label: 'Import', cls: 'badge badge-primary' },
       }
-      container.innerHTML = `<div style="margin-bottom:8px;color:var(--text-light)" data-i18n="activity.total">Total: ${total}</div>
-        <div style="max-height:500px;overflow-y:auto"><table><thead><tr>
-        <th>${I18n.t('activity.user', 'User')}</th>
-        <th>${I18n.t('activity.action', 'Action')}</th>
-        <th>${I18n.t('activity.details', 'Details')}</th>
-        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
-        <th>${I18n.t('activity.ip', 'IP')}</th>
-      </tr></thead><tbody>${logs.map(l => {
+      const rowsHtml = logs.map(l => {
         const al = actionLabels[l.action] || { label: l.action, cls: 'badge badge-secondary' }
         return `<tr>
           <td>${this._esc(l.user_name || '')}</td>
@@ -1964,9 +1967,18 @@ let App = {
           <td>${(l.timestamp || '').substring(0, 19)}</td>
           <td style="font-size:12px;color:var(--text-light)">${l.ip_address || '-'}</td>
         </tr>`
-      }).join('')}</tbody></table></div>`
+      }).join('')
+      container.innerHTML = `<div style="margin-bottom:8px;color:var(--text-light)">Total: ${total}</div>
+        <div style="max-height:500px;overflow-y:auto"><table><thead><tr>
+        <th>${I18n.t('activity.user', 'User')}</th>
+        <th>${I18n.t('activity.action', 'Action')}</th>
+        <th>${I18n.t('activity.details', 'Details')}</th>
+        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
+        <th>${I18n.t('activity.ip', 'IP')}</th>
+      </tr></thead><tbody>${rowsHtml}</tbody></table></div>`
     } catch(e) {
-      container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}: ${this._esc(e.message || e)}</p>`
+      console.error('renderActivity error:', e)
+      container.innerHTML = `<p style="color:var(--danger);padding:20px">${I18n.t('activity.error', 'Error loading activity log')}: ${this._esc(e.message || e)}</p>`
     }
   },
 

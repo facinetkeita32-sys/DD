@@ -1402,14 +1402,13 @@ def email_sales_report():
     total_orders = len(orders)
     avg_order = total_sales / total_orders if total_orders else 0
 
-    recipient = ''
+    recipients = []
     for admin in ResUsers().search([('role', '=', 'admin'), ('active', '=', True)]):
         email = admin._data.get('email', '') or ''
         if email:
-            recipient = email
-            break
-    if not recipient:
-        return error_response('No email configured for the admin user. Set an email in the Users screen.', 400)
+            recipients.append(email)
+    if not recipients:
+        return error_response('No email configured for any admin user. Set emails in the Users screen.', 400)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -1462,7 +1461,7 @@ def email_sales_report():
     """
     try:
         send_email(
-            recipient,
+            recipients,
             subject,
             html_body,
             attachment_name=f'sales_report_{period}_{now.strftime("%Y%m%d")}.csv',
@@ -1470,8 +1469,8 @@ def email_sales_report():
         )
     except Exception as e:
         return error_response(f'Failed to send email: {e}', 500)
-    log_activity('email_report', 'Sales report sent to %s' % recipient, model='report')
-    return success_response(message='Report sent to %s' % recipient)
+    log_activity('email_report', 'Sales report sent to %s' % ', '.join(recipients), model='report')
+    return success_response(message='Report sent to %d admin email(s): %s' % (len(recipients), ', '.join(recipients)))
 
 
 

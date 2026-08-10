@@ -17,9 +17,14 @@ def send_email(to_address, subject, html_body, attachment_name=None, attachment_
     host, port, user, password, mail_from = _smtp_settings()
     if not user or not password:
         raise RuntimeError('SMTP is not configured: set SMTP_USER and SMTP_PASS')
+    if isinstance(to_address, str):
+        to_address = [to_address]
+    to_address = [a for a in to_address if a and a.strip()]
+    if not to_address:
+        raise RuntimeError('No recipient email provided')
     msg = EmailMessage()
     msg['From'] = formataddr(('ShopDD POS', mail_from))
-    msg['To'] = to_address
+    msg['To'] = ', '.join(to_address)
     msg['Subject'] = subject
     msg.set_content('This email requires an HTML-capable client.')
     msg.add_alternative(html_body, subtype='html')

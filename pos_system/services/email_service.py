@@ -5,7 +5,7 @@ from email.utils import formataddr
 
 
 def _smtp_settings():
-    host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+    host = os.environ.get('SMTP_HOST', 'smtp.hostinger.com')
     port = int(os.environ.get('SMTP_PORT', '587'))
     user = os.environ.get('SMTP_USER', '')
     password = os.environ.get('SMTP_PASS', '')

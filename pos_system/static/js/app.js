@@ -1,4 +1,4 @@
-console.log('POS App v2.23')
+console.log('POS App v2.24')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.23'
+    document.getElementById('app-version').textContent = 'v2.24'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -113,6 +113,12 @@ let App = {
 
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
+    const reportPeriod = document.getElementById('report-period')
+    if (reportPeriod) reportPeriod.onchange = () => {
+      const custom = reportPeriod.value === 'custom'
+      document.getElementById('report-date-from').style.display = custom ? 'inline-block' : 'none'
+      document.getElementById('report-date-to').style.display = custom ? 'inline-block' : 'none'
+    }
     document.getElementById('bulk-delete-btn').onclick = () => this.bulkDeleteProducts()
     document.getElementById('settings-save-btn').onclick = () => this.saveSettings()
     document.getElementById('add-user-btn').onclick = () => this.showUserModal()
@@ -1525,8 +1531,15 @@ let App = {
 
   async generateReport() {
     const period = document.getElementById('report-period').value
+    let query = `/reports/sales?period=${period}`
+    if (period === 'custom') {
+      const from = document.getElementById('report-date-from').value
+      const to = document.getElementById('report-date-to').value
+      if (from) query += '&date_from=' + encodeURIComponent(from)
+      if (to) query += '&date_to=' + encodeURIComponent(to)
+    }
     try {
-      const res = await this.api('GET', `/reports/sales?period=${period}`)
+      const res = await this.api('GET', query)
       const r = res.data
       const container = document.getElementById('report-results')
       container.innerHTML = `
@@ -1547,8 +1560,15 @@ let App = {
 
   async exportReportCsv() {
     const period = document.getElementById('report-period').value
+    let query = `period=${period}`
+    if (period === 'custom') {
+      const from = document.getElementById('report-date-from').value
+      const to = document.getElementById('report-date-to').value
+      if (from) query += '&date_from=' + encodeURIComponent(from)
+      if (to) query += '&date_to=' + encodeURIComponent(to)
+    }
     try {
-      const res = await fetch(`/api/reports/sales/export?period=${period}`, { credentials: 'same-origin' })
+      const res = await fetch(`/api/reports/sales/export?${query}`, { credentials: 'same-origin' })
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)

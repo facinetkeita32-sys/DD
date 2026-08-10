@@ -1252,10 +1252,22 @@ def export_sales_report_csv():
     PosOrder()._reload_from_db()
     PosOrderLine()._reload_from_db()
     period = request.args.get('period', 'daily')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
     fmt = request.args.get('format', 'csv')
     now = datetime.now()
 
-    if period == 'daily':
+    if period == 'custom' or date_from or date_to:
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        orders = []
+        for o in all_orders:
+            ds = o._data.get('date_order', '')[:10]
+            if date_from and ds < date_from:
+                continue
+            if date_to and ds > date_to:
+                continue
+            orders.append(o)
+    elif period == 'daily':
         date_str = now.strftime('%Y-%m-%d')
         orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
     elif period == 'weekly':
@@ -1322,9 +1334,21 @@ def export_sales_report_csv():
 @login_required
 def get_sales_report():
     period = request.args.get('period', 'daily')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
     now = datetime.now()
 
-    if period == 'daily':
+    if period == 'custom' or date_from or date_to:
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        orders = []
+        for o in all_orders:
+            ds = o._data.get('date_order', '')[:10]
+            if date_from and ds < date_from:
+                continue
+            if date_to and ds > date_to:
+                continue
+            orders.append(o)
+    elif period == 'daily':
         date_str = now.strftime('%Y-%m-%d')
         orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
     elif period == 'weekly':
@@ -1431,6 +1455,8 @@ def _activity_log_rows(args, limit=50, offset=0):
 @api_bp.route('/activity-log', methods=['GET'])
 @login_required
 def get_activity_log():
+    if g.user_role != 'admin':
+        return error_response('Forbidden: admin only', 403)
     args = request.args
     offset = args.get('offset', 0, type=int)
     limit = args.get('limit', 50, type=int)
@@ -1445,6 +1471,8 @@ def get_activity_log():
 @api_bp.route('/activity-log/export', methods=['GET'])
 @login_required
 def export_activity_log():
+    if g.user_role != 'admin':
+        return error_response('Forbidden: admin only', 403)
     args = request.args
     total, rows = _activity_log_rows(args, limit=100000, offset=0)
     lines = ['timestamp,user,action,model,message']

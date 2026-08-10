@@ -1,4 +1,4 @@
-console.log('POS App v2.24')
+console.log('POS App v2.25')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.24'
+    document.getElementById('app-version').textContent = 'v2.25'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -113,6 +113,8 @@ let App = {
 
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
+    const emailBtn = document.getElementById('email-report-btn')
+    if (emailBtn) emailBtn.onclick = () => this.emailReport()
     const reportPeriod = document.getElementById('report-period')
     if (reportPeriod) reportPeriod.onchange = () => {
       const custom = reportPeriod.value === 'custom'
@@ -1581,6 +1583,28 @@ let App = {
       URL.revokeObjectURL(url)
     } catch(e) {
       alert('Export error: ' + e.message)
+    }
+  },
+
+  async emailReport() {
+    const period = document.getElementById('report-period').value
+    const payload = { period }
+    if (period === 'custom') {
+      const from = document.getElementById('report-date-from').value
+      const to = document.getElementById('report-date-to').value
+      if (from) payload.date_from = from
+      if (to) payload.date_to = to
+    }
+    const btn = document.getElementById('email-report-btn')
+    const original = btn ? btn.textContent : ''
+    if (btn) { btn.disabled = true; btn.textContent = I18n.t('report.sending', 'Sending...') }
+    try {
+      const res = await this.api('POST', '/reports/sales/email', payload)
+      if (res && res.success) this.showToast(res.message || 'Report sent')
+    } catch(e) {
+      this.showToast(e.message || 'Failed to send email')
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original }
     }
   },
 

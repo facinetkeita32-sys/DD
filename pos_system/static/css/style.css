@@ -35,6 +35,8 @@ a { text-decoration: none; color: var(--primary); cursor: pointer; }
 .btn-primary:hover { box-shadow: 0 4px 14px var(--primary-glow); }
 .btn-success { background: linear-gradient(135deg, var(--success), #059669); color: #fff; }
 .btn-success:hover { box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); }
+.btn-info { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; }
+.btn-info:hover { box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3); }
 .btn-danger { background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; }
 .btn-warning { background: linear-gradient(135deg, var(--warning), #d97706); color: #fff; }
 .btn-secondary { background: var(--hover); color: var(--text); border: 1px solid var(--border); }

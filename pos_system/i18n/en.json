@@ -130,6 +130,8 @@
   "report.avg_order": "Average Order",
   "report.generate": "Generate Report",
   "report.export_csv": "Export CSV",
+  "report.email": "Email",
+  "report.sending": "Sending...",
 
   "settings.title": "Settings",
   "settings.language": "Language",

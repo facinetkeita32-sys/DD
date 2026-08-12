@@ -1,4 +1,4 @@
-console.log('POS App v2.28')
+console.log('POS App v2.29')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.28'
+    document.getElementById('app-version').textContent = 'v2.29'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1550,17 +1550,6 @@ let App = {
         container.innerHTML = `<div style="background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto">
           <table><thead><tr><th>${I18n.t('order.ref', 'Order')}</th><th>${I18n.t('order.total', 'Total')}</th><th>${I18n.t('order.status', 'Status')}</th></tr></thead><tbody>
           ${orders.map(o => `<tr><td>${o.name || o.id}</td><td>${this.currencyFormat(o.amount_total)}</td><td><span class="status-badge status-${o.state}">${o.state}</span></td></tr>`).join('')}
-        </tbody></table></div>`
-      }
-
-      const tpContainer = document.getElementById('dashboard-top-products')
-      const top = d.top_products || []
-      if (!top.length) {
-        tpContainer.innerHTML = `<p style="color:var(--text-light);padding:16px">${I18n.t('report.no_products', 'No products sold today')}</p>`
-      } else {
-        tpContainer.innerHTML = `<div style="background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto">
-          <table><thead><tr><th>#</th><th>${I18n.t('product.name', 'Name')}</th><th>${I18n.t('pos.qty', 'Qty')}</th><th>${I18n.t('report.revenue', 'Revenue')}</th></tr></thead><tbody>
-          ${top.map((p, i) => `<tr><td>${i + 1}</td><td>${this._esc(p.name || 'Product')}</td><td>${p.qty}</td><td>${this.currencyFormat(p.revenue || 0)}</td></tr>`).join('')}
         </tbody></table></div>`
       }
     } catch(e) { console.error(e) }

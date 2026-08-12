@@ -135,7 +135,6 @@
   "report.sending": "Envoi...",
   "report.top_products": "Top 10 des produits les plus vendus",
   "report.revenue": "Revenu",
-  "report.no_products": "Aucun produit vendu sur cette période",
   "session.warning": "Votre session va bientôt expirer par inactivité",
 
   "settings.title": "Paramètres",
@@ -282,6 +281,5 @@
   "order.state_pending": "Paiement en Attente",
   "pos.pending_order_note": "La commande sera en attente",
 
-  "dashboard.orders_pending": "Commandes en Attente",
-  "dashboard.top_products": "Produits les plus vendus"
+  "dashboard.orders_pending": "Commandes en Attente"
 }

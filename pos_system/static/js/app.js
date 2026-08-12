@@ -1,4 +1,4 @@
-console.log('POS App v2.25')
+console.log('POS App v2.26')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.25'
+    document.getElementById('app-version').textContent = 'v2.26'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -178,6 +178,7 @@ let App = {
       this.showScreen('pos')
       document.getElementById('main-screen').classList.add('active')
       document.getElementById('login-screen').classList.remove('active')
+      this.startIdleTimer()
     } catch(e) {
       this.showLogin()
     }
@@ -214,15 +215,40 @@ let App = {
       this.showScreen('pos')
       document.getElementById('main-screen').classList.add('active')
       document.getElementById('login-screen').classList.remove('active')
+      this.startIdleTimer()
     } catch(e) {
       document.getElementById('login-error').textContent = I18n.t('login.error', 'Invalid credentials')
     }
   },
 
   async doLogout() {
-    await this.api('POST', '/auth/logout')
+    this.stopIdleTimer()
+    try { await this.api('POST', '/auth/logout') } catch(e) {}
     this.user = null
     this.showLogin()
+  },
+
+  startIdleTimer() {
+    const timeoutMs = 3 * 60 * 60 * 1000
+    const warningMs = 5 * 60 * 1000
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+    const arm = () => {
+      if (!this.user) return
+      if (this._idleLogoutTimer) clearTimeout(this._idleLogoutTimer)
+      if (this._idleWarnTimer) clearTimeout(this._idleWarnTimer)
+      this._idleWarnTimer = setTimeout(() => this.showToast(I18n.t('session.warning', 'Your session will expire soon due to inactivity')), timeoutMs - warningMs)
+      this._idleLogoutTimer = setTimeout(() => this.doLogout(), timeoutMs)
+    }
+    if (!this._idleBound) {
+      this._idleBound = true
+      events.forEach(ev => document.addEventListener(ev, arm, { passive: true }))
+    }
+    arm()
+  },
+
+  stopIdleTimer() {
+    if (this._idleLogoutTimer) clearTimeout(this._idleLogoutTimer)
+    if (this._idleWarnTimer) clearTimeout(this._idleWarnTimer)
   },
 
   async loadInitData() {

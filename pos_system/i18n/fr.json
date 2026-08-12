@@ -132,6 +132,7 @@
   "report.export_csv": "Exporter CSV",
   "report.email": "Envoyer par Email",
   "report.sending": "Envoi...",
+  "session.warning": "Votre session va bientôt expirer par inactivité",
 
   "settings.title": "Paramètres",
   "settings.language": "Langue",

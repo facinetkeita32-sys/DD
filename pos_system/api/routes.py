@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 from datetime import datetime
 from functools import wraps
@@ -35,6 +36,15 @@ def login_required(f):
         user_id = session.get('user_id')
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
+        timeout_hours = float(os.environ.get('SESSION_TIMEOUT_HOURS', '3'))
+        last = session.get('last_activity')
+        now = datetime.now().timestamp()
+        if last and (now - last) > timeout_hours * 3600:
+            log_activity('logout', 'Session expired after inactivity')
+            session.clear()
+            return jsonify({'error': 'Unauthorized: session expired'}), 401
+        if not last or (now - last) > 60:
+            session['last_activity'] = now
         user = ResUsers().browse(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 401

@@ -127,6 +127,7 @@
   "report.annual": "Annual",
   "report.total_sales": "Total Sales",
   "report.total_orders": "Total Orders",
+  "report.total_items": "Total Items",
   "report.avg_order": "Average Order",
   "report.generate": "Generate Report",
   "report.export_csv": "Export CSV",

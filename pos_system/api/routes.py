@@ -1320,6 +1320,13 @@ def _top_selling_products(orders, limit=10):
     return products[:limit]
 
 
+def _total_items_sold(orders):
+    if not orders:
+        return 0
+    lines = PosOrderLine().search([('order_id', 'in', [o.id for o in orders])])
+    return sum(l._data.get('qty', 0) or 0 for l in lines)
+
+
 @api_bp.route('/reports/sales/export', methods=['GET'])
 @login_required
 @permission_required('report.read')
@@ -1343,6 +1350,7 @@ def export_sales_report_csv():
     writer.writerow(['Period', period.upper()])
     writer.writerow(['Total Sales', f'{total_sales:.2f}'])
     writer.writerow(['Total Orders', len(orders)])
+    writer.writerow(['Total Items', _total_items_sold(orders)])
     writer.writerow(['Avg Order', f'{avg_order:.2f}'])
     writer.writerow([])
     writer.writerow(['Order Ref', 'Date', 'Customer', 'Cashier', 'Items', 'Total', 'Status'])
@@ -1414,6 +1422,7 @@ def get_sales_report():
         'period': period,
         'total_sales': total_sales,
         'total_orders': total_orders,
+        'total_items': _total_items_sold(orders),
         'avg_order': round(avg_order, 2),
         'orders': order_list,
         'top_products': _top_selling_products(orders, 10),
@@ -1438,6 +1447,7 @@ def email_sales_report():
     total_sales = sum(o.amount_total for o in orders)
     total_orders = len(orders)
     avg_order = total_sales / total_orders if total_orders else 0
+    total_items = _total_items_sold(orders)
 
     recipients = []
     for admin in ResUsers().search([('role', '=', 'admin'), ('active', '=', True)]):
@@ -1488,6 +1498,7 @@ def email_sales_report():
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
       <tr><td><b>Total Sales</b></td><td>{total_sales:.2f}</td></tr>
       <tr><td><b>Total Orders</b></td><td>{total_orders}</td></tr>
+      <tr><td><b>Total Items</b></td><td>{total_items}</td></tr>
       <tr><td><b>Average Order</b></td><td>{avg_order:.2f}</td></tr>
     </table>
     <h3>Orders ({min(total_orders, 100)} shown of {total_orders})</h3>

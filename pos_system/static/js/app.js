@@ -1,4 +1,4 @@
-console.log('POS App v2.27')
+console.log('POS App v2.28')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.27'
+    document.getElementById('app-version').textContent = 'v2.28'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1585,6 +1585,7 @@ let App = {
         <div class="report-summary">
           <div class="report-stat"><div class="stat-value">${this.currencyFormat(r.total_sales || 0)}</div><div class="stat-label">${I18n.t('report.total_sales', 'Total Sales')}</div></div>
           <div class="report-stat"><div class="stat-value">${r.total_orders || 0}</div><div class="stat-label">${I18n.t('report.total_orders', 'Total Orders')}</div></div>
+          <div class="report-stat"><div class="stat-value">${r.total_items || 0}</div><div class="stat-label">${I18n.t('report.total_items', 'Total Items')}</div></div>
           <div class="report-stat"><div class="stat-value">${this.currencyFormat(r.avg_order || 0)}</div><div class="stat-label">${I18n.t('report.avg_order', 'Avg Order')}</div></div>
         </div>
         <div style="max-height:400px;overflow-y:auto">

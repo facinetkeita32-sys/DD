@@ -1317,7 +1317,7 @@ def _top_selling_products(orders, limit=10):
         item['name'] = name
         products.append(item)
     products.sort(key=lambda x: (x['qty'], x['revenue']), reverse=True)
-    return products[:limit]
+    return products if limit is None else products[:limit]
 
 
 def _total_items_sold(orders):
@@ -1426,6 +1426,7 @@ def get_sales_report():
         'avg_order': round(avg_order, 2),
         'orders': order_list,
         'top_products': _top_selling_products(orders, 10),
+        'products': _top_selling_products(orders, None),
     })
 
 

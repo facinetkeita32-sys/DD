@@ -134,6 +134,8 @@
   "report.email": "Email",
   "report.sending": "Sending...",
   "report.top_products": "Top 10 Best-Selling Products",
+  "report.products_sold": "Products Sold",
+  "report.amount": "Amount",
   "report.revenue": "Revenue",
   "session.warning": "Your session will expire soon due to inactivity",
 

@@ -134,6 +134,8 @@
   "report.email": "Envoyer par Email",
   "report.sending": "Envoi...",
   "report.top_products": "Top 10 des produits les plus vendus",
+  "report.products_sold": "Produits Vendus",
+  "report.amount": "Montant",
   "report.revenue": "Revenu",
   "session.warning": "Votre session va bientôt expirer par inactivité",
 

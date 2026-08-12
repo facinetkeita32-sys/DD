@@ -219,7 +219,7 @@ def generate_receipt_html(order_id, lang='en'):
   @page {{ margin: 0; size: 58mm auto; }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{ font-family: 'Courier New', monospace; font-size: 10px; padding: 8px; color: #000; }}
-  .receipt {{ max-width: 58mm; margin: 0 auto; }}
+  .receipt {{ max-width: 48mm; margin: 0 auto; }}
   .receipt-logo {{ max-width: 48mm; max-height: 24mm; display: block; margin: 6px auto; }}
   h2 {{ text-align: center; font-size: 12px; margin: 4px 0; }}
   .company-info {{ text-align: center; font-size: 10px; margin-bottom: 6px; }}
@@ -337,10 +337,10 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     pdf = ReceiptPDF()
     pdf.add_page()
-    pdf.set_margins(3, 3, 3)
+    pdf.set_margins(5, 5, 5)
 
-    page_w = 58 - 6
-    left = 3
+    page_w = 48
+    left = 5
 
     y = 5
 
@@ -452,7 +452,7 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Items header
     pdf.set_font('Courier', 'B', 8)
-    col_w = [18, 6, 13, 15]
+    col_w = [16, 6, 12, 14]
     headers = [_('item', lang), _('qty', lang), _('price', lang), _('total', lang)]
     pdf.set_x(left)
     for i, h in enumerate(headers):

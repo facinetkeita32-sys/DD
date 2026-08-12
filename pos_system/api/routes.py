@@ -1343,11 +1343,13 @@ def export_sales_report_csv():
 
     total_sales = sum(o.amount_total for o in orders)
     avg_order = total_sales / len(orders) if orders else 0
+    subtotal_total = sum((l._data.get('price_subtotal', 0) or 0) for l in PosOrderLine().search([('order_id', 'in', [o.id for o in orders])]))
 
     import csv, io
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Period', period.upper()])
+    writer.writerow(['Total Subtotal', f'{subtotal_total:.2f}'])
     writer.writerow(['Total Sales', f'{total_sales:.2f}'])
     writer.writerow(['Total Orders', len(orders)])
     writer.writerow(['Total Items', _total_items_sold(orders)])
@@ -1486,6 +1488,7 @@ def email_sales_report():
 
     now = datetime.now()
     subject = f"Sales Report ({period}) - {now.strftime('%Y-%m-%d %H:%M')}"
+    subtotal_total = sum((l._data.get('price_subtotal', 0) or 0) for l in PosOrderLine().search([('order_id', 'in', [o.id for o in orders])]))
     rows_html = ''.join(
         f"<tr><td>{i + 1}</td><td>{html.escape(d.get('name', '') or ('Order #' + str(o.id)))}</td>"
         f"<td>{(d.get('date_order', '') or '')[:19]}</td>"
@@ -1493,14 +1496,24 @@ def email_sales_report():
         f"<td>{o.amount_total:.2f}</td></tr>"
         for i, o in enumerate(orders[:100])
     )
+    prod_rows_html = ''.join(
+        f"<tr><td>{i + 1}</td><td>{html.escape(p['name'])}</td><td>{p['qty']}</td><td>{p['revenue']:.2f}</td></tr>"
+        for i, p in enumerate(_top_selling_products(orders, None))
+    )
     html_body = f"""
     <h2>Sales Report ({period})</h2>
     <p>Generated: {now.strftime('%Y-%m-%d %H:%M')}</p>
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+      <tr><td><b>Total Subtotal</b></td><td>{subtotal_total:.2f}</td></tr>
       <tr><td><b>Total Sales</b></td><td>{total_sales:.2f}</td></tr>
       <tr><td><b>Total Orders</b></td><td>{total_orders}</td></tr>
       <tr><td><b>Total Items</b></td><td>{total_items}</td></tr>
       <tr><td><b>Average Order</b></td><td>{avg_order:.2f}</td></tr>
+    </table>
+    <h3>Products Sold</h3>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+      <tr><th>#</th><th>Product</th><th>Qty</th><th>Amount</th></tr>
+      {prod_rows_html}
     </table>
     <h3>Orders ({min(total_orders, 100)} shown of {total_orders})</h3>
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">

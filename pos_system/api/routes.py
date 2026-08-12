@@ -1249,6 +1249,7 @@ def get_dashboard():
         'inventory_value': inventory_value,
         'session_status': open_session[0].state if open_session else 'closed',
         'session': model_to_dict(open_session[0]) if open_session else None,
+        'top_products': _top_selling_products(today_orders, 10),
     })
 
 
@@ -1292,6 +1293,31 @@ def _sales_report_orders(period, date_from, date_to, now=None):
     else:
         orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
     return orders
+
+
+def _top_selling_products(orders, limit=10):
+    if not orders:
+        return []
+    order_ids = [o.id for o in orders]
+    lines = PosOrderLine().search([('order_id', 'in', order_ids)])
+    agg = {}
+    for line in lines:
+        d = line._data
+        pid = d.get('product_id', 0) or 0
+        if not pid:
+            continue
+        qty = d.get('qty', 0) or 0
+        item = agg.setdefault(pid, {'product_id': pid, 'qty': 0.0, 'revenue': 0.0})
+        item['qty'] += qty
+        item['revenue'] += d.get('price_subtotal', 0) or 0
+    products = []
+    for pid, item in agg.items():
+        p = ProductProduct().browse([pid])
+        name = p[0]._data.get('name', 'Product') if p else 'Product'
+        item['name'] = name
+        products.append(item)
+    products.sort(key=lambda x: (x['qty'], x['revenue']), reverse=True)
+    return products[:limit]
 
 
 @api_bp.route('/reports/sales/export', methods=['GET'])
@@ -1390,6 +1416,7 @@ def get_sales_report():
         'total_orders': total_orders,
         'avg_order': round(avg_order, 2),
         'orders': order_list,
+        'top_products': _top_selling_products(orders, 10),
     })
 
 

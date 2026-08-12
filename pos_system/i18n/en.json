@@ -132,6 +132,9 @@
   "report.export_csv": "Export CSV",
   "report.email": "Email",
   "report.sending": "Sending...",
+  "report.top_products": "Top 10 Best-Selling Products",
+  "report.revenue": "Revenue",
+  "report.no_products": "No products sold in this period",
   "session.warning": "Your session will expire soon due to inactivity",
 
   "settings.title": "Settings",
@@ -278,5 +281,6 @@
   "order.state_pending": "Pending Payment",
   "pos.pending_order_note": "Order will be pending",
 
-  "dashboard.orders_pending": "Pending Orders"
+  "dashboard.orders_pending": "Pending Orders",
+  "dashboard.top_products": "Top Selling Products"
 }

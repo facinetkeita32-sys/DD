@@ -1,4 +1,4 @@
-console.log('POS App v2.26')
+console.log('POS App v2.27')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.26'
+    document.getElementById('app-version').textContent = 'v2.27'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1552,6 +1552,17 @@ let App = {
           ${orders.map(o => `<tr><td>${o.name || o.id}</td><td>${this.currencyFormat(o.amount_total)}</td><td><span class="status-badge status-${o.state}">${o.state}</span></td></tr>`).join('')}
         </tbody></table></div>`
       }
+
+      const tpContainer = document.getElementById('dashboard-top-products')
+      const top = d.top_products || []
+      if (!top.length) {
+        tpContainer.innerHTML = `<p style="color:var(--text-light);padding:16px">${I18n.t('report.no_products', 'No products sold today')}</p>`
+      } else {
+        tpContainer.innerHTML = `<div style="background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto">
+          <table><thead><tr><th>#</th><th>${I18n.t('product.name', 'Name')}</th><th>${I18n.t('pos.qty', 'Qty')}</th><th>${I18n.t('report.revenue', 'Revenue')}</th></tr></thead><tbody>
+          ${top.map((p, i) => `<tr><td>${i + 1}</td><td>${this._esc(p.name || 'Product')}</td><td>${p.qty}</td><td>${this.currencyFormat(p.revenue || 0)}</td></tr>`).join('')}
+        </tbody></table></div>`
+      }
     } catch(e) { console.error(e) }
   },
 
@@ -1582,7 +1593,14 @@ let App = {
             const items = (o.lines || []).map(l => `${l.product_name || 'Product'} x${l.qty}`).join(', ') || '-'
             return `<tr><td>${o.name || o.id}</td><td style="max-width:250px;white-space:normal">${items}</td><td>${this.currencyFormat(o.amount_total)}</td><td>${(o.date_order || '').substring(0, 10)}</td></tr>`
           }).join('')}
-        </tbody></table></div>`
+        </tbody></table></div>
+        ${(r.top_products && r.top_products.length) ? `
+        <div class="report-block">
+          <h3>${I18n.t('report.top_products', 'Top 10 Best-Selling Products')}</h3>
+          <table><thead><tr><th>#</th><th>${I18n.t('product.name', 'Name')}</th><th>${I18n.t('pos.qty', 'Qty')}</th><th>${I18n.t('report.revenue', 'Revenue')}</th></tr></thead><tbody>
+          ${r.top_products.map((p, i) => `<tr><td>${i + 1}</td><td>${this._esc(p.name || 'Product')}</td><td>${p.qty}</td><td>${this.currencyFormat(p.revenue || 0)}</td></tr>`).join('')}
+          </tbody></table>
+        </div>` : ''}`
     } catch(e) { alert('Error: ' + e.message) }
   },
 

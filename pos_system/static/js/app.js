@@ -1,4 +1,4 @@
-console.log('POS App v2.31')
+console.log('POS App v2.32')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.31'
+    document.getElementById('app-version').textContent = 'v2.32'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)

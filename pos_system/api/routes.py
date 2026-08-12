@@ -1315,6 +1315,7 @@ def _top_selling_products(orders, limit=10):
         p = ProductProduct().browse([pid])
         name = p[0]._data.get('name', 'Product') if p else 'Product'
         item['name'] = name
+        item['unit_price'] = round(item['revenue'] / item['qty'], 2) if item['qty'] else 0.0
         products.append(item)
     products.sort(key=lambda x: (x['qty'], x['revenue']), reverse=True)
     return products if limit is None else products[:limit]
@@ -1497,7 +1498,7 @@ def email_sales_report():
         for i, o in enumerate(orders[:100])
     )
     prod_rows_html = ''.join(
-        f"<tr><td>{i + 1}</td><td>{html.escape(p['name'])}</td><td>{p['qty']}</td><td>{p['revenue']:.2f}</td></tr>"
+        f"<tr><td>{i + 1}</td><td>{html.escape(p['name'])}</td><td>{p['unit_price']:.2f}</td><td>{p['qty']}</td><td>{p['revenue']:.2f}</td></tr>"
         for i, p in enumerate(_top_selling_products(orders, None))
     )
     html_body = f"""
@@ -1512,7 +1513,7 @@ def email_sales_report():
     </table>
     <h3>Products Sold</h3>
     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
-      <tr><th>#</th><th>Product</th><th>Qty</th><th>Amount</th></tr>
+      <tr><th>#</th><th>Product</th><th>Unit Price</th><th>Qty</th><th>Amount</th></tr>
       {prod_rows_html}
     </table>
     <h3>Orders ({min(total_orders, 100)} shown of {total_orders})</h3>

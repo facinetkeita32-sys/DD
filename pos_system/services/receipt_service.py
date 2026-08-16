@@ -310,10 +310,6 @@ def generate_receipt_html(order_id, lang='en', include_controls=True):
   <div class="divider"></div>
   <div class="footer" style="font-size:9px">{_('generated', lang)} - {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
 
-  <div class="no-print">
-    <button onclick="window.print()">{_('print', lang)}</button>
-    <button onclick="window.close()">{_('close', lang)}</button>
-  </div>
   {controls_html}
 </div>
 </body>

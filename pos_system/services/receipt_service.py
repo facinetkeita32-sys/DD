@@ -225,22 +225,22 @@ def generate_receipt_html(order_id, lang='en', include_controls=True):
 <style>
   @page {{ margin: 0; size: 58mm auto; }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ font-family: 'Courier New', monospace; font-size: 8px; padding: 8px; color: #000; }}
-  .receipt {{ max-width: 38mm; margin: 0 auto; }}
-  .receipt-logo {{ max-width: 34mm; max-height: 18mm; display: block; margin: 6px auto; }}
-  h2 {{ text-align: center; font-size: 10px; margin: 4px 0; }}
-  .company-info {{ text-align: center; font-size: 8px; margin-bottom: 6px; }}
-  .header-line {{ text-align: center; font-size: 11px; font-weight: bold; margin: 8px 0; letter-spacing: 2px; }}
+  body {{ font-family: 'Courier New', monospace; font-size: 10px; padding: 8px; color: #000; }}
+  .receipt {{ max-width: 58mm; margin: 0 auto; }}
+  .receipt-logo {{ max-width: 50mm; max-height: 24mm; display: block; margin: 6px auto; }}
+  h2 {{ text-align: center; font-size: 12px; margin: 4px 0; }}
+  .company-info {{ text-align: center; font-size: 10px; margin-bottom: 6px; }}
+  .header-line {{ text-align: center; font-size: 14px; font-weight: bold; margin: 8px 0; letter-spacing: 2px; }}
   .divider {{ border-top: 1px dashed #000; margin: 6px 0; }}
-  .info-grid {{ display: flex; justify-content: space-between; font-size: 8px; margin: 4px 0; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 7px; }}
+  .info-grid {{ display: flex; justify-content: space-between; font-size: 10px; margin: 4px 0; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 9px; }}
   th {{ border-bottom: 1px solid #000; padding: 4px 0; text-align: left; }}
   td {{ padding: 2px 0; }}
   .totals-table td {{ border: none; padding: 2px 4px; }}
-  .total-row {{ font-weight: bold; font-size: 9px; }}
-  .footer {{ text-align: center; margin-top: 8px; font-size: 8px; }}
+  .total-row {{ font-weight: bold; font-size: 11px; }}
+  .footer {{ text-align: center; margin-top: 8px; font-size: 10px; }}
   .payment-info {{ margin-top: 6px; }}
-  .status-badge {{ display: inline-block; padding: 2px 8px; border: 1px solid #000; font-weight: bold; font-size: 7px; }}
+  .status-badge {{ display: inline-block; padding: 2px 8px; border: 1px solid #000; font-weight: bold; font-size: 9px; }}
   @media print {{ body {{ padding: 8px; }} .no-print {{ display: none; }} }}
   .no-print {{ text-align: center; margin-top: 12px; }}
   .no-print button {{ padding: 8px 24px; font-size: 14px; cursor: pointer; background: #2563eb; color: #fff; border: none; border-radius: 4px; }}
@@ -299,7 +299,7 @@ def generate_receipt_html(order_id, lang='en', include_controls=True):
   {company.get('receipt_header', '') and '<div class="divider"></div><div class="company-info">' + company['receipt_header'] + '</div>'}
 
   <div class="divider"></div>
-  <div class="header-line" style="font-size:12px">{_('payment', lang)}</div>
+  <div class="header-line" style="font-size:14px">{_('payment', lang)}</div>
   <table class="payment-info">
     {payments_rows}
     <tr><td>{_('change', lang)}:</td><td style="text-align:right">{currency_format(change, currency)}</td></tr>
@@ -345,10 +345,10 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     pdf = ReceiptPDF()
     pdf.add_page()
-    pdf.set_margins(10, 5, 10)
+    pdf.set_margins(5, 5, 5)
 
-    page_w = 38
-    left = 10
+    page_w = 58
+    left = 5
 
     y = 5
 
@@ -357,20 +357,20 @@ def generate_receipt_pdf(order_id, lang='en'):
         try:
             img_data = base64.b64decode(company['logo'])
             img_fp = io.BytesIO(img_data)
-            pdf.image(img_fp, x=left + page_w / 2 - 8, w=16, h=8)
+            pdf.image(img_fp, x=left + page_w / 2 - 15, w=30, h=15)
             y = pdf.get_y() + 2
         except Exception:
             pass
 
     # Company name
     pdf.set_y(max(y, pdf.get_y()))
-    pdf.set_font('Courier', 'B', 10)
+    pdf.set_font('Courier', 'B', 12)
     pdf.set_x(left)
     pdf.cell(page_w, 5, company.get('name', ''), align='C')
     pdf.ln(5)
 
     # Company info
-    pdf.set_font('Courier', '', 7)
+    pdf.set_font('Courier', '', 8)
     info_lines = []
     if company.get('street'):
         info_lines.append(company['street'])
@@ -401,11 +401,11 @@ def generate_receipt_pdf(order_id, lang='en'):
     pdf.ln(1)
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(4)
 
     # Receipt header
-    pdf.set_font('Courier', 'B', 12)
+    pdf.set_font('Courier', 'B', 14)
     pdf.set_x(left)
     pdf.cell(page_w, 6, _('receipt', lang).upper(), align='C')
     pdf.ln(6)
@@ -413,7 +413,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(4)
 
     ref = data.get('name', '') or f"{_('order', lang)} #{d['id']}"
@@ -426,7 +426,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     change = float(data.get('amount_change', 0) or 0)
 
     # Order info
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Courier', '', 9)
     pdf.set_x(left)
     pdf.cell(page_w, 4, f"{_('order', lang)}: {ref}  {_('status', lang)}: {state.upper()}")
     pdf.ln(4)
@@ -455,21 +455,21 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(4)
 
     # Items header
-    pdf.set_font('Courier', 'B', 8)
-    col_w = [13, 5, 9, 11]
+    pdf.set_font('Courier', 'B', 9)
+    col_w = [20, 7, 14, 17]
     headers = [_('item', lang), _('qty', lang), _('price', lang), _('total', lang)]
     pdf.set_x(left)
     for i, h in enumerate(headers):
         pdf.cell(col_w[i], 4, h)
     pdf.ln(4)
 
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Courier', '', 9)
     pdf.set_x(left)
-    pdf.cell(page_w, 2, '-' * 40, align='C')
+    pdf.cell(page_w, 2, '-' * 60, align='C')
     pdf.ln(3)
 
     # Items
@@ -482,7 +482,7 @@ def generate_receipt_pdf(order_id, lang='en'):
         subtotal = float(ld.get('price_subtotal', 0) or (qty * price * (1 - disc / 100)))
 
         pdf.set_x(left)
-        pdf.cell(col_w[0], 4, name[:13])
+        pdf.cell(col_w[0], 4, name[:20])
         pdf.cell(col_w[1], 4, str(int(qty) if qty == int(qty) else qty), align='C')
         pdf.cell(col_w[2], 4, currency_format(price, currency), align='R')
         pdf.cell(col_w[3], 4, currency_format(subtotal, currency), align='R')
@@ -491,38 +491,38 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(4)
 
     # Totals
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Courier', '', 9)
     pdf.set_x(left)
-    pdf.cell(page_w - 20, 4, f"{_('subtotal', lang)}:", align='R')
-    pdf.cell(20, 4, currency_format(items_total, currency), align='R')
+    pdf.cell(page_w - 30, 4, f"{_('subtotal', lang)}:", align='R')
+    pdf.cell(30, 4, currency_format(items_total, currency), align='R')
     pdf.ln(4)
 
     if delivery_cost > 0:
         pdf.set_x(left)
-        pdf.cell(page_w - 20, 4, f"{_('delivery', lang)}:", align='R')
-        pdf.cell(20, 4, currency_format(delivery_cost, currency), align='R')
+        pdf.cell(page_w - 30, 4, f"{_('delivery', lang)}:", align='R')
+        pdf.cell(30, 4, currency_format(delivery_cost, currency), align='R')
         pdf.ln(4)
 
     pdf.set_x(left)
-    pdf.cell(page_w - 20, 4, f"{_('discount', lang)}:", align='R')
-    pdf.cell(20, 4, currency_format(0, currency), align='R')
+    pdf.cell(page_w - 30, 4, f"{_('discount', lang)}:", align='R')
+    pdf.cell(30, 4, currency_format(0, currency), align='R')
     pdf.ln(4)
 
-    pdf.set_font('Courier', 'B', 9)
+    pdf.set_font('Courier', 'B', 11)
     pdf.set_x(left)
-    pdf.cell(page_w - 20, 5, f"{_('total', lang).upper()}:", align='R')
-    pdf.cell(20, 5, currency_format(total, currency), align='R')
+    pdf.cell(page_w - 30, 5, f"{_('total', lang).upper()}:", align='R')
+    pdf.cell(30, 5, currency_format(total, currency), align='R')
     pdf.ln(6)
 
     # Receipt header text
     if company.get('receipt_header'):
         pdf.set_x(left)
-        pdf.set_font('Courier', '', 7)
-        pdf.cell(page_w, 3, '-' * 40, align='C')
+        pdf.set_font('Courier', '', 8)
+        pdf.cell(page_w, 3, '-' * 60, align='C')
         pdf.ln(3)
         pdf.set_x(left)
         pdf.cell(page_w, 4, company['receipt_header'], align='C')
@@ -530,44 +530,44 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Payment info
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.set_font('Courier', '', 9)
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(3)
-    pdf.set_font('Courier', 'B', 8)
+    pdf.set_font('Courier', 'B', 9)
     pdf.set_x(left)
     pdf.cell(page_w, 4, _('payment', lang), align='C')
     pdf.ln(5)
 
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Courier', '', 9)
     for pmt in payments:
         pd = pmt['_data']
         pmt_name = pmt['payment_method_name']
         amt = float(pd.get('amount', 0) or 0)
         pdf.set_x(left)
-        pdf.cell(page_w - 20, 4, pmt_name, align='L')
-        pdf.cell(20, 4, currency_format(amt, currency), align='R')
+        pdf.cell(page_w - 30, 4, pmt_name, align='L')
+        pdf.cell(30, 4, currency_format(amt, currency), align='R')
         pdf.ln(4)
 
     pdf.set_x(left)
-    pdf.cell(page_w - 20, 4, f"{_('change', lang)}:", align='R')
-    pdf.cell(20, 4, currency_format(change, currency), align='R')
+    pdf.cell(page_w - 30, 4, f"{_('change', lang)}:", align='R')
+    pdf.cell(30, 4, currency_format(change, currency), align='R')
     pdf.ln(4)
 
     # Receipt footer
     if company.get('receipt_footer'):
         pdf.set_x(left)
-        pdf.set_font('Courier', '', 8)
-        pdf.cell(page_w, 3, '-' * 40, align='C')
+        pdf.set_font('Courier', '', 9)
+        pdf.cell(page_w, 3, '-' * 60, align='C')
         pdf.ln(3)
-        pdf.set_font('Courier', '', 8)
+        pdf.set_font('Courier', '', 9)
         pdf.set_x(left)
         pdf.cell(page_w, 4, company['receipt_footer'], align='C')
         pdf.ln(4)
 
     # Footer line
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 7)
-    pdf.cell(page_w, 3, '-' * 40, align='C')
+    pdf.set_font('Courier', '', 8)
+    pdf.cell(page_w, 3, '-' * 60, align='C')
     pdf.ln(3)
     pdf.set_x(left)
     pdf.cell(page_w, 3, _('generated', lang), align='C')

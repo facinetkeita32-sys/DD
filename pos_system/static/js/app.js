@@ -1,4 +1,4 @@
-console.log('POS App v2.34')
+console.log('POS App v2.35')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.34'
+    document.getElementById('app-version').textContent = 'v2.35'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1407,12 +1407,16 @@ let App = {
         <button class="btn btn-primary" onclick="App.openPrintReceipt(${id})">${I18n.t('receipt.print', 'Print Receipt')}</button>
         <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>
         <button class="btn btn-info" onclick="App.emailReceipt(${id})">${I18n.t('receipt.email', 'Email Receipt')}</button>
-        <button class="btn btn-success" onclick="App.whatsappReceipt(${id})">${I18n.t('receipt.whatsapp', 'WhatsApp')}</button>`
+        <button class="btn btn-success" id="whatsapp-receipt-btn">${I18n.t('receipt.whatsapp', 'WhatsApp')}</button>`
       if (o.state === 'pending') {
         html += `<button class="btn btn-warning" id="validate-payment-btn" data-i18n="payment.validate">Validate Payment</button>`
       }
       html += `</div><div id="validate-payment-area"></div>`
       this.showModal(html)
+      const waBtn = document.getElementById('whatsapp-receipt-btn')
+      if (waBtn) {
+        waBtn.onclick = () => this.whatsappReceipt(id, o)
+      }
       const vpBtn = document.getElementById('validate-payment-btn')
       if (vpBtn) {
         vpBtn.onclick = () => this.showValidatePaymentModal(id, o)
@@ -1487,24 +1491,22 @@ let App = {
     }
   },
 
-  async whatsappReceipt(id) {
-    let stored = ''
-    try {
-      const res = await this.api('GET', `/orders/${id}`)
-      stored = (res.data && res.data.partner_phone) || ''
-    } catch(e) {}
+  whatsappReceipt(id, order) {
+    order = order || {}
+    const stored = order.partner_phone || ''
     const value = prompt(I18n.t('receipt.enter_phone', 'Customer WhatsApp number (with country code):'), stored)
     if (value === null) return
-    const phone = value.trim().replace(/\s/g, '')
+    const phone = value.trim().replace(/[^\d]/g, '')
     if (!phone) { this.showToast(I18n.t('receipt.need_phone', 'Phone is required')); return }
-    try {
-      const res = await this.api('GET', `/orders/${id}/whatsapp-link?phone=${encodeURIComponent(phone)}`)
-      if (res && res.success && res.data && res.data.url) {
-        window.open(res.data.url, '_blank')
-      }
-    } catch(e) {
-      this.showToast(e.message || 'Failed to open WhatsApp')
-    }
+    const lines = (order.lines || []).map(l =>
+      `- ${l.product_name || 'Product'} x${l.qty}: ${this.currencyFormat(l.price_subtotal || l.qty * l.price_unit)}`
+    ).join('\n')
+    const ref = order.name || 'Order #' + id
+    const date = (order.date_order || '').substring(0, 16)
+    const total = this.currencyFormat(order.amount_total)
+    const msg = `${I18n.t('receipt.whatsapp_msg', 'Receipt')} ${ref}\n${date}\n\n${lines}\n\n${I18n.t('pos.total', 'Total')}: ${total}`
+    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg)
+    window.open(url, '_blank')
   },
 
   // === CUSTOMERS TABLE ===

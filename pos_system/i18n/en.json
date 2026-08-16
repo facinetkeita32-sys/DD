@@ -209,6 +209,7 @@
   "receipt.need_email": "Email is required",
   "receipt.enter_phone": "Customer WhatsApp number (with country code):",
   "receipt.need_phone": "Phone is required",
+  "receipt.whatsapp_msg": "Receipt",
   "receipt.header": "RECEIPT",
   "receipt.order": "Order",
   "receipt.status": "Status",

@@ -151,7 +151,7 @@ def _(key, lang='en'):
     return labels.get(key, RECEIPT_LABELS['en'].get(key, key))
 
 
-def generate_receipt_html(order_id, lang='en'):
+def generate_receipt_html(order_id, lang='en', include_controls=True):
     d = get_order_data(order_id)
     if not d:
         return None
@@ -209,6 +209,13 @@ def generate_receipt_html(order_id, lang='en'):
         delivery_contact_html = f'<div class="info-grid"><span><strong>{_("delivery", lang)}:</strong> {dz_name}</span></div><div class="info-grid"><span>{contact_str}</span></div>'
 
     html_lang = 'fr' if lang == 'fr' else 'en'
+
+    controls_html = ''
+    if include_controls:
+        controls_html = f'''<div class="no-print">
+    <button onclick="window.print()">{_('print', lang)}</button>
+    <button onclick="window.close()">{_('close', lang)}</button>
+  </div>'''
 
     return f'''<!DOCTYPE html>
 <html lang="{html_lang}">
@@ -307,6 +314,7 @@ def generate_receipt_html(order_id, lang='en'):
     <button onclick="window.print()">{_('print', lang)}</button>
     <button onclick="window.close()">{_('close', lang)}</button>
   </div>
+  {controls_html}
 </div>
 </body>
 </html>'''

@@ -203,6 +203,8 @@
   "receipt.title": "Receipt",
   "receipt.print": "Print Receipt",
   "receipt.pdf": "Download PDF",
+  "receipt.email": "Email Receipt",
+  "receipt.whatsapp": "WhatsApp",
   "receipt.header": "RECEIPT",
   "receipt.order": "Order",
   "receipt.status": "Status",

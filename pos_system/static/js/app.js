@@ -1,4 +1,4 @@
-console.log('POS App v2.32')
+console.log('POS App v2.33')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.32'
+    document.getElementById('app-version').textContent = 'v2.33'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1405,7 +1405,9 @@ let App = {
       }
       html += `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="App.openPrintReceipt(${id})">${I18n.t('receipt.print', 'Print Receipt')}</button>
-        <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>`
+        <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>
+        <button class="btn btn-info" onclick="App.emailReceipt(${id})">${I18n.t('receipt.email', 'Email Receipt')}</button>
+        <button class="btn btn-success" onclick="App.whatsappReceipt(${id})">${I18n.t('receipt.whatsapp', 'WhatsApp')}</button>`
       if (o.state === 'pending') {
         html += `<button class="btn btn-warning" id="validate-payment-btn" data-i18n="payment.validate">Validate Payment</button>`
       }
@@ -1465,6 +1467,26 @@ let App = {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+  },
+
+  async emailReceipt(id) {
+    try {
+      const res = await this.api('POST', `/orders/${id}/email-receipt`)
+      if (res && res.success) this.showToast(res.message || 'Receipt sent')
+    } catch(e) {
+      this.showToast(e.message || 'Failed to send receipt')
+    }
+  },
+
+  async whatsappReceipt(id) {
+    try {
+      const res = await this.api('GET', `/orders/${id}/whatsapp-link`)
+      if (res && res.success && res.data && res.data.url) {
+        window.open(res.data.url, '_blank')
+      }
+    } catch(e) {
+      this.showToast(e.message || 'Failed to open WhatsApp')
+    }
   },
 
   // === CUSTOMERS TABLE ===

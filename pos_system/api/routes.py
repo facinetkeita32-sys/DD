@@ -849,6 +849,8 @@ def get_order(order_id):
         partner = ResPartner().browse([pid])
         if partner:
             d['partner_name'] = partner[0]._data.get('name', '')
+            d['partner_email'] = partner[0]._data.get('email', '') or ''
+            d['partner_phone'] = partner[0]._data.get('phone', '') or partner[0]._data.get('mobile', '') or ''
     dzid = order._data.get('delivery_zone_id', 0) or 0
     if dzid:
         zone = DeliveryZone().browse([dzid])
@@ -1043,6 +1045,90 @@ def get_receipt_pdf(order_id):
             'Content-Type': 'application/pdf',
         },
     )
+
+
+@api_bp.route('/orders/<int:order_id>/email-receipt', methods=['POST'])
+@login_required
+def email_order_receipt(order_id):
+    from ..services.receipt_service import generate_receipt_html, currency_format
+    from ..services.email_service import send_email
+    PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
+    orders = PosOrder().browse([order_id])
+    if not orders:
+        return error_response('Order not found', 404)
+    order = orders[0]
+    pid = order._data.get('partner_id', 0) or 0
+    customer_email = ''
+    customer_name = ''
+    if pid:
+        partner = ResPartner().browse([pid])
+        if partner:
+            customer_email = partner[0]._data.get('email', '') or ''
+            customer_name = partner[0]._data.get('name', '') or ''
+    if not customer_email:
+        return error_response('Customer has no email. Add an email to the customer.', 400)
+    lang = session.get('lang', 'en')
+    if lang not in ('en', 'fr'):
+        lang = 'en'
+    ref = order._data.get('name', '') or f"Order #{order_id}"
+    html = generate_receipt_html(order_id, lang=lang)
+    if html is None:
+        return error_response('Receipt generation failed', 500)
+    subject = f"Receipt {ref}"
+    try:
+        send_email(customer_email, subject, html)
+    except Exception as e:
+        return error_response(f'Failed to send email: {e}', 500)
+    log_activity('email_receipt', 'Receipt emailed to %s' % customer_email, model='pos.order')
+    return success_response(message='Receipt sent to %s' % customer_email)
+
+
+@api_bp.route('/orders/<int:order_id>/whatsapp-link', methods=['GET'])
+@login_required
+def order_whatsapp_link(order_id):
+    from urllib.parse import quote
+    from ..services.receipt_service import currency_format
+    PosOrder()._reload_from_db(ids=[order_id])
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
+    orders = PosOrder().browse([order_id])
+    if not orders:
+        return error_response('Order not found', 404)
+    order = orders[0]
+    pid = order._data.get('partner_id', 0) or 0
+    customer_phone = ''
+    if pid:
+        partner = ResPartner().browse([pid])
+        if partner:
+            customer_phone = (partner[0]._data.get('phone', '') or partner[0]._data.get('mobile', '') or '').replace(' ', '')
+    if not customer_phone:
+        return error_response('Customer has no phone number. Add a phone to the customer.', 400)
+
+    company = ResCompany().search([], limit=1)
+    company_name = company[0]._data.get('name', '') if company else ''
+    cur_id = company[0]._data.get('currency_id', 0) or 0 if company else 0
+    currency = {}
+    if company and cur_id:
+        cur = ResCurrency().browse([cur_id])
+        if cur:
+            currency = cur[0]._data
+
+    ref = order._data.get('name', '') or f"Order #{order_id}"
+    date_val = (order._data.get('date_order', '') or '')[:16]
+    lines = PosOrderLine().search([('order_id', '=', order.id)])
+    lines_txt = []
+    for line in lines:
+        ld = line._data
+        pname = ld.get('product_name', '') or 'Product'
+        qty = float(ld.get('qty', 0) or 0)
+        price = float(ld.get('price_subtotal', 0) or 0)
+        lines_txt.append(f"- {pname} x{qty}: {currency_format(price, currency)}")
+    total = float(order._data.get('amount_total', 0) or 0)
+    message = f"*{company_name}* - Receipt {ref}\n{date_val}\n\n" + '\n'.join(lines_txt) + f"\n\n*Total: {currency_format(total, currency)}*"
+    url = 'https://wa.me/' + quote(customer_phone, safe='') + '?text=' + quote(message)
+    return success_response({'url': url, 'phone': customer_phone})
 
 
 

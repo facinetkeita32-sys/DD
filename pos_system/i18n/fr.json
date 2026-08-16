@@ -203,6 +203,8 @@
   "receipt.title": "Reçu",
   "receipt.print": "Imprimer le Reçu",
   "receipt.pdf": "Télécharger PDF",
+  "receipt.email": "Envoyer Reçu par Email",
+  "receipt.whatsapp": "WhatsApp",
   "receipt.header": "REÇU",
   "receipt.order": "Commande",
   "receipt.status": "Statut",

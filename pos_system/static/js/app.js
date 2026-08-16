@@ -1,4 +1,4 @@
-console.log('POS App v2.35')
+console.log('POS App v2.36')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.35'
+    document.getElementById('app-version').textContent = 'v2.36'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -870,6 +870,7 @@ let App = {
     })
     html += `</div>
       <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-primary" id="customer-new-btn">${I18n.t('pos.new_customer', 'New Customer')}</button>
         <button class="btn btn-secondary" id="customer-clear">${I18n.t('pos.remove', 'Remove')}</button>
         <button class="btn btn-secondary" id="customer-cancel-btn">${I18n.t('common.cancel', 'Cancel')}</button>
       </div>`
@@ -894,6 +895,10 @@ let App = {
       this.renderCart()
     }
     document.getElementById('customer-cancel-btn').onclick = () => this.closeModal()
+    document.getElementById('customer-new-btn').onclick = () => {
+      this.closeModal()
+      this.showCustomerModal(null, true)
+    }
   },
 
   // === PRODUCTS TABLE ===
@@ -1531,7 +1536,7 @@ let App = {
     })
   },
 
-  showCustomerModal(id) {
+  showCustomerModal(id, selectOnSave) {
     const customer = id ? this.customers.find(c => c.id === id) : null
     const title = customer ? I18n.t('customer.edit', 'Edit Customer') : I18n.t('customer.add', 'Add Customer')
     let html = `<h3>${title}</h3>
@@ -1554,12 +1559,16 @@ let App = {
         if (customer) {
           await this.api('PUT', `/customers/${customer.id}`, data)
         } else {
-          await this.api('POST', '/customers', data)
+          const created = await this.api('POST', '/customers', data)
+          if (selectOnSave) {
+            this.cartCustomer = (created.data && created.data.id) || null
+          }
         }
         this.closeModal()
         const res = await this.api('GET', '/customers')
         this.customers = res.data || []
         this.renderAll()
+        if (selectOnSave) this.renderCart()
       } catch(e) { document.getElementById('c-save').disabled = false; alert('Error: ' + e.message) }
     }
     document.getElementById('c-cancel').onclick = () => this.closeModal()

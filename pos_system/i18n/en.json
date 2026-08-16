@@ -37,6 +37,7 @@
   "pos.add_customer": "Add Customer",
   "pos.set_customer": "Set Customer",
   "pos.remove": "Remove",
+  "pos.new_customer": "New Customer",
   "pos.print": "Print Receipt",
   "pos.new_order": "New Order",
   "pos.barcode": "Scan barcode...",

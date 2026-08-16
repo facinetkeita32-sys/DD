@@ -37,6 +37,7 @@
   "pos.add_customer": "Ajouter Client",
   "pos.set_customer": "Choisir Client",
   "pos.remove": "Supprimer",
+  "pos.new_customer": "Nouveau Client",
   "pos.print": "Imprimer Ticket",
   "pos.new_order": "Nouvelle Commande",
   "pos.barcode": "Scan code-barres...",

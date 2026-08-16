@@ -1050,7 +1050,7 @@ def get_receipt_pdf(order_id):
 @api_bp.route('/orders/<int:order_id>/email-receipt', methods=['POST'])
 @login_required
 def email_order_receipt(order_id):
-    from ..services.receipt_service import generate_receipt_html, currency_format
+    from ..services.receipt_service import generate_receipt_html
     from ..services.email_service import send_email
     PosOrder()._reload_from_db(ids=[order_id])
     PosOrderLine()._reload_from_db()
@@ -1059,16 +1059,15 @@ def email_order_receipt(order_id):
     if not orders:
         return error_response('Order not found', 404)
     order = orders[0]
+    data = request.get_json(silent=True) or {}
+    customer_email = (data.get('email') or '').strip()
     pid = order._data.get('partner_id', 0) or 0
-    customer_email = ''
-    customer_name = ''
-    if pid:
+    if not customer_email and pid:
         partner = ResPartner().browse([pid])
         if partner:
             customer_email = partner[0]._data.get('email', '') or ''
-            customer_name = partner[0]._data.get('name', '') or ''
     if not customer_email:
-        return error_response('Customer has no email. Add an email to the customer.', 400)
+        return error_response('Enter a customer email.', 400)
     lang = session.get('lang', 'en')
     if lang not in ('en', 'fr'):
         lang = 'en'
@@ -1097,14 +1096,14 @@ def order_whatsapp_link(order_id):
     if not orders:
         return error_response('Order not found', 404)
     order = orders[0]
+    customer_phone = (request.args.get('phone') or '').replace(' ', '')
     pid = order._data.get('partner_id', 0) or 0
-    customer_phone = ''
-    if pid:
+    if not customer_phone and pid:
         partner = ResPartner().browse([pid])
         if partner:
             customer_phone = (partner[0]._data.get('phone', '') or partner[0]._data.get('mobile', '') or '').replace(' ', '')
     if not customer_phone:
-        return error_response('Customer has no phone number. Add a phone to the customer.', 400)
+        return error_response('Enter the customer phone number.', 400)
 
     company = ResCompany().search([], limit=1)
     company_name = company[0]._data.get('name', '') if company else ''

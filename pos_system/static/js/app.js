@@ -1,4 +1,4 @@
-console.log('POS App v2.33')
+console.log('POS App v2.34')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.33'
+    document.getElementById('app-version').textContent = 'v2.34'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1470,8 +1470,17 @@ let App = {
   },
 
   async emailReceipt(id) {
+    let stored = ''
     try {
-      const res = await this.api('POST', `/orders/${id}/email-receipt`)
+      const res = await this.api('GET', `/orders/${id}`)
+      stored = (res.data && res.data.partner_email) || ''
+    } catch(e) {}
+    const value = prompt(I18n.t('receipt.enter_email', 'Customer email:'), stored)
+    if (value === null) return
+    const email = value.trim()
+    if (!email) { this.showToast(I18n.t('receipt.need_email', 'Email is required')); return }
+    try {
+      const res = await this.api('POST', `/orders/${id}/email-receipt`, { email })
       if (res && res.success) this.showToast(res.message || 'Receipt sent')
     } catch(e) {
       this.showToast(e.message || 'Failed to send receipt')
@@ -1479,8 +1488,17 @@ let App = {
   },
 
   async whatsappReceipt(id) {
+    let stored = ''
     try {
-      const res = await this.api('GET', `/orders/${id}/whatsapp-link`)
+      const res = await this.api('GET', `/orders/${id}`)
+      stored = (res.data && res.data.partner_phone) || ''
+    } catch(e) {}
+    const value = prompt(I18n.t('receipt.enter_phone', 'Customer WhatsApp number (with country code):'), stored)
+    if (value === null) return
+    const phone = value.trim().replace(/\s/g, '')
+    if (!phone) { this.showToast(I18n.t('receipt.need_phone', 'Phone is required')); return }
+    try {
+      const res = await this.api('GET', `/orders/${id}/whatsapp-link?phone=${encodeURIComponent(phone)}`)
       if (res && res.success && res.data && res.data.url) {
         window.open(res.data.url, '_blank')
       }

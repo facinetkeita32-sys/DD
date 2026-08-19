@@ -1050,7 +1050,7 @@ def get_receipt_pdf(order_id):
 @api_bp.route('/orders/<int:order_id>/email-receipt', methods=['POST'])
 @login_required
 def email_order_receipt(order_id):
-    from ..services.receipt_service import generate_receipt_html
+    from ..services.receipt_service import generate_receipt_html, generate_receipt_pdf
     from ..services.email_service import send_email
     PosOrder()._reload_from_db(ids=[order_id])
     PosOrderLine()._reload_from_db()
@@ -1075,8 +1075,10 @@ def email_order_receipt(order_id):
     html = generate_receipt_html(order_id, lang=lang, include_controls=False)
     if html is None:
         return error_response('Receipt generation failed', 500)
+    pdf_bytes = generate_receipt_pdf(order_id, lang=lang)
     subject = f"Receipt {ref}"
     try:
+        send_email(customer_email, subject, html, attachment_name=f"receipt_{ref}.pdf", attachment_bytes=pdf_bytes)
         send_email(customer_email, subject, html)
     except Exception as e:
         return error_response(f'Failed to send email: {e}', 500)

@@ -29,7 +29,9 @@ def send_email(to_address, subject, html_body, attachment_name=None, attachment_
     msg.set_content('This email requires an HTML-capable client.')
     msg.add_alternative(html_body, subtype='html')
     if attachment_name and attachment_bytes:
-        msg.add_attachment(attachment_bytes, maintype='text', subtype='csv', filename=attachment_name)
+        subtype = 'pdf' if attachment_name.endswith('.pdf') else 'csv'
+        maintype = 'application' if subtype == 'pdf' else 'text'
+        msg.add_attachment(attachment_bytes, maintype=maintype, subtype=subtype, filename=attachment_name)
     with smtplib.SMTP(host, port, timeout=30) as server:
         server.ehlo()
         server.starttls()

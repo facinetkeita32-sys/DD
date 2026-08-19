@@ -1072,7 +1072,7 @@ def email_order_receipt(order_id):
     if lang not in ('en', 'fr'):
         lang = 'en'
     ref = order._data.get('name', '') or f"Order #{order_id}"
-    html = generate_receipt_html(order_id, lang=lang)
+    html = generate_receipt_html(order_id, lang=lang, include_controls=False)
     if html is None:
         return error_response('Receipt generation failed', 500)
     subject = f"Receipt {ref}"

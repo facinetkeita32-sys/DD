@@ -251,14 +251,14 @@ def generate_receipt_html(order_id, lang='en', include_controls=True):
   {logo_html}
   <h2>{company.get('name', '')}</h2>
   <div class="company-info">
-    {company.get('street', '') and company['street'] + '<br>'}
-    {company.get('city', '') and company['city']}
-    {company.get('state', '') and ', ' + company['state']}
-    {company.get('zip_code', '') and ' ' + company['zip_code']}
-    {company.get('country', '') and '<br>' + company['country']}
-    {company.get('phone', '') and '<br>' + _('tel', lang) + ': ' + company['phone']}
-    {company.get('email', '') and '<br>' + company['email']}
-    {company.get('vat', '') and '<br>' + _('tax_id', lang) + ': ' + company['vat']}
+    {(company.get('street') or '') and company.get('street') + '<br>'}
+    {(company.get('city') or '') and company.get('city')}
+    {(company.get('state') or '') and ', ' + company.get('state')}
+    {(company.get('zip_code') or '') and ' ' + company.get('zip_code')}
+    {(company.get('country') or '') and '<br>' + company.get('country')}
+    {(company.get('phone') or '') and '<br>' + _('tel', lang) + ': ' + company.get('phone')}
+    {(company.get('email') or '') and '<br>' + company.get('email')}
+    {(company.get('vat') or '') and '<br>' + _('tax_id', lang) + ': ' + company.get('vat')}
   </div>
 
   <div class="divider"></div>

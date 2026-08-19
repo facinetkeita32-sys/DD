@@ -343,7 +343,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     pdf.add_page()
     pdf.set_margins(5, 5, 5)
 
-    page_w = 58
+    page_w = 48
     left = 5
 
     y = 5
@@ -397,7 +397,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     pdf.ln(1)
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(4)
 
     # Receipt header
@@ -409,7 +409,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(4)
 
     ref = data.get('name', '') or f"{_('order', lang)} #{d['id']}"
@@ -451,12 +451,12 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(4)
 
     # Items header
     pdf.set_font('Courier', 'B', 9)
-    col_w = [20, 7, 14, 17]
+    col_w = [18, 6, 12, 12]
     headers = [_('item', lang), _('qty', lang), _('price', lang), _('total', lang)]
     pdf.set_x(left)
     for i, h in enumerate(headers):
@@ -465,7 +465,7 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     pdf.set_font('Courier', '', 9)
     pdf.set_x(left)
-    pdf.cell(page_w, 2, '-' * 60, align='C')
+    pdf.cell(page_w, 2, '-' * 50, align='C')
     pdf.ln(3)
 
     # Items
@@ -478,7 +478,7 @@ def generate_receipt_pdf(order_id, lang='en'):
         subtotal = float(ld.get('price_subtotal', 0) or (qty * price * (1 - disc / 100)))
 
         pdf.set_x(left)
-        pdf.cell(col_w[0], 4, name[:20])
+        pdf.cell(col_w[0], 4, name[:12])
         pdf.cell(col_w[1], 4, str(int(qty) if qty == int(qty) else qty), align='C')
         pdf.cell(col_w[2], 4, currency_format(price, currency), align='R')
         pdf.cell(col_w[3], 4, currency_format(subtotal, currency), align='R')
@@ -487,38 +487,38 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(4)
 
     # Totals
     pdf.set_font('Courier', '', 9)
     pdf.set_x(left)
-    pdf.cell(page_w - 30, 4, f"{_('subtotal', lang)}:", align='R')
-    pdf.cell(30, 4, currency_format(items_total, currency), align='R')
+    pdf.cell(page_w - 28, 4, f"{_('subtotal', lang)}:", align='R')
+    pdf.cell(28, 4, currency_format(items_total, currency), align='R')
     pdf.ln(4)
 
     if delivery_cost > 0:
         pdf.set_x(left)
-        pdf.cell(page_w - 30, 4, f"{_('delivery', lang)}:", align='R')
-        pdf.cell(30, 4, currency_format(delivery_cost, currency), align='R')
+        pdf.cell(page_w - 28, 4, f"{_('delivery', lang)}:", align='R')
+        pdf.cell(28, 4, currency_format(delivery_cost, currency), align='R')
         pdf.ln(4)
 
     pdf.set_x(left)
-    pdf.cell(page_w - 30, 4, f"{_('discount', lang)}:", align='R')
-    pdf.cell(30, 4, currency_format(0, currency), align='R')
+    pdf.cell(page_w - 28, 4, f"{_('discount', lang)}:", align='R')
+    pdf.cell(28, 4, currency_format(0, currency), align='R')
     pdf.ln(4)
 
     pdf.set_font('Courier', 'B', 11)
     pdf.set_x(left)
-    pdf.cell(page_w - 30, 5, f"{_('total', lang).upper()}:", align='R')
-    pdf.cell(30, 5, currency_format(total, currency), align='R')
+    pdf.cell(page_w - 28, 5, f"{_('total', lang).upper()}:", align='R')
+    pdf.cell(28, 5, currency_format(total, currency), align='R')
     pdf.ln(6)
 
     # Receipt header text
     if company.get('receipt_header'):
         pdf.set_x(left)
         pdf.set_font('Courier', '', 8)
-        pdf.cell(page_w, 3, '-' * 60, align='C')
+        pdf.cell(page_w, 3, '-' * 50, align='C')
         pdf.ln(3)
         pdf.set_x(left)
         pdf.cell(page_w, 4, company['receipt_header'], align='C')
@@ -527,7 +527,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Payment info
     pdf.set_x(left)
     pdf.set_font('Courier', '', 9)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(3)
     pdf.set_font('Courier', 'B', 9)
     pdf.set_x(left)
@@ -540,20 +540,20 @@ def generate_receipt_pdf(order_id, lang='en'):
         pmt_name = pmt['payment_method_name']
         amt = float(pd.get('amount', 0) or 0)
         pdf.set_x(left)
-        pdf.cell(page_w - 30, 4, pmt_name, align='L')
-        pdf.cell(30, 4, currency_format(amt, currency), align='R')
+        pdf.cell(page_w - 28, 4, pmt_name, align='L')
+        pdf.cell(28, 4, currency_format(amt, currency), align='R')
         pdf.ln(4)
 
     pdf.set_x(left)
-    pdf.cell(page_w - 30, 4, f"{_('change', lang)}:", align='R')
-    pdf.cell(30, 4, currency_format(change, currency), align='R')
+    pdf.cell(page_w - 28, 4, f"{_('change', lang)}:", align='R')
+    pdf.cell(28, 4, currency_format(change, currency), align='R')
     pdf.ln(4)
 
     # Receipt footer
     if company.get('receipt_footer'):
         pdf.set_x(left)
         pdf.set_font('Courier', '', 9)
-        pdf.cell(page_w, 3, '-' * 60, align='C')
+        pdf.cell(page_w, 3, '-' * 50, align='C')
         pdf.ln(3)
         pdf.set_font('Courier', '', 9)
         pdf.set_x(left)
@@ -563,7 +563,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Footer line
     pdf.set_x(left)
     pdf.set_font('Courier', '', 8)
-    pdf.cell(page_w, 3, '-' * 60, align='C')
+    pdf.cell(page_w, 3, '-' * 50, align='C')
     pdf.ln(3)
     pdf.set_x(left)
     pdf.cell(page_w, 3, _('generated', lang), align='C')

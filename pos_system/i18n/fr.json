@@ -60,6 +60,7 @@
   "order.cashier": "Caissier",
   "order.total": "Total",
   "order.status": "Statut",
+  "order.remaining": "Reste à payer",
   "order.items": "Articles",
   "order.details": "Détails de la Commande",
   "order.list": "Liste des Commandes",

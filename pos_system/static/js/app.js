@@ -1,4 +1,4 @@
-console.log('POS App v2.37')
+console.log('POS App v2.38')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.37'
+    document.getElementById('app-version').textContent = 'v2.38'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1339,7 +1339,7 @@ let App = {
       const orders = res.data || []
       const tbody = document.getElementById('orders-tbody')
       if (!orders.length) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
         return
       }
       tbody.innerHTML = orders.map(o => {
@@ -1355,6 +1355,7 @@ let App = {
           <td style="max-width:200px;white-space:normal">${items}</td>
           <td>${payMethods}</td>
           <td>${this.currencyFormat(o.amount_total)}</td>
+          <td style="${(o.amount_total - (o.amount_paid || 0)) > 0 ? 'color:var(--danger);font-weight:700' : ''}">${this.currencyFormat(Math.max(0, (o.amount_total || 0) - (o.amount_paid || 0)))}</td>
           <td><span class="status-badge status-${o.state}">${o.state}</span></td>
           <td><button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button></td>
         </tr>`

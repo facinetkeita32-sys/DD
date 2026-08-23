@@ -60,6 +60,7 @@
   "order.cashier": "Cashier",
   "order.total": "Total",
   "order.status": "Status",
+  "order.remaining": "Remaining",
   "order.items": "Items",
   "order.details": "Order Details",
   "order.list": "Orders List",

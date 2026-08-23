@@ -291,5 +291,28 @@
   "order.state_pending": "Paiement en Attente",
   "pos.pending_order_note": "La commande sera en attente",
 
-  "dashboard.orders_pending": "Commandes en Attente"
+  "dashboard.orders_pending": "Commandes en Attente",
+
+  "category.manage": "Catégories",
+  "report.custom": "Personnalisé",
+  "product.filter_all_stock": "Tout le Stock",
+  "product.filter_all_categories": "Toutes les Catégories",
+  "product.img": "Img",
+  "product.selected": "sélectionné(s)",
+  "product.select_first": "Sélectionner des produits d'abord",
+  "product.no_changes": "Aucune modification spécifiée",
+  "product.provide_data": "Fournir un fichier CSV ou des données JSON",
+
+  "common.error": "Erreur",
+  "common.export_error": "Erreur d'exportation",
+  "common.name_required": "Le nom est requis",
+  "common.login_required": "Nom d'utilisateur et mot de passe requis",
+  "common.restore_failed": "Échec de la restauration",
+  "common.invalid_json": "Fichier JSON invalide",
+  "common.leave_blank": "Laisser vide pour conserver la valeur actuelle",
+
+  "pos.customer_default": "Client",
+
+  "backup.select_file": "Sélectionner un fichier de sauvegarde JSON",
+  "backup.invalid_file": "Fichier JSON invalide"
 }

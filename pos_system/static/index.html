@@ -116,12 +116,12 @@
       </div>
       <div class="product-filters">
         <input type="text" id="products-search" class="search-input" placeholder="Search products..." data-i18n-placeholder="pos.search" style="flex:1;min-width:150px">
-        <select id="products-category-filter" class="filter-select"><option value="">All Categories</option></select>
+        <select id="products-category-filter" class="filter-select"><option value="" data-i18n="product.filter_all_categories">All Categories</option></select>
         <select id="products-stock-filter" class="filter-select">
-          <option value="">All Stock</option>
-          <option value="in">In Stock</option>
-          <option value="low">Low Stock</option>
-          <option value="out">Out of Stock</option>
+          <option value="" data-i18n="product.filter_all_stock">All Stock</option>
+          <option value="in" data-i18n="product.in_stock">In Stock</option>
+          <option value="low" data-i18n="product.low_stock">Low Stock</option>
+          <option value="out" data-i18n="product.out_of_stock">Out of Stock</option>
         </select>
       </div>
       <div class="bulk-delete-bar" id="bulk-delete-bar" style="display:none">
@@ -132,7 +132,7 @@
         <table id="products-table">
           <thead><tr>
             <th style="width:36px"><input type="checkbox" id="select-all-products"></th>
-            <th style="width:50px">Img</th>
+            <th style="width:50px" data-i18n="product.img">Img</th>
             <th data-i18n="product.name">Name</th>
             <th data-i18n="product.price">Price</th>
             <th data-i18n="product.cost">Cost</th>
@@ -201,7 +201,7 @@
               <option value="biweekly" data-i18n="report.biweekly">Last 2 Weeks</option>
               <option value="monthly" data-i18n="report.monthly">Monthly</option>
               <option value="annual" data-i18n="report.annual">Annual</option>
-              <option value="custom">Custom</option>
+              <option value="custom" data-i18n="report.custom">Custom</option>
             </select>
             <input type="date" id="report-date-from" class="report-date-input" style="display:none" title="From">
             <input type="date" id="report-date-to" class="report-date-input" style="display:none" title="To">

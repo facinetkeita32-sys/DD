@@ -291,5 +291,28 @@
   "order.state_pending": "Pending Payment",
   "pos.pending_order_note": "Order will be pending",
 
-  "dashboard.orders_pending": "Pending Orders"
+  "dashboard.orders_pending": "Pending Orders",
+
+  "category.manage": "Categories",
+  "report.custom": "Custom",
+  "product.filter_all_stock": "All Stock",
+  "product.filter_all_categories": "All Categories",
+  "product.img": "Img",
+  "product.selected": "selected",
+  "product.select_first": "Select products first",
+  "product.no_changes": "No changes specified",
+  "product.provide_data": "Provide CSV file or JSON data",
+
+  "common.error": "Error",
+  "common.export_error": "Export error",
+  "common.name_required": "Name required",
+  "common.login_required": "Login and password required",
+  "common.restore_failed": "Restore failed",
+  "common.invalid_json": "Invalid JSON file",
+  "common.leave_blank": "Leave blank to keep current value",
+
+  "pos.customer_default": "Customer",
+
+  "backup.select_file": "Select a JSON backup file",
+  "backup.invalid_file": "Invalid JSON file"
 }

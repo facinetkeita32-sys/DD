@@ -1,4 +1,4 @@
-console.log('POS App v2.36')
+console.log('POS App v2.37')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.36'
+    document.getElementById('app-version').textContent = 'v2.37'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -573,7 +573,7 @@ let App = {
 
     if (this.cartCustomer) {
       const c = this.customers.find(x => x.id === this.cartCustomer)
-      customerEl.innerHTML = `<span class="customer-icon">👤</span> ${c ? c.name : 'Customer'} <span class="customer-hint">${I18n.t('common.change', 'change')}</span>`
+      customerEl.innerHTML = `<span class="customer-icon">👤</span> ${c ? c.name : I18n.t('pos.customer_default', 'Customer')} <span class="customer-hint">${I18n.t('common.change', 'change')}</span>`
     } else {
       customerEl.innerHTML = `<span class="customer-icon">➕</span> ${I18n.t('pos.add_customer', 'Add Customer')}`
     }
@@ -853,7 +853,7 @@ let App = {
         }
       }
     } catch(e) {
-      alert('Error: ' + e.message)
+      alert(I18n.t('common.error', 'Error') + ': ' + e.message)
     }
   },
 
@@ -909,7 +909,7 @@ let App = {
     const selected = new Set(selectedIds)
     const catSelect = document.getElementById('products-category-filter')
     if (catSelect && !catSelect.dataset.populated) {
-      catSelect.innerHTML = '<option value="">All Categories</option>' + (this.productCategories || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+      catSelect.innerHTML = `<option value="">${I18n.t('product.filter_all_categories', 'All Categories')}</option>` + (this.productCategories || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('')
       catSelect.dataset.populated = '1'
     }
 
@@ -1033,7 +1033,7 @@ let App = {
       return
     }
     bar.style.display = 'flex'
-    countEl.textContent = `${ids.length} product${ids.length !== 1 ? 's' : ''} selected`
+    countEl.textContent = `${ids.length} product${ids.length !== 1 ? 's' : ''} ${I18n.t('product.selected', 'selected')}`
   },
 
   async bulkDeleteProducts() {
@@ -1047,7 +1047,7 @@ let App = {
       this._updateBulkDeleteBar()
       this.renderAll()
     } catch (e) {
-      alert('Error: ' + e.message)
+      alert(I18n.t('common.error', 'Error') + ': ' + e.message)
     }
   },
 
@@ -1153,7 +1153,7 @@ let App = {
         const res = await this.api('GET', '/products?light=true&refresh=1')
         this.products = res.data || []
         this.renderAll()
-      } catch(e) { document.getElementById('prod-save').disabled = false; alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('prod-save').disabled = false; alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('prod-cancel').onclick = () => this.closeModal()
   },
@@ -1246,7 +1246,7 @@ let App = {
           if (!fetchRes.ok) throw new Error(res.error || 'Import failed')
         } else {
           const jsonText = document.getElementById('import-json').value.trim()
-          if (!jsonText) { alert('Provide CSV file or JSON data'); return }
+          if (!jsonText) { alert(I18n.t('product.provide_data', 'Provide CSV file or JSON data')); return }
           const jsonData = JSON.parse(jsonText)
           res = await this.api('POST', '/products/bulk-import', jsonData)
         }
@@ -1266,7 +1266,7 @@ let App = {
       } catch(e) {
         resultDiv.style.display = 'block'
         resultDiv.className = 'session-status closed'
-        resultDiv.textContent = 'Error: ' + e.message
+        resultDiv.textContent = I18n.t('common.error', 'Error') + ': ' + e.message
       }
     }
     document.getElementById('import-cancel-btn').onclick = () => this.closeModal()
@@ -1279,18 +1279,18 @@ let App = {
       this.products = this.products.filter(p => p.id !== id)
       this.renderAll()
     } catch(e) {
-      alert('Error: ' + e.message)
+      alert(I18n.t('common.error', 'Error') + ': ' + e.message)
     }
   },
 
   showBulkUpdateModal() {
     const ids = window._selectedProductIds || []
-    if (!ids.length) { alert('Select products first'); return }
+    if (!ids.length) { alert(I18n.t('product.select_first', 'Select products first')); return }
     const cats = this.productCategories || []
     const catOpts = '<option value="">' + I18n.t('common.no_change', 'No Change') + '</option>' +
       cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
     const html = `<h3>${I18n.t('product.bulk_update_title', 'Bulk Update Products')}</h3>
-      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">${ids.length} product${ids.length !== 1 ? 's' : ''} selected. Leave blank to keep current value.</p>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">${ids.length} product${ids.length !== 1 ? 's' : ''} ${I18n.t('product.selected', 'selected')}. ${I18n.t('common.leave_blank', 'Leave blank to keep current value')}.</p>
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="bulk-price" type="number" step="100" placeholder="New price"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="bulk-cost" type="number" step="100" placeholder="New cost"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="bulk-qty" type="number" step="1" placeholder="New quantity"></div>
@@ -1312,7 +1312,7 @@ let App = {
       if (qtyEl.value) data.available_qty = parseFloat(qtyEl.value)
       const catEl = document.getElementById('bulk-category')
       if (catEl.value) data.categ_id = parseInt(catEl.value)
-      if (!Object.keys(data).length) { alert('No changes specified'); return }
+      if (!Object.keys(data).length) { alert(I18n.t('product.no_changes', 'No changes specified')); return }
       data.ids = ids
       try {
         const res = await this.api('PUT', '/products/bulk-update', data)
@@ -1326,7 +1326,7 @@ let App = {
         window._selectedProductIds = []
         this._updateBulkDeleteBar()
         this.renderAll()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('bulk-update-cancel').onclick = () => this.closeModal()
   },
@@ -1426,7 +1426,7 @@ let App = {
       if (vpBtn) {
         vpBtn.onclick = () => this.showValidatePaymentModal(id, o)
       }
-    } catch(e) { alert('Error: ' + e.message) }
+    } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
   },
 
   async showValidatePaymentModal(orderId, o) {
@@ -1460,7 +1460,7 @@ let App = {
         this.closeModal()
         this.renderOrdersTable()
         this.renderDashboard()
-      } catch(e) { document.getElementById('vp-confirm').disabled = false; alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('vp-confirm').disabled = false; alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('vp-cancel').onclick = () => this.closeModal()
   },
@@ -1569,7 +1569,7 @@ let App = {
         this.customers = res.data || []
         this.renderAll()
         if (selectOnSave) this.renderCart()
-      } catch(e) { document.getElementById('c-save').disabled = false; alert('Error: ' + e.message) }
+      } catch(e) { document.getElementById('c-save').disabled = false; alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('c-cancel').onclick = () => this.closeModal()
   },
@@ -1650,7 +1650,7 @@ let App = {
           ${r.products.map((p, i) => `<tr><td>${i + 1}</td><td>${this._esc(p.name || 'Product')}</td><td>${p.qty}</td><td>${this.currencyFormat(p.revenue || 0)}</td></tr>`).join('')}
           </tbody></table></div>
         </div>` : ''}`
-    } catch(e) { alert('Error: ' + e.message) }
+    } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
   },
 
   async exportReportCsv() {
@@ -1675,7 +1675,7 @@ let App = {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch(e) {
-      alert('Export error: ' + e.message)
+      alert(I18n.t('common.export_error', 'Export error') + ': ' + e.message)
     }
   },
 
@@ -1760,7 +1760,7 @@ let App = {
     document.getElementById('dz-save').onclick = async () => {
       const name = document.getElementById('dz-name').value.trim()
       const cost = parseFloat(document.getElementById('dz-cost').value) || 0
-      if (!name) { alert('Name required'); return }
+      if (!name) { alert(I18n.t('common.name_required', 'Name required')); return }
       try {
         if (zone) {
           await this.api('PUT', `/delivery-zones/${zone.id}`, { name, cost })
@@ -1769,7 +1769,7 @@ let App = {
         }
         this.closeModal()
         this.renderDeliveryZonesSettings()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('dz-cancel').onclick = () => this.closeModal()
   },
@@ -1908,7 +1908,7 @@ let App = {
   async restoreBackup() {
     const input = document.getElementById('backup-restore-input')
     const file = input.files[0]
-    if (!file) { alert('Select a JSON backup file'); return }
+    if (!file) { alert(I18n.t('backup.select_file', 'Select a JSON backup file')); return }
     if (!confirm(I18n.t('backup.restore_confirm', 'This will overwrite existing data. Are you sure?'))) return
     const reader = new FileReader()
     reader.onload = async (e) => {
@@ -1920,12 +1920,12 @@ let App = {
           msg.textContent = I18n.t('backup.restore_done', 'Restore completed') + ` (${res.message || ''})`
           msg.style.color = 'var(--success)'
         } else {
-          msg.textContent = res.error || 'Restore failed'
+          msg.textContent = res.error || I18n.t('common.restore_failed', 'Restore failed')
           msg.style.color = 'var(--danger)'
         }
         setTimeout(() => msg.textContent = '', 5000)
       } catch (err) {
-        alert('Invalid JSON file: ' + err.message)
+        alert(I18n.t('common.invalid_json', 'Invalid JSON file') + ': ' + err.message)
       }
     }
     reader.readAsText(file)
@@ -2011,12 +2011,12 @@ let App = {
           await this.api('PUT', `/users/${user.id}`, data)
         } else {
           data.login = document.getElementById('u-login').value
-          if (!data.login || !pwd) { alert('Login and password required'); return }
+          if (!data.login || !pwd) { alert(I18n.t('common.login_required', 'Login and password required')); return }
           await this.api('POST', '/users', data)
         }
         this.closeModal()
         this.renderUsersTable()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('u-cancel').onclick = () => this.closeModal()
   },
@@ -2075,7 +2075,7 @@ let App = {
     this.showModal(html)
     document.getElementById('cat-save').onclick = async () => {
       const name = document.getElementById('cat-name').value.trim()
-      if (!name) { alert('Name required'); return }
+      if (!name) { alert(I18n.t('common.name_required', 'Name required')); return }
       const data = { name, description: document.getElementById('cat-desc').value }
       try {
         if (cat) {
@@ -2087,7 +2087,7 @@ let App = {
         const res = await this.api('GET', '/product-categories')
         this.productCategories = res.data || []
         this.renderAll()
-      } catch(e) { alert('Error: ' + e.message) }
+      } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
     }
     document.getElementById('cat-cancel').onclick = () => this.closeModal()
   },
@@ -2107,7 +2107,7 @@ let App = {
       console.error('renderActivity: #activity-log-container not found')
       return
     }
-    container.innerHTML = `<p style="color:var(--text-light);padding:20px">Loading...</p>`
+    container.innerHTML = `<p style="color:var(--text-light);padding:20px">${I18n.t('common.loading', 'Loading...')}</p>`
     try {
       const searchEl = document.getElementById('activity-search')
       const actionEl = document.getElementById('activity-filter-action')
@@ -2184,7 +2184,7 @@ let App = {
       if (dateFrom) query += '&date_from=' + encodeURIComponent(dateFrom)
       if (dateTo) query += '&date_to=' + encodeURIComponent(dateTo)
       window.open('/api' + query, '_blank')
-    } catch(e) { alert('Export error: ' + e.message) }
+    } catch(e) { alert(I18n.t('common.export_error', 'Export error') + ': ' + e.message) }
   },
 
   // === CAMERA SCANNER ===

@@ -1,4 +1,4 @@
-console.log('POS App v2.38')
+console.log('POS App v2.39')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.38'
+    document.getElementById('app-version').textContent = 'v2.39'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -115,6 +115,10 @@ let App = {
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
     const emailBtn = document.getElementById('email-report-btn')
     if (emailBtn) emailBtn.onclick = () => this.emailReport()
+    const pendingBtn = document.getElementById('pending-balances-btn')
+    if (pendingBtn) pendingBtn.onclick = () => this.loadPendingBalances()
+    const pendingExportBtn = document.getElementById('pending-balances-export-btn')
+    if (pendingExportBtn) pendingExportBtn.onclick = () => this.exportPendingBalancesCsv()
     const reportPeriod = document.getElementById('report-period')
     if (reportPeriod) reportPeriod.onchange = () => {
       const custom = reportPeriod.value === 'custom'
@@ -1699,6 +1703,58 @@ let App = {
       this.showToast(e.message || 'Failed to send email')
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = original }
+    }
+  },
+
+  async loadPendingBalances() {
+    try {
+      const res = await this.api('GET', '/reports/pending-balances')
+      const r = res.data
+      const container = document.getElementById('report-results')
+      container.innerHTML = `
+        <div class="report-summary">
+          <div class="report-stat"><div class="stat-value">${r.total_orders || 0}</div><div class="stat-label">${I18n.t('report.pending_orders', 'Pending Orders')}</div></div>
+          <div class="report-stat"><div class="stat-value">${this.currencyFormat(r.total_remaining || 0)}</div><div class="stat-label">${I18n.t('report.total_remaining', 'Total Remaining')}</div></div>
+        </div>
+        <div style="max-height:500px;overflow-y:auto">
+          <table><thead><tr>
+            <th>${I18n.t('order.ref', 'Order')}</th>
+            <th>${I18n.t('order.date', 'Date')}</th>
+            <th>${I18n.t('order.customer', 'Customer')}</th>
+            <th>${I18n.t('order.total', 'Total')}</th>
+            <th>${I18n.t('report.paid', 'Paid')}</th>
+            <th>${I18n.t('report.remaining', 'Remaining')}</th>
+            <th>${I18n.t('order.status', 'Status')}</th>
+          </tr></thead><tbody>
+          ${(r.orders || []).map(o => `<tr>
+            <td>${o.name || o.id}</td>
+            <td>${(o.date_order || '').substring(0, 10)}</td>
+            <td>${o.partner_name || '-'}</td>
+            <td>${this.currencyFormat(o.amount_total)}</td>
+            <td>${this.currencyFormat(o.amount_paid || 0)}</td>
+            <td style="color:var(--danger);font-weight:700">${this.currencyFormat(o.remaining || 0)}</td>
+            <td><span class="status-badge status-${o.state}">${o.state}</span></td>
+          </tr>`).join('')}
+          </tbody></table>
+        </div>`
+    } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
+  },
+
+  async exportPendingBalancesCsv() {
+    try {
+      const res = await fetch('/api/reports/pending-balances/export', { credentials: 'same-origin' })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pending_balances_${new Date().toISOString().slice(0,10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch(e) {
+      alert(I18n.t('common.export_error', 'Export error') + ': ' + e.message)
     }
   },
 

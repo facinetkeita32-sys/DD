@@ -1622,6 +1622,96 @@ def email_sales_report():
 
 
 
+def _pending_balance_orders():
+    PosOrder()._reload_from_db()
+    PosOrderLine()._reload_from_db()
+    PosPayment()._reload_from_db()
+    all_orders = PosOrder().search([('state', 'in', ['paid', 'done', 'pending'])])
+    pending = []
+    for o in all_orders:
+        total = float(o.amount_total or 0)
+        paid = float(o.amount_paid or 0)
+        if (total - paid) > 0.01:
+            pending.append(o)
+    pending.sort(key=lambda o: o._data.get('date_order', ''), reverse=True)
+    return pending
+
+
+def _pending_order_dict(o):
+    d = model_to_dict(o)
+    total = float(o.amount_total or 0)
+    paid = float(o.amount_paid or 0)
+    d['remaining'] = round(total - paid, 2)
+    pid = o._data.get('partner_id', 0) or 0
+    if pid:
+        partner = ResPartner().browse([pid])
+        if partner:
+            d['partner_name'] = partner[0]._data.get('name', '')
+    return d
+
+
+@api_bp.route('/reports/pending-balances', methods=['GET'])
+@login_required
+def get_pending_balances():
+    orders = _pending_balance_orders()
+    order_list = [_pending_order_dict(o) for o in orders]
+    total_remaining = sum(o['remaining'] for o in order_list)
+    return success_response({
+        'total_orders': len(order_list),
+        'total_remaining': round(total_remaining, 2),
+        'orders': order_list,
+    })
+
+
+@api_bp.route('/reports/pending-balances/export', methods=['GET'])
+@login_required
+@permission_required('report.read')
+def export_pending_balances_csv():
+    orders = _pending_balance_orders()
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    total_remaining = 0.0
+    writer.writerow(['Order Ref', 'Date', 'Customer', 'Cashier', 'Total', 'Paid', 'Remaining', 'Status'])
+    for o in orders:
+        d = o._data
+        total = float(o.amount_total or 0)
+        paid = float(o.amount_paid or 0)
+        remaining = round(total - paid, 2)
+        total_remaining += remaining
+        partner_name = ''
+        pid = d.get('partner_id', 0) or 0
+        if pid:
+            partner = ResPartner().browse([pid])
+            if partner:
+                partner_name = partner[0]._data.get('name', '')
+        user_name = ''
+        uid = d.get('user_id', 0) or 0
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                user_name = user[0]._data.get('name', '')
+        writer.writerow([
+            d.get('name', '') or f"Order #{o.id}",
+            (d.get('date_order', '') or '')[:19],
+            partner_name or '-',
+            user_name,
+            f'{total:.2f}',
+            f'{paid:.2f}',
+            f'{remaining:.2f}',
+            d.get('state', ''),
+        ])
+    writer.writerow([])
+    writer.writerow(['', '', '', '', '', '', f'{total_remaining:.2f}', ''])
+    now = datetime.now()
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=pending_balances_{now.strftime("%Y%m%d")}.csv'},
+    )
+
+
+
 # === ACTIVITY LOG ===
 
 def _activity_log_rows(args, limit=50, offset=0):

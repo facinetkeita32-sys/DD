@@ -49,6 +49,7 @@
         <a class="nav-link" data-screen="dashboard" data-i18n="nav.dashboard">Dashboard</a>
         <a class="nav-link" data-screen="activity" data-i18n="nav.activity">Activity</a>
         <a class="nav-link nav-link-users" data-screen="users" data-i18n="nav.users" style="display:none">Users</a>
+        <a class="nav-link nav-link-roles" data-screen="roles" data-i18n="nav.roles" style="display:none">Roles</a>
         <a class="nav-link" data-screen="settings" data-i18n="nav.settings">Settings</a>
       </div>
       <div class="nav-right">
@@ -242,6 +243,26 @@
             <th data-i18n="common.delete">Delete</th>
           </tr></thead>
           <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="screen-roles" class="content-screen">
+      <div class="screen-header">
+        <h2 data-i18n="role.title">Roles & Permissions</h2>
+        <button id="add-role-btn" class="btn btn-primary" data-i18n="role.add">Add Role</button>
+      </div>
+      <div class="table-container">
+        <table id="roles-table">
+          <thead><tr>
+            <th data-i18n="role.name">Name</th>
+            <th data-i18n="role.key">Key</th>
+            <th data-i18n="role.screens_access">Screens</th>
+            <th data-i18n="role.actions_access">Actions</th>
+            <th data-i18n="common.edit">Edit</th>
+            <th data-i18n="common.delete">Delete</th>
+          </tr></thead>
+          <tbody id="roles-tbody"></tbody>
         </table>
       </div>
     </div>

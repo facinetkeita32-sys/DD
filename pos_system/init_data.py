@@ -9,6 +9,7 @@ from .models.pos_category import PosCategory
 from .models.pos_payment_method import PosPaymentMethod
 from .models.pos_tax import PosTax
 from .models.pos_config import PosConfig
+from .models.pos_role import PosRole
 from .models.delivery_zone import DeliveryZone
 
 
@@ -24,4 +25,5 @@ def load_demo_data():
     ProductProduct()._init_defaults()
     ResUsers()._init_defaults()
     PosConfig()._init_defaults()
+    PosRole()._init_defaults()
     DeliveryZone()._init_defaults()

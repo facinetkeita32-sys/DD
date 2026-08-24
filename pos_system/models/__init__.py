@@ -13,5 +13,6 @@ from . import pos_session
 from . import pos_order
 from . import pos_order_line
 from . import pos_config
+from . import pos_role
 from . import delivery_zone
 from . import login_log

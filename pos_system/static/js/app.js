@@ -1,4 +1,4 @@
-console.log('POS App v2.39')
+console.log('POS App v2.40')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.39'
+    document.getElementById('app-version').textContent = 'v2.40'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -128,6 +128,7 @@ let App = {
     document.getElementById('bulk-delete-btn').onclick = () => this.bulkDeleteProducts()
     document.getElementById('settings-save-btn').onclick = () => this.saveSettings()
     document.getElementById('add-user-btn').onclick = () => this.showUserModal()
+    document.getElementById('add-role-btn').onclick = () => this.showRoleModal()
     document.getElementById('add-delivery-zone-btn').onclick = () => this.showDeliveryZoneModal()
     document.getElementById('settings-logo-area').onclick = () => document.getElementById('settings-logo-input').click()
     document.getElementById('settings-logo-input').onchange = (e) => {
@@ -257,7 +258,7 @@ let App = {
 
   async loadInitData() {
     try {
-      const [confRes, curRes, prodRes, pcatRes, custRes, pmRes, compRes, dzRes] = await Promise.all([
+      const [confRes, curRes, prodRes, pcatRes, custRes, pmRes, compRes, dzRes, rolesRes] = await Promise.all([
         this.api('GET', '/config'),
         this.api('GET', '/currencies'),
         this.api('GET', '/products?light=true&refresh=1'),
@@ -266,6 +267,7 @@ let App = {
         this.api('GET', '/payment-methods'),
         this.api('GET', '/company'),
         this.api('GET', '/delivery-zones'),
+        this.api('GET', '/roles'),
       ])
       this.config = confRes.data
       this.currencies = curRes.data || []
@@ -276,6 +278,7 @@ let App = {
       this.paymentMethods = pmRes.data || []
       this.company = compRes.data
       this.deliveryZones = dzRes.data || []
+      this.roles = rolesRes.data || []
 
       if (this.config && this.config.currency) {
         this.currency = this.config.currency
@@ -300,6 +303,7 @@ let App = {
     this.renderDashboard()
     this.renderSettings()
     this.renderUsersTable()
+    this.renderRolesTable()
     this.renderActivity()
   },
 
@@ -335,6 +339,7 @@ let App = {
     if (name === 'reports') this.generateReport()
     if (name === 'activity') this.renderActivity()
     if (name === 'users') this.renderUsersTable()
+    if (name === 'roles') this.renderRolesTable()
   },
 
   applyNavPermissions() {
@@ -2036,15 +2041,22 @@ let App = {
   showUserModal(id) {
     const user = id ? this.users.find(u => u.id === id) : null
     const title = user ? I18n.t('user.edit', 'Edit User') : I18n.t('user.add', 'Add User')
+    const rolesList = this.roles || []
+    let rolesOptions = ''
+    if (rolesList.length) {
+      rolesOptions = rolesList.map(r => `<option value="${r.key}" ${user && user.role === r.key ? 'selected' : ''}>${this._esc(r.name)}</option>`).join('')
+    } else {
+      rolesOptions = `<option value="admin" ${user && user.role === 'admin' ? 'selected' : ''}>Administrator</option>
+        <option value="manager" ${user && user.role === 'manager' ? 'selected' : ''}>Manager</option>
+        <option value="cashier" ${user && user.role === 'cashier' ? 'selected' : ''}>Cashier</option>`
+    }
     let html = `<h3>${title}</h3>
       <div class="form-group"><label data-i18n="login.username">Login</label><input id="u-login" value="${user ? this._esc(user.login || '') : ''}" ${user ? 'readonly' : ''}></div>
       <div class="form-group"><label data-i18n="user.full_name">Full Name</label><input id="u-name" value="${user ? this._esc(user.name || '') : ''}"></div>
       <div class="form-group"><label data-i18n="user.email">Email</label><input id="u-email" value="${user ? this._esc(user.email || '') : ''}"></div>
       <div class="form-group"><label data-i18n="user.password">Password</label><input type="password" id="u-password" value="" ${user ? `placeholder="Leave empty to keep current"` : ''}></div>
       <div class="form-group"><label data-i18n="user.role">Role</label><select id="u-role">
-        <option value="admin" ${user && user.role === 'admin' ? 'selected' : ''}>Administrator</option>
-        <option value="manager" ${user && user.role === 'manager' ? 'selected' : ''}>Manager</option>
-        <option value="cashier" ${user && user.role === 'cashier' ? 'selected' : ''}>Cashier</option>
+        ${rolesOptions}
       </select></div>
       <div class="form-group">
         <label><input type="checkbox" id="u-active" ${user && user.active !== false ? 'checked' : ''}> Active</label>
@@ -2083,6 +2095,105 @@ let App = {
     await this.api('DELETE', `/users/${id}`)
     this.users = this.users.filter(u => u.id !== id)
     this.renderUsersTable()
+  },
+
+  // === ROLES ===
+
+  async renderRolesTable() {
+    try {
+      const res = await this.api('GET', '/roles')
+      this.roles = res.data || []
+      const tbody = document.getElementById('roles-tbody')
+      if (!this.roles.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('role.no_roles', 'No roles')}</td></tr>`
+        return
+      }
+      tbody.innerHTML = this.roles.map(r => `<tr>
+        <td>${this._esc(r.name || '')}</td>
+        <td><code>${this._esc(r.key || '')}</code></td>
+        <td>${(r.screens_list || []).length}</td>
+        <td>${(r.actions_list || []).length}</td>
+        <td><button class="btn btn-sm btn-primary edit-role" data-id="${r.id}">${I18n.t('common.edit', 'Edit')}</button></td>
+        <td>${['admin','manager','cashier'].includes(r.key) ? '<span style="color:var(--text-light);font-size:12px">Built-in</span>' : `<button class="btn btn-sm btn-danger delete-role" data-id="${r.id}">${I18n.t('common.delete', 'Delete')}</button>`}</td>
+      </tr>`).join('')
+      tbody.querySelectorAll('.edit-role').forEach(btn => {
+        btn.onclick = () => this.showRoleModal(parseInt(btn.dataset.id))
+      })
+      tbody.querySelectorAll('.delete-role').forEach(btn => {
+        btn.onclick = () => this.deleteRole(parseInt(btn.dataset.id))
+      })
+    } catch(e) { console.error(e) }
+  },
+
+  async showRoleModal(id) {
+    const role = id ? this.roles.find(r => r.id === id) : null
+    const title = role ? I18n.t('role.edit', 'Edit Role') : I18n.t('role.add', 'Add Role')
+    let allScreens = [], allActions = []
+    try {
+      const res = await this.api('GET', '/roles/all-screens')
+      allScreens = res.data.screens || []
+      allActions = res.data.actions || []
+    } catch(e) {}
+    const currentScreens = role ? (role.screens_list || []) : []
+    const currentActions = role ? (role.actions_list || []) : []
+    const actionGroups = {
+      'Products': allActions.filter(a => a.startsWith('product.')),
+      'Customers': allActions.filter(a => a.startsWith('customer.')),
+      'Orders': allActions.filter(a => a.startsWith('order.')),
+      'Sessions': allActions.filter(a => a.startsWith('session.')),
+      'Users': allActions.filter(a => a.startsWith('user.')),
+      'Settings': allActions.filter(a => a.startsWith('settings.')),
+      'Reports': allActions.filter(a => a.startsWith('report.')),
+      'Other': allActions.filter(a => a === 'bulk.import'),
+    }
+    const builtIn = role && ['admin','manager','cashier'].includes(role.key)
+    let html = `<h3>${title}</h3>
+      <div class="form-group"><label>${I18n.t('role.name', 'Name')}</label><input id="r-name" value="${role ? this._esc(role.name || '') : ''}"></div>
+      <div class="form-group"><label>${I18n.t('role.key', 'Key')}</label><input id="r-key" value="${role ? this._esc(role.key || '') : ''}" ${role ? 'readonly' : ''} placeholder="e.g. stock_manager"></div>
+      <div class="form-group"><label style="font-weight:700">${I18n.t('role.screens_access', 'Screens')}</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+        ${allScreens.map(s => `<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" class="r-screen" value="${s}" ${currentScreens.includes(s) ? 'checked' : ''}> ${s}</label>`).join('')}
+        </div>
+      </div>
+      <div class="form-group"><label style="font-weight:700">${I18n.t('role.actions_access', 'Actions')}</label>
+        ${Object.entries(actionGroups).map(([group, acts]) => acts.length ? `
+          <div style="margin-top:8px"><strong style="font-size:12px;color:var(--text-light)">${group}</strong>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">
+          ${acts.map(a => `<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" class="r-action" value="${a}" ${currentActions.includes(a) ? 'checked' : ''}> ${a}</label>`).join('')}
+          </div></div>` : '').join('')}
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="r-save">${I18n.t('common.save', 'Save')}</button>
+        <button class="btn btn-secondary" id="r-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`
+    this.showModal(html)
+    document.getElementById('r-save').onclick = async () => {
+      const data = {
+        name: document.getElementById('r-name').value.trim(),
+        key: document.getElementById('r-key').value.trim(),
+        screens: [...document.querySelectorAll('.r-screen:checked')].map(cb => cb.value),
+        actions: [...document.querySelectorAll('.r-action:checked')].map(cb => cb.value),
+      }
+      if (!data.name || !data.key) { alert(I18n.t('role.name_key_required', 'Name and key are required')); return }
+      try {
+        if (role) {
+          await this.api('PUT', `/roles/${role.id}`, data)
+        } else {
+          await this.api('POST', '/roles', data)
+        }
+        this.closeModal()
+        this.renderRolesTable()
+      } catch(e) { alert(I18n.t('common.error', 'Error') + ': ' + e.message) }
+    }
+    document.getElementById('r-cancel').onclick = () => this.closeModal()
+  },
+
+  async deleteRole(id) {
+    if (!confirm(I18n.t('common.confirm', 'Confirm') + '?')) return
+    try {
+      await this.api('DELETE', `/roles/${id}`)
+      this.renderRolesTable()
+    } catch(e) { alert(e.message || 'Failed') }
   },
 
   // === CATEGORIES ===

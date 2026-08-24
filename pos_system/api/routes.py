@@ -246,6 +246,107 @@ def get_my_permissions():
     })
 
 
+# === ROLES ===
+
+@api_bp.route('/roles', methods=['GET'])
+@login_required
+def get_roles():
+    from ..models.pos_role import PosRole
+    roles = PosRole().search([])
+    result = []
+    for r in roles:
+        d = model_to_dict(r)
+        try:
+            d['screens_list'] = json.loads(r._data.get('screens', '[]') or '[]')
+        except (json.JSONDecodeError, TypeError):
+            d['screens_list'] = []
+        try:
+            d['actions_list'] = json.loads(r._data.get('actions', '[]') or '[]')
+        except (json.JSONDecodeError, TypeError):
+            d['actions_list'] = []
+        result.append(d)
+    return success_response(result)
+
+
+@api_bp.route('/roles', methods=['POST'])
+@login_required
+@permission_required('settings.write')
+def create_role():
+    from ..models.pos_role import PosRole
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    key = (data.get('key') or '').strip().lower().replace(' ', '_')
+    if not name or not key:
+        return error_response('Name and key are required', 400)
+    existing = PosRole().search([('key', '=', key)])
+    if existing:
+        return error_response('A role with this key already exists', 400)
+    screens = data.get('screens', [])
+    actions = data.get('actions', [])
+    role = PosRole().create({
+        'name': name,
+        'key': key,
+        'screens': json.dumps(screens),
+        'actions': json.dumps(actions),
+    })
+    from ..permissions import reload_permissions
+    reload_permissions()
+    return success_response(model_to_dict(role), 'Role created')
+
+
+@api_bp.route('/roles/<int:role_id>', methods=['PUT'])
+@login_required
+@permission_required('settings.write')
+def update_role(role_id):
+    from ..models.pos_role import PosRole
+    roles = PosRole().browse([role_id])
+    if not roles:
+        return error_response('Role not found', 404)
+    data = request.get_json() or {}
+    role = roles[0]
+    vals = {}
+    if 'name' in data:
+        vals['name'] = data['name']
+    if 'screens' in data:
+        vals['screens'] = json.dumps(data['screens'])
+    if 'actions' in data:
+        vals['actions'] = json.dumps(data['actions'])
+    if vals:
+        role.write(vals)
+    from ..permissions import reload_permissions
+    reload_permissions()
+    return success_response(model_to_dict(role), 'Role updated')
+
+
+@api_bp.route('/roles/<int:role_id>', methods=['DELETE'])
+@login_required
+@permission_required('settings.write')
+def delete_role(role_id):
+    from ..models.pos_role import PosRole
+    from ..models.res_users import ResUsers
+    roles = PosRole().browse([role_id])
+    if not roles:
+        return error_response('Role not found', 404)
+    role = roles[0]
+    key = role._data.get('key', '')
+    if key in ('admin', 'manager', 'cashier'):
+        return error_response('Cannot delete built-in role', 400)
+    users_with_role = ResUsers().search([('role', '=', key)])
+    if users_with_role:
+        return error_response('Cannot delete role: %d user(s) still assigned' % len(users_with_role), 400)
+    role.unlink()
+    from ..permissions import reload_permissions
+    reload_permissions()
+    return success_response(message='Role deleted')
+
+
+@api_bp.route('/roles/all-screens', methods=['GET'])
+@login_required
+def get_all_screens_actions():
+    from ..permissions import ALL_SCREENS, ALL_ACTIONS
+    return success_response({'screens': ALL_SCREENS, 'actions': ALL_ACTIONS})
+
+
 # === LANGUAGE ===
 
 @api_bp.route('/languages', methods=['GET'])

@@ -997,7 +997,7 @@ def validate_payment(order_id):
     total_paid = sum(p.amount for p in PosPayment().search([('order_id', '=', order.id)]))
     change = max(0, total_paid - order.amount_total)
     new_state = 'paid' if total_paid >= order.amount_total else 'pending'
-    order.write({'amount_paid': total_paid, 'amount_change': change, 'state': new_state})
+    order.write({'amount_paid': total_paid, 'amount_change': change, 'state': new_state, 'amount_due': max(0, order.amount_total - total_paid)})
     log_activity('validate_payment', 'Order: %s' % order.name, model='pos.order',
                  message='Payment received: %s GNF' % '{:,.0f}'.format(amount))
     return success_response(model_to_dict(order), 'Payment validated')

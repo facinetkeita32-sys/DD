@@ -1,4 +1,4 @@
-console.log('POS App v2.40')
+console.log('POS App v2.41')
 let App = {
   user: null,
   permissions: null,
@@ -18,7 +18,7 @@ let App = {
   company: null,
 
   async init() {
-    document.getElementById('app-version').textContent = 'v2.40'
+    document.getElementById('app-version').textContent = 'v2.41'
     window.addEventListener('error', (e) => {
       const vb = document.getElementById('app-version')
       if (vb) vb.textContent = 'ERR: ' + String(e.message || '').slice(0, 40)
@@ -1645,14 +1645,14 @@ let App = {
             return `<tr><td>${o.name || o.id}</td><td style="max-width:250px;white-space:normal">${items}</td><td>${this.currencyFormat(o.amount_total)}</td><td>${(o.date_order || '').substring(0, 10)}</td></tr>`
           }).join('')}
         </tbody></table></div>
-        ${(r.top_products && r.top_products.length) ? `
+        ${(r.top_products && r.top_products.length && this.user && this.user.role === 'admin') ? `
         <div class="report-block">
           <h3>${I18n.t('report.top_products', 'Top 10 Best-Selling Products')}</h3>
           <table><thead><tr><th>#</th><th>${I18n.t('product.name', 'Name')}</th><th>${I18n.t('pos.qty', 'Qty')}</th><th>${I18n.t('report.amount', 'Amount')}</th></tr></thead><tbody>
           ${r.top_products.map((p, i) => `<tr><td>${i + 1}</td><td>${this._esc(p.name || 'Product')}</td><td>${p.qty}</td><td>${this.currencyFormat(p.revenue || 0)}</td></tr>`).join('')}
           </tbody></table>
         </div>` : ''}
-        ${(r.products && r.products.length) ? `
+        ${(r.products && r.products.length && this.user && this.user.role === 'admin') ? `
         <div class="report-block">
           <h3>${I18n.t('report.products_sold', 'Products Sold')}</h3>
           <div style="max-height:400px;overflow-y:auto">

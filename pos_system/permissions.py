@@ -1,6 +1,6 @@
 PERMISSIONS = {
     'admin': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity', 'inventory'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'settings', 'users', 'activity', 'inventory', 'purchases'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write', 'customer.delete',
                     'order.create', 'order.write', 'order.cancel',
@@ -9,17 +9,19 @@ PERMISSIONS = {
                     'settings.read', 'settings.write',
                     'report.read',
                     'bulk.import',
-                    'inventory.create', 'inventory.write', 'inventory.delete', 'inventory.import', 'inventory.export'],
+                    'inventory.create', 'inventory.write', 'inventory.delete', 'inventory.import', 'inventory.export',
+                    'purchase.create', 'purchase.write', 'purchase.cancel', 'purchase.view_costs'],
     },
     'manager': {
-        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'inventory'],
+        'screens': ['pos', 'products', 'orders', 'customers', 'sessions', 'reports', 'dashboard', 'inventory', 'purchases'],
         'actions': ['product.create', 'product.write', 'product.delete',
                     'customer.create', 'customer.write',
                     'order.create', 'order.write', 'order.cancel',
                     'session.open', 'session.close',
                     'report.read',
                     'bulk.import',
-                    'inventory.export'],
+                    'inventory.export',
+                    'purchase.create', 'purchase.write', 'purchase.cancel', 'purchase.view_costs'],
     },
     'cashier': {
         'screens': ['pos', 'orders', 'customers', 'sessions', 'dashboard'],

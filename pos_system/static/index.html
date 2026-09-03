@@ -51,6 +51,7 @@
         <a class="nav-link" data-screen="orders" data-i18n="nav.orders">Orders</a>
         <a class="nav-link" data-screen="customers" data-i18n="nav.customers">Customers</a>
         <a class="nav-link" data-screen="inventory" data-i18n="nav.inventory">Inventory</a>
+        <a class="nav-link" data-screen="purchases" data-i18n="nav.purchases">Purchases</a>
         <a class="nav-link" data-screen="sessions" data-i18n="nav.sessions">Sessions</a>
         <a class="nav-link" data-screen="reports" data-i18n="nav.reports">Reports</a>
         <a class="nav-link" data-screen="dashboard" data-i18n="nav.dashboard">Dashboard</a>
@@ -336,6 +337,158 @@
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div id="screen-purchases" class="content-screen">
+      <div class="screen-header"><h2 data-i18n="purchase.title">Purchases</h2></div>
+      <div class="ptab-bar" style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px;flex-wrap:wrap">
+        <button class="ptab-btn active" data-ptab="dashboard" data-i18n="purchase.tab_dashboard">Dashboard</button>
+        <button class="ptab-btn" data-ptab="new" data-i18n="purchase.tab_new">New Purchase</button>
+        <button class="ptab-btn" data-ptab="pending" data-i18n="purchase.tab_pending">Pending Reception</button>
+        <button class="ptab-btn" data-ptab="received" data-i18n="purchase.tab_received">Received</button>
+        <button class="ptab-btn" data-ptab="history" data-i18n="purchase.tab_history">History</button>
+        <button class="ptab-btn" data-ptab="suppliers" data-i18n="purchase.tab_suppliers">Suppliers</button>
+      </div>
+
+      <div id="ptab-dashboard" class="ptab-view active">
+        <div class="dashboard-cards" id="purchases-dashboard-cards"></div>
+        <div id="purchases-dashboard-content"></div>
+      </div>
+
+      <div id="ptab-new" class="ptab-view" style="display:none">
+        <div class="settings-form" style="max-width:100%">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label data-i18n="purchase.supplier">Supplier</label>
+              <select id="po-supplier"></select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="purchase.currency">Currency</label>
+              <select id="po-currency"></select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="purchase.purchase_date">Purchase Date</label>
+              <input type="date" id="po-date">
+            </div>
+            <div class="form-group">
+              <label data-i18n="purchase.expected_date">Expected Delivery</label>
+              <input type="date" id="po-expected">
+            </div>
+            <div class="form-group">
+              <label data-i18n="purchase.invoice_reference">Invoice Reference</label>
+              <input type="text" id="po-invoice" placeholder="">
+            </div>
+            <div class="form-group">
+              <label data-i18n="purchase.notes">Notes</label>
+              <input type="text" id="po-notes" placeholder="">
+            </div>
+          </div>
+
+          <div style="margin-top:20px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h3 data-i18n="purchase.products">Products</h3>
+              <div class="btn-group">
+                <button id="po-bulk-upload-btn" class="btn btn-sm btn-secondary" data-i18n="purchase.bulk_upload">Bulk Upload</button>
+                <button id="po-add-product-btn" class="btn btn-sm btn-primary" data-i18n="purchase.add_product">Add Product</button>
+              </div>
+            </div>
+            <div class="po-grid-header">
+              <span data-i18n="purchase.col_product">Product name</span>
+              <span data-i18n="purchase.col_barcode">Barcode</span>
+              <span data-i18n="purchase.col_cost">Cost</span>
+              <span data-i18n="purchase.col_qty">Quantity</span>
+              <span></span>
+            </div>
+            <div id="po-lines"></div>
+            <div id="po-summary" style="margin-top:16px;padding:16px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+                <div><span data-i18n="purchase.summary_products">Number of products:</span> <strong id="po-summary-count">0</strong></div>
+                <div><span data-i18n="purchase.summary_units">Units ordered:</span> <strong id="po-summary-units">0</strong></div>
+                <div><span data-i18n="purchase.subtotal">Subtotal:</span> <strong id="po-summary-subtotal">0 GNF</strong></div>
+                <div style="display:flex;gap:6px;align-items:center"><span data-i18n="purchase.additional_cost">Additional costs:</span> <input type="number" id="po-additional-cost" value="0" min="0" step="100" style="width:120px;padding:4px 8px;border:1px solid var(--border);border-radius:4px"></div>
+                <div style="display:flex;gap:6px;align-items:center"><span data-i18n="purchase.discount">Discount:</span> <input type="number" id="po-discount" value="0" min="0" step="100" style="width:120px;padding:4px 8px;border:1px solid var(--border);border-radius:4px"></div>
+                <div><span data-i18n="purchase.grand_total">Grand total:</span> <strong id="po-summary-grand">0 GNF</strong></div>
+              </div>
+              <div class="btn-group" style="margin-top:16px;justify-content:flex-end">
+                <button id="po-cancel-btn" class="btn btn-secondary" data-i18n="common.cancel">Cancel</button>
+                <button id="po-save-draft-btn" class="btn btn-warning" data-i18n="purchase.save_draft">Save Draft</button>
+                <button id="po-create-btn" class="btn btn-primary" data-i18n="purchase.create_purchase">Create Purchase</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="ptab-pending" class="ptab-view" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 data-i18n="purchase.pending_title">Pending Reception</h3>
+          <button id="po-export-pending-btn" class="btn btn-sm btn-success" data-i18n="purchase.export_csv">Export CSV</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th data-i18n="purchase.col_number">Number</th>
+              <th data-i18n="purchase.supplier">Supplier</th>
+              <th data-i18n="purchase.products">Products</th>
+              <th data-i18n="purchase.grand_total">Total</th>
+              <th data-i18n="purchase.status">Status</th>
+              <th data-i18n="common.actions">Actions</th>
+            </tr></thead>
+            <tbody id="po-pending-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="ptab-received" class="ptab-view" style="display:none">
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th data-i18n="purchase.col_number">Number</th>
+              <th data-i18n="purchase.supplier">Supplier</th>
+              <th data-i18n="purchase.products">Products</th>
+              <th data-i18n="purchase.grand_total">Total</th>
+              <th data-i18n="purchase.status">Status</th>
+              <th data-i18n="common.actions">Actions</th>
+            </tr></thead>
+            <tbody id="po-received-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="ptab-history" class="ptab-view" style="display:none">
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th data-i18n="purchase.col_number">Number</th>
+              <th data-i18n="purchase.supplier">Supplier</th>
+              <th data-i18n="purchase.products">Products</th>
+              <th data-i18n="purchase.grand_total">Total</th>
+              <th data-i18n="purchase.status">Status</th>
+              <th data-i18n="common.actions">Actions</th>
+            </tr></thead>
+            <tbody id="po-history-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="ptab-suppliers" class="ptab-view" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 data-i18n="purchase.suppliers">Suppliers</h3>
+          <button id="po-add-supplier-btn" class="btn btn-sm btn-primary" data-i18n="purchase.add_supplier">Add Supplier</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th data-i18n="customer.name">Name</th>
+              <th data-i18n="customer.phone">Phone</th>
+              <th data-i18n="customer.email">Email</th>
+              <th data-i18n="common.actions">Actions</th>
+            </tr></thead>
+            <tbody id="po-suppliers-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
     <div id="screen-settings" class="content-screen">

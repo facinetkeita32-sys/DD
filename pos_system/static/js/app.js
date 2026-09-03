@@ -18,6 +18,11 @@ let App = {
   _cachedBestSellers: null,
   session: null,
   company: null,
+  purchaseLines: [],
+  editingPurchaseId: null,
+  suppliers: [],
+  pendingPurchases: [],
+  purchasesCache: [],
 
   async init() {
       await I18n.init('en')
@@ -148,6 +153,29 @@ let App = {
     document.getElementById('scanner-overlay').onclick = e => {
       if (e.target === document.getElementById('scanner-overlay')) this.stopScanner()
     }
+
+    // === PURCHASES Wiring ===
+    document.querySelectorAll('.ptab-btn').forEach(btn => {
+      btn.onclick = () => this.showPurchTab(btn.dataset.ptab)
+    })
+    const poAddBtn = document.getElementById('po-add-product-btn')
+    if (poAddBtn) poAddBtn.onclick = () => this.addPoLine()
+    const poBulkBtn = document.getElementById('po-bulk-upload-btn')
+    if (poBulkBtn) poBulkBtn.onclick = () => this.showPoBulkModal()
+    const poCancel = document.getElementById('po-cancel-btn')
+    if (poCancel) poCancel.onclick = () => { this.editingPurchaseId = null; this.purchaseLines = []; this.showPurchTab('pending') }
+    const poSaveDraft = document.getElementById('po-save-draft-btn')
+    if (poSaveDraft) poSaveDraft.onclick = () => this.savePurchase('draft')
+    const poCreate = document.getElementById('po-create-btn')
+    if (poCreate) poCreate.onclick = () => this.savePurchase('ordered')
+    const poAddCost = document.getElementById('po-additional-cost')
+    if (poAddCost) poAddCost.oninput = () => this.updatePoSummary()
+    const poDiscount = document.getElementById('po-discount')
+    if (poDiscount) poDiscount.oninput = () => this.updatePoSummary()
+    const poExportPending = document.getElementById('po-export-pending-btn')
+    if (poExportPending) poExportPending.onclick = () => this.exportPendingCSV()
+    const poAddSupplier = document.getElementById('po-add-supplier-btn')
+    if (poAddSupplier) poAddSupplier.onclick = () => this.showSupplierModal()
   },
 
   async api(method, path, body) {
@@ -288,6 +316,7 @@ let App = {
     if (isVisible('orders')) this.renderOrdersTable()
     if (isVisible('customers')) this.renderCustomersTable()
     if (isVisible('inventory')) this.renderInventory()
+    if (isVisible('purchases')) this.showPurchTab('dashboard')
     if (isVisible('sessions')) this.renderSessionsTable()
     if (isVisible('dashboard')) this.renderDashboard()
     if (isVisible('activity')) this.renderActivity()
@@ -324,6 +353,7 @@ let App = {
     if (name === 'orders') this.renderOrdersTable()
     if (name === 'customers') this.renderCustomersTable()
     if (name === 'inventory') this.renderInventory()
+    if (name === 'purchases') { this.showPurchTab('dashboard') }
     if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
     if (name === 'activity') this.renderActivity()
@@ -347,8 +377,21 @@ let App = {
     const symbol = c.symbol || 'FG'
     const decimals = c.decimal_places != null ? c.decimal_places : 0
     const pos = c.position || 'before'
-    const formatted = Number(amount || 0).toFixed(decimals)
+    const num = Number(amount || 0)
+    const formatted = num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     return pos === 'before' ? `${symbol} ${formatted}` : `${formatted} ${symbol}`
+  },
+
+  formatCurrency(amount) {
+    return Number(amount || 0).toLocaleString('en-US') + ' GNF'
+  },
+
+  purchaseCurrencyFormat(amount) {
+    return this.formatCurrency(amount)
+  },
+
+  formatPurchaseCurrency(amount) {
+    return this.formatCurrency(amount)
   },
 
   // === POS PRODUCTS ===
@@ -2640,6 +2683,560 @@ let App = {
     await this.api('DELETE', `/product-categories/${id}`)
     this.productCategories = this.productCategories.filter(c => c.id !== id)
     this.renderAll()
+  },
+
+  // === PURCHASES ===
+
+  async showPurchTab(tab) {
+    document.querySelectorAll('.ptab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.ptab === tab)
+    })
+    document.querySelectorAll('.ptab-view').forEach(v => {
+      const isActive = v.id === 'ptab-' + tab
+      v.classList.toggle('active', isActive)
+      v.style.display = isActive ? 'block' : 'none'
+    })
+    if (tab === 'dashboard') await this.renderPurchasesDashboard()
+    else if (tab === 'new') await this.openNewPurchase()
+    else if (tab === 'pending') await this.renderPendingPurchases()
+    else if (tab === 'received') await this.renderReceivedPurchases()
+    else if (tab === 'history') await this.renderPurchaseHistory()
+    else if (tab === 'suppliers') await this.renderSuppliers()
+  },
+
+  async openNewPurchase(keepData) {
+    if (!keepData) {
+      this.editingPurchaseId = null
+      this.purchaseLines = []
+      document.getElementById('po-supplier').value = ''
+      document.getElementById('po-currency').value = ''
+      document.getElementById('po-date').value = new Date().toISOString().slice(0,10)
+      document.getElementById('po-expected').value = ''
+      document.getElementById('po-invoice').value = ''
+      document.getElementById('po-notes').value = ''
+      document.getElementById('po-additional-cost').value = 0
+      document.getElementById('po-discount').value = 0
+    }
+    // Populate suppliers
+    try {
+      const res = await this.api('GET', '/suppliers')
+      this.suppliers = res.data || []
+    } catch(e) { this.suppliers = this.suppliers || [] }
+    const supSel = document.getElementById('po-supplier')
+    if (supSel) {
+      const curVal = supSel.value
+      supSel.innerHTML = '<option value="">-- Select Supplier --</option>' + (this.suppliers || []).map(s => `<option value="${s.id}">${this._esc(s.name)}</option>`).join('')
+      if (curVal) supSel.value = curVal
+    }
+    // Populate currencies
+    const curSel = document.getElementById('po-currency')
+    if (curSel) {
+      const curVal = curSel.value
+      const currencies = this.currencies || []
+      curSel.innerHTML = currencies.map(c => `<option value="${c.id}" ${c.iso_code === 'GNF' ? 'selected' : ''}>${c.name} (${c.symbol})</option>`).join('')
+      if (curVal) curSel.value = curVal
+      else {
+        const gnf = currencies.find(c => c.iso_code === 'GNF')
+        if (gnf) curSel.value = gnf.id
+      }
+    }
+    if (!keepData && this.purchaseLines.length === 0) {
+      this.purchaseLines.push({ product_id: '', product_name: '', sku: '', barcode: '', quantity_ordered: 1, unit_cost: 0, selling_price: 0, isNew: false })
+    }
+    this.renderPoLines()
+    this.updatePoSummary()
+  },
+
+  addPoLine() {
+    this.purchaseLines.push({ product_id: '', product_name: '', sku: '', barcode: '', quantity_ordered: 1, unit_cost: 0, selling_price: 0, isNew: false })
+    this.renderPoLines()
+    this.updatePoSummary()
+  },
+
+  renderPoLines() {
+    const container = document.getElementById('po-lines')
+    if (!container) return
+    if (!this.purchaseLines.length) {
+      container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-light)">No products</div>'
+      return
+    }
+    container.innerHTML = this.purchaseLines.map((line, idx) => {
+      const productOpts = '<option value="">Select product...</option>' + (this.products || []).map(p => `<option value="${p.id}" ${String(line.product_id) === String(p.id) ? 'selected' : ''}>${this._esc(p.name)}</option>`).join('')
+      const nameField = line.isNew
+        ? `<input type="text" placeholder="New product name" value="${this._esc(line.product_name || '')}" data-idx="${idx}" class="po-new-name" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px">`
+        : `<div style="display:flex;gap:4px"><select data-idx="${idx}" class="po-product-select" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px">${productOpts}</select><button class="btn btn-sm btn-secondary po-new-btn" data-idx="${idx}">+ new</button></div>`
+      return `<div class="po-line-row">
+        <div>${nameField}</div>
+        <div><input type="text" placeholder="Barcode" value="${this._esc(line.barcode || '')}" data-idx="${idx}" class="po-barcode" style="width:100%"></div>
+        <div><input type="number" placeholder="Cost" value="${line.unit_cost || 0}" min="0" step="100" data-idx="${idx}" class="po-cost"></div>
+        <div><input type="number" placeholder="Qty" value="${line.quantity_ordered || 1}" min="1" step="1" data-idx="${idx}" class="po-qty"></div>
+        <div><button class="btn btn-sm btn-danger po-remove" data-idx="${idx}">✕</button></div>
+      </div>`
+    }).join('')
+    // Wire events
+    container.querySelectorAll('.po-product-select').forEach(sel => {
+      sel.onchange = () => {
+        const idx = parseInt(sel.dataset.idx)
+        const pid = sel.value
+        const line = this.purchaseLines[idx]
+        line.product_id = pid ? parseInt(pid) : ''
+        line.isNew = false
+        if (pid) {
+          const prod = (this.products || []).find(p => String(p.id) === String(pid))
+          if (prod) {
+            line.product_name = prod.name || ''
+            line.barcode = prod.barcode || line.barcode
+            line.sku = prod.default_code || ''
+            if (!line.unit_cost) line.unit_cost = prod.cost_price || prod.list_price || 0
+            if (!line.selling_price) line.selling_price = prod.list_price || 0
+          }
+        } else {
+          line.product_name = ''
+        }
+        this.renderPoLines()
+        this.updatePoSummary()
+      }
+    })
+    container.querySelectorAll('.po-new-btn').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx)
+        this.purchaseLines[idx].isNew = true
+        this.purchaseLines[idx].product_id = ''
+        this.renderPoLines()
+      }
+    })
+    container.querySelectorAll('.po-new-name').forEach(inp => {
+      inp.oninput = () => {
+        const idx = parseInt(inp.dataset.idx)
+        this.purchaseLines[idx].product_name = inp.value
+        this.updatePoSummary()
+      }
+    })
+    container.querySelectorAll('.po-barcode').forEach(inp => {
+      inp.oninput = () => {
+        const idx = parseInt(inp.dataset.idx)
+        this.purchaseLines[idx].barcode = inp.value
+        this.poLineBarcode(idx, inp.value)
+      }
+    })
+    container.querySelectorAll('.po-cost').forEach(inp => {
+      inp.oninput = () => {
+        const idx = parseInt(inp.dataset.idx)
+        this.purchaseLines[idx].unit_cost = parseFloat(inp.value) || 0
+        this.updatePoSummary()
+      }
+    })
+    container.querySelectorAll('.po-qty').forEach(inp => {
+      inp.oninput = () => {
+        const idx = parseInt(inp.dataset.idx)
+        this.purchaseLines[idx].quantity_ordered = parseFloat(inp.value) || 0
+        this.updatePoSummary()
+      }
+    })
+    container.querySelectorAll('.po-remove').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx)
+        this.purchaseLines.splice(idx, 1)
+        if (!this.purchaseLines.length) this.purchaseLines.push({ product_id: '', product_name: '', sku: '', barcode: '', quantity_ordered: 1, unit_cost: 0, selling_price: 0, isNew: false })
+        this.renderPoLines()
+        this.updatePoSummary()
+      }
+    })
+  },
+
+  poLineBarcode(idx, barcode) {
+    if (!barcode) return
+    const prod = (this.products || []).find(p => p.barcode && p.barcode.trim() === barcode.trim())
+    if (prod) {
+      const line = this.purchaseLines[idx]
+      line.product_id = prod.id
+      line.product_name = prod.name
+      line.barcode = prod.barcode
+      line.sku = prod.default_code || ''
+      if (!line.unit_cost) line.unit_cost = prod.cost_price || prod.list_price || 0
+      this.renderPoLines()
+      this.updatePoSummary()
+    }
+  },
+
+  updatePoSummary() {
+    const count = this.purchaseLines.length
+    const units = this.purchaseLines.reduce((s, l) => s + (parseFloat(l.quantity_ordered) || 0), 0)
+    const subtotal = this.purchaseLines.reduce((s, l) => s + (parseFloat(l.quantity_ordered) || 0) * (parseFloat(l.unit_cost) || 0), 0)
+    const additional = parseFloat(document.getElementById('po-additional-cost')?.value || 0) || 0
+    const discount = parseFloat(document.getElementById('po-discount')?.value || 0) || 0
+    const grand = subtotal + additional - discount
+    const countEl = document.getElementById('po-summary-count')
+    const unitsEl = document.getElementById('po-summary-units')
+    const subEl = document.getElementById('po-summary-subtotal')
+    const grandEl = document.getElementById('po-summary-grand')
+    if (countEl) countEl.textContent = count
+    if (unitsEl) unitsEl.textContent = units
+    if (subEl) subEl.textContent = this.formatCurrency(subtotal)
+    if (grandEl) grandEl.textContent = this.formatCurrency(grand)
+  },
+
+  async savePurchase(status) {
+    // Validate every line has product or new name and quantity >0
+    for (let i = 0; i < this.purchaseLines.length; i++) {
+      const line = this.purchaseLines[i]
+      const hasProduct = line.product_id || (line.product_name && line.product_name.trim() !== '')
+      const qty = parseFloat(line.quantity_ordered) || 0
+      if (!hasProduct || qty <= 0) {
+        alert('Line ' + (i+1) + ': every line has a product or a new name and a quantity greater than zero')
+        return
+      }
+    }
+    const data = {
+      supplier_id: document.getElementById('po-supplier')?.value ? parseInt(document.getElementById('po-supplier').value) : false,
+      purchase_date: document.getElementById('po-date')?.value || new Date().toISOString().slice(0,10),
+      expected_date: document.getElementById('po-expected')?.value || false,
+      invoice_reference: document.getElementById('po-invoice')?.value || '',
+      currency_id: document.getElementById('po-currency')?.value ? parseInt(document.getElementById('po-currency').value) : false,
+      notes: document.getElementById('po-notes')?.value || '',
+      additional_cost: parseFloat(document.getElementById('po-additional-cost')?.value || 0) || 0,
+      discount: parseFloat(document.getElementById('po-discount')?.value || 0) || 0,
+      status: status || 'draft',
+    }
+    const items = this.purchaseLines.map(l => ({
+      product_id: l.product_id || false,
+      product_name: l.product_name || '',
+      sku: l.sku || '',
+      barcode: l.barcode || '',
+      quantity_ordered: parseFloat(l.quantity_ordered) || 0,
+      unit_cost: parseFloat(l.unit_cost) || 0,
+      selling_price: parseFloat(l.selling_price) || 0,
+    }))
+    try {
+      if (this.editingPurchaseId) {
+        await this.api('PUT', '/purchases/' + this.editingPurchaseId, { ...data, items })
+      } else {
+        await this.api('POST', '/purchases', { ...data, items })
+      }
+      this.editingPurchaseId = null
+      this.purchaseLines = []
+      // Clear form
+      document.getElementById('po-supplier').value = ''
+      document.getElementById('po-notes').value = ''
+      document.getElementById('po-invoice').value = ''
+      document.getElementById('po-additional-cost').value = 0
+      document.getElementById('po-discount').value = 0
+      await this.showPurchTab('pending')
+    } catch(e) {
+      alert('Error: ' + e.message)
+    }
+  },
+
+  async editPurchase(id) {
+    try {
+      const res = await this.api('GET', '/purchases/' + id)
+      const po = res.data
+      this.editingPurchaseId = id
+      // Open New Purchase tab without clearing it, and fill form
+      document.querySelectorAll('.ptab-btn').forEach(b => b.classList.toggle('active', b.dataset.ptab === 'new'))
+      document.querySelectorAll('.ptab-view').forEach(v => {
+        const isActive = v.id === 'ptab-new'
+        v.classList.toggle('active', isActive)
+        v.style.display = isActive ? 'block' : 'none'
+      })
+      // Fill fields
+      document.getElementById('po-supplier').value = po.supplier_id ? (po.supplier_id.id || po.supplier_id) : ''
+      document.getElementById('po-date').value = (po.purchase_date || '').slice(0,10)
+      document.getElementById('po-expected').value = (po.expected_date || '').slice(0,10)
+      document.getElementById('po-invoice').value = po.invoice_reference || ''
+      document.getElementById('po-currency').value = po.currency_id ? (po.currency_id.id || po.currency_id) : ''
+      document.getElementById('po-notes').value = po.notes || ''
+      document.getElementById('po-additional-cost').value = po.additional_cost || 0
+      document.getElementById('po-discount').value = po.discount || 0
+      this.purchaseLines = (po.items || []).map(it => ({
+        product_id: it.product_id || '',
+        product_name: it.product_name || '',
+        sku: it.sku || '',
+        barcode: it.barcode || '',
+        quantity_ordered: it.quantity_ordered || 1,
+        unit_cost: it.unit_cost || 0,
+        selling_price: it.selling_price || 0,
+        isNew: !it.product_id && !!it.product_name,
+      }))
+      if (!this.purchaseLines.length) this.purchaseLines.push({ product_id: '', product_name: '', sku: '', barcode: '', quantity_ordered: 1, unit_cost: 0, selling_price: 0, isNew: false })
+      this.renderPoLines()
+      this.updatePoSummary()
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async renderPendingPurchases() {
+    try {
+      const res = await this.api('GET', '/purchases/pending')
+      const list = res.data || []
+      const tbody = document.getElementById('po-pending-tbody')
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-light)">No pending purchases</td></tr>'
+        return
+      }
+      tbody.innerHTML = list.map(po => {
+        const summary = po.product_summary || (po.items || []).map(it => `${it.product_name || 'Product'} x${it.quantity_ordered}`).join(', ')
+        const count = po.items ? po.items.length : 0
+        return `<tr>
+          <td>${po.name || po.id}</td>
+          <td>${po.supplier_name || '-'}</td>
+          <td><div>${this._esc(summary)}</div><small style="color:var(--text-light)">${count} items</small></td>
+          <td>${this.formatCurrency(po.grand_total || 0)}</td>
+          <td><span class="po-badge po-badge-${po.status}">${po.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-primary" onclick="App.editPurchase(${po.id})">${I18n.t('common.edit','Edit')}</button>
+            <button class="btn btn-sm btn-success" onclick="App.receivePurchase(${po.id})">Receive</button>
+            <button class="btn btn-sm btn-danger" onclick="App.cancelPurchase(${po.id})">Cancel</button>
+          </td>
+        </tr>`
+      }).join('')
+    } catch(e) { console.error(e) }
+  },
+
+  async renderReceivedPurchases() {
+    try {
+      const res = await this.api('GET', '/purchases/pending')
+      const pending = res.data || []
+      const receivedList = pending.filter(p => p.status === 'partially_received' || p.status === 'received')
+      // Fallback: fetch all and filter
+      const allRes = await this.api('GET', '/purchases')
+      const all = allRes.data || []
+      const received = all.filter(p => p.status === 'received' || p.status === 'partially_received')
+      const list = received.length ? received : receivedList
+      const tbody = document.getElementById('po-received-tbody')
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-light)">No received purchases</td></tr>'
+        return
+      }
+      tbody.innerHTML = list.map(po => {
+        const summary = po.product_summary || (po.items || []).map(it => `${it.product_name || 'Product'} x${it.quantity_ordered}`).join(', ')
+        const count = po.items ? po.items.length : 0
+        return `<tr>
+          <td>${po.name || po.id}</td>
+          <td>${po.supplier_name || '-'}</td>
+          <td><div>${this._esc(summary)}</div><small style="color:var(--text-light)">${count} items</small></td>
+          <td>${this.formatCurrency(po.grand_total || 0)}</td>
+          <td><span class="po-badge po-badge-${po.status}">${po.status}</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="App.viewPurchaseReceipts(${po.id})">Receipts</button></td>
+        </tr>`
+      }).join('')
+    } catch(e) { console.error(e) }
+  },
+
+  async renderPurchaseHistory() {
+    try {
+      const res = await this.api('GET', '/purchases/history')
+      const list = res.data || []
+      const tbody = document.getElementById('po-history-tbody')
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-light)">No history</td></tr>'
+        return
+      }
+      tbody.innerHTML = list.map(po => {
+        const summary = po.product_summary || (po.items || []).map(it => `${it.product_name || 'Product'} x${it.quantity_ordered}`).join(', ')
+        const count = po.items ? po.items.length : 0
+        return `<tr>
+          <td>${po.name || po.id}</td>
+          <td>${po.supplier_name || '-'}</td>
+          <td><div>${this._esc(summary)}</div><small style="color:var(--text-light)">${count} items</small></td>
+          <td>${this.formatCurrency(po.grand_total || 0)}</td>
+          <td><span class="po-badge po-badge-${po.status}">${po.status}</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="App.viewPurchaseReceipts(${po.id})">View</button></td>
+        </tr>`
+      }).join('')
+    } catch(e) { console.error(e) }
+  },
+
+  async renderReceipts(purchaseId) {
+    try {
+      const res = await this.api('GET', '/purchases/' + purchaseId + '/receipts')
+      const receipts = res.data || []
+      if (!receipts.length) { alert('No receipts'); return }
+      let html = '<h3>Receipts</h3><div style="max-height:400px;overflow-y:auto">'
+      receipts.forEach(r => {
+        html += `<div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:8px"><strong>${r.name}</strong> - ${r.received_at || ''}<br>`
+        const items = r.items || []
+        items.forEach(it => {
+          html += `<div>${it.product_name || 'Product'} x${it.quantity_received} <small style="color:var(--text-light)">cost ${this.formatCurrency(it.unit_cost)}</small></div>`
+        })
+        html += '</div>'
+      })
+      html += '</div><div class="btn-group"><button class="btn btn-secondary" onclick="App.closeModal()">Close</button></div>'
+      this.showModal(html)
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async viewPurchaseReceipts(id) { return this.renderReceipts(id) },
+
+  async exportPendingCSV() {
+    try {
+      const res = await this.api('GET', '/purchases/pending')
+      const list = res.data || []
+      const rows = [['Purchase Number','Supplier','Product','Barcode','Quantity Ordered','Quantity Received','Remaining','Unit Cost','Status']]
+      list.forEach(po => {
+        (po.items || []).forEach(it => {
+          const remaining = (parseFloat(it.quantity_ordered) || 0) - (parseFloat(it.quantity_received) || 0)
+          if (remaining > 0) {
+            rows.push([po.name || po.id, po.supplier_name || '', it.product_name || '', it.barcode || '', it.quantity_ordered, it.quantity_received, remaining, it.unit_cost, po.status])
+          }
+        })
+      })
+      if (rows.length === 1) { alert('No pending products'); return }
+      const csv = rows.map(r => r.map(v => {
+        const s = String(v)
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+      }).join(',')).join('\n')
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pending_purchases_${new Date().toISOString().slice(0,10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  showPoBulkModal() {
+    const html = `<h3>${I18n.t('purchase.bulk_upload','Bulk Upload')}</h3>
+      <p style="font-size:13px;color:var(--text-light)">CSV columns: Product, Barcode, Cost, Quantity. Matches by barcode first, then by name.</p>
+      <div class="form-group"><input type="file" id="po-bulk-file" accept=".csv" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px"></div>
+      <div id="po-bulk-result" style="display:none;padding:12px;border-radius:6px;margin-top:8px"></div>
+      <div class="btn-group"><button class="btn btn-primary" id="po-bulk-import">Import</button><button class="btn btn-secondary" id="po-bulk-cancel">Cancel</button></div>`
+    this.showModal(html)
+    document.getElementById('po-bulk-cancel').onclick = () => this.closeModal()
+    document.getElementById('po-bulk-import').onclick = async () => {
+      const file = document.getElementById('po-bulk-file').files[0]
+      if (!file) { alert('Select file'); return }
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      if (!lines.length) { alert('Empty file'); return }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const idxProduct = headers.indexOf('product')
+      const idxBarcode = headers.indexOf('barcode')
+      const idxCost = headers.indexOf('cost')
+      const idxQty = headers.indexOf('quantity')
+      if (idxProduct === -1 || idxBarcode === -1 || idxCost === -1 || idxQty === -1) { alert('CSV must have Product, Barcode, Cost, Quantity headers'); return }
+      let added = 0
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+        const prodName = cols[idxProduct] || ''
+        const barcode = cols[idxBarcode] || ''
+        const cost = parseFloat(cols[idxCost]) || 0
+        const qty = parseFloat(cols[idxQty]) || 0
+        if (!prodName && !barcode) continue
+        let matched = null
+        if (barcode) matched = (this.products || []).find(p => p.barcode === barcode)
+        if (!matched && prodName) matched = (this.products || []).find(p => p.name.toLowerCase() === prodName.toLowerCase())
+        if (matched) {
+          this.purchaseLines.push({ product_id: matched.id, product_name: matched.name, sku: matched.default_code || '', barcode: matched.barcode || barcode, quantity_ordered: qty, unit_cost: cost, selling_price: matched.list_price || 0, isNew: false })
+        } else {
+          this.purchaseLines.push({ product_id: '', product_name: prodName, sku: '', barcode: barcode, quantity_ordered: qty, unit_cost: cost, selling_price: cost, isNew: true })
+        }
+        added++
+      }
+      // Remove initial empty line if present
+      if (this.purchaseLines.length > added) {
+        const emptyIdx = this.purchaseLines.findIndex(l => !l.product_id && !l.product_name)
+        if (emptyIdx !== -1) this.purchaseLines.splice(emptyIdx, 1)
+      }
+      this.closeModal()
+      this.renderPoLines()
+      this.updatePoSummary()
+      document.getElementById('po-bulk-result').style.display = 'block'
+    }
+  },
+
+  async renderPurchasesDashboard() {
+    try {
+      const res = await this.api('GET', '/purchases/dashboard')
+      const d = res.data || {}
+      const container = document.getElementById('purchases-dashboard-cards')
+      if (container) {
+        container.innerHTML = `
+          <div class="dash-card"><div class="dash-icon">📦</div><div class="dash-value">${d.pending || 0}</div><div class="dash-label">Pending</div></div>
+          <div class="dash-card"><div class="dash-icon">✅</div><div class="dash-value">${d.received || 0}</div><div class="dash-label">Received</div></div>
+          <div class="dash-card"><div class="dash-icon">💰</div><div class="dash-value">${this.formatCurrency(d.total_value || 0)}</div><div class="dash-label">Total Value</div></div>
+          <div class="dash-card"><div class="dash-icon">📋</div><div class="dash-value">${d.total || 0}</div><div class="dash-label">Total Orders</div></div>
+        `
+      }
+      const content = document.getElementById('purchases-dashboard-content')
+      if (content) {
+        const pendingRes = await this.api('GET', '/purchases/pending')
+        const pend = pendingRes.data || []
+        if (!pend.length) content.innerHTML = '<p style="color:var(--text-light);padding:16px">No pending purchases</p>'
+        else {
+          content.innerHTML = '<div class="table-container"><table><thead><tr><th>Number</th><th>Supplier</th><th>Products</th><th>Status</th></tr></thead><tbody>' + pend.slice(0,5).map(po => {
+            const summary = po.product_summary || (po.items || []).map(it => `${it.product_name} x${it.quantity_ordered}`).join(', ')
+            return `<tr><td>${po.name}</td><td>${po.supplier_name || '-'}</td><td><div>${this._esc(summary)}</div><small>${po.items ? po.items.length : 0} items</small></td><td><span class="po-badge po-badge-${po.status}">${po.status}</span></td></tr>`
+          }).join('') + '</tbody></table></div>'
+        }
+      }
+    } catch(e) { console.error(e) }
+  },
+
+  async renderSuppliers() {
+    try {
+      const res = await this.api('GET', '/suppliers')
+      const list = res.data || []
+      const tbody = document.getElementById('po-suppliers-tbody')
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-light)">No suppliers</td></tr>'
+        return
+      }
+      tbody.innerHTML = list.map(s => `<tr><td>${this._esc(s.name)}</td><td>${this._esc(s.phone || '-')}</td><td>${this._esc(s.email || '-')}</td><td><button class="btn btn-sm btn-danger" onclick="App.deleteSupplier(${s.id})">${I18n.t('common.delete','Delete')}</button></td></tr>`).join('')
+    } catch(e) { console.error(e) }
+  },
+
+  showSupplierModal() {
+    const html = `<h3>${I18n.t('purchase.add_supplier','Add Supplier')}</h3>
+      <div class="form-group"><label>Name</label><input id="sup-name"></div>
+      <div class="form-group"><label>Phone</label><input id="sup-phone"></div>
+      <div class="form-group"><label>Email</label><input id="sup-email"></div>
+      <div class="btn-group"><button class="btn btn-primary" id="sup-save">Save</button><button class="btn btn-secondary" id="sup-cancel">Cancel</button></div>`
+    this.showModal(html)
+    document.getElementById('sup-save').onclick = async () => {
+      const data = { name: document.getElementById('sup-name').value, phone: document.getElementById('sup-phone').value, email: document.getElementById('sup-email').value, supplier: true, customer: false }
+      if (!data.name) { alert('Name required'); return }
+      try {
+        await this.api('POST', '/customers', data)
+        this.closeModal()
+        this.renderSuppliers()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
+    document.getElementById('sup-cancel').onclick = () => this.closeModal()
+  },
+
+  async deleteSupplier(id) {
+    if (!confirm(I18n.t('common.confirm_delete','Delete this item?'))) return
+    try {
+      await this.api('DELETE', '/customers/' + id)
+      this.renderSuppliers()
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async receivePurchase(id) {
+    if (!confirm('Receive this purchase? Stock will be updated.')) return
+    try {
+      await this.api('POST', '/purchases/' + id + '/receive', {})
+      alert('Reception completed')
+      this.renderPendingPurchases()
+      this.renderPurchasesDashboard()
+      // Refresh products to show new stock
+      const prodRes = await this.api('GET', '/products')
+      this.products = prodRes.data || []
+      this.renderProducts()
+      this.renderProductsTable()
+    } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async cancelPurchase(id) {
+    if (!confirm('Cancel this purchase?')) return
+    try {
+      await this.api('POST', '/purchases/' + id + '/cancel')
+      this.renderPendingPurchases()
+      this.renderPurchaseHistory()
+    } catch(e) { alert('Error: ' + e.message) }
   },
 
   // === MODAL ===

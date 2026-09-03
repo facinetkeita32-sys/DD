@@ -200,7 +200,7 @@ def _migrate_table(conn, model_class):
 
 HEAVY_COLS = {'logo', 'image'}
 CACHE_EXCLUDE_COLS = {'description', 'description_sale', 'notes', 'note'}
-DB_ONLY_TABLES = {'pos.order', 'pos.order.line', 'pos.payment', 'pos.session', 'login.log', 'inventory.item'}
+DB_ONLY_TABLES = {'pos.order', 'pos.order.line', 'pos.payment', 'pos.session', 'login.log', 'inventory.item', 'purchase.order', 'purchase.item', 'pending.product', 'purchase.receipt', 'purchase.receipt.item', 'inventory.transaction'}
 
 
 def _ensure_all_tables():
@@ -225,6 +225,21 @@ def _ensure_all_tables():
                     import traceback
                     print('Error ensuring table {}:'.format(cls._name))
                     traceback.print_exc()
+        # Drop old purchase.receipt.line table if exists
+        if 'purchase.receipt.line' in existing:
+            try:
+                cur = conn.cursor()
+                cur.execute('DROP TABLE IF EXISTS "purchase.receipt.line"')
+                conn.commit()
+                cur.close()
+                print('Dropped old table purchase.receipt.line')
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
     finally:
         put_conn(conn)
 

@@ -16,3 +16,10 @@ from . import pos_config
 from . import delivery_zone
 from . import stock_lot
 from . import login_log
+from . import inventory_item
+from . import purchase_order
+from . import purchase_item
+from . import pending_product
+from . import purchase_receipt
+from . import purchase_receipt_item
+from . import inventory_transaction

@@ -26,6 +26,12 @@ from ..models.delivery_zone import DeliveryZone
 from ..models.stock_lot import StockLot
 from ..models.login_log import LoginLog
 from ..models.inventory_item import InventoryItem
+from ..models.purchase_order import PurchaseOrder
+from ..models.purchase_item import PurchaseItem
+from ..models.pending_product import PendingProduct
+from ..models.purchase_receipt import PurchaseReceipt
+from ..models.purchase_receipt_item import PurchaseReceiptItem
+from ..models.inventory_transaction import InventoryTransaction
 
 
 def migrate_product_images():
@@ -1578,6 +1584,308 @@ def bulk_delete_inventory():
     _persist_bulk_delete(InventoryItem, ids)
     log_activity('delete', '%s inventory items bulk deleted' % len(ids))
     return success_response({'deleted': len(ids)}, '%s items deleted' % len(ids))
+
+
+# === PURCHASES ===
+
+@api_bp.route('/suppliers', methods=['GET'])
+@login_required
+def get_suppliers():
+    domain = [('supplier', '=', True)]
+    if request.args.get('search'):
+        domain.append(('name', 'ilike', request.args['search']))
+    suppliers = ResPartner().search(domain, limit=100)
+    # Also include customers who are suppliers? filter active
+    result = []
+    for s in suppliers:
+        if s._data.get('active', True):
+            result.append(model_to_dict(s, ['id', 'name', 'phone', 'email', 'supplier', 'active']))
+    return success_response(result)
+
+
+@api_bp.route('/purchase-products/search', methods=['GET'])
+@login_required
+def search_purchase_products():
+    q = request.args.get('q', '') or request.args.get('search', '') or ''
+    domain = []
+    if q:
+        domain.append(('name', 'ilike', q))
+    products = ProductProduct().search(domain, limit=50)
+    # If no results and q maybe barcode, try barcode exact
+    if not products and q:
+        products = ProductProduct().search([('barcode', '=', q)], limit=50)
+    result = model_to_dict(products, PRODUCT_FIELDS)
+    return success_response(result)
+
+
+@api_bp.route('/pending-products', methods=['GET'])
+@login_required
+def get_pending_products():
+    domain = [('status', '=', 'pending')]
+    pendings = PendingProduct().search(domain, limit=100)
+    return success_response([model_to_dict(p) for p in pendings])
+
+
+@api_bp.route('/purchases', methods=['GET'])
+@login_required
+def get_purchases():
+    domain = []
+    # No filter - return all
+    purchases = PurchaseOrder().search(domain, order='id desc', limit=100)
+    result = []
+    for po in purchases:
+        d = model_to_dict(po)
+        # attach supplier name
+        sid = po._data.get('supplier_id')
+        if sid:
+            sup = ResPartner().browse([sid])
+            if sup:
+                d['supplier_name'] = sup[0]._data.get('name', '')
+        # attach items count
+        items = PurchaseItem().search([('purchase_id', '=', po.id)])
+        d['items'] = [model_to_dict(it) for it in items]
+        # compute display like "Coffee (Small) x18, Hamburger x100"
+        prod_names = []
+        for it in items:
+            pn = it._data.get('product_name', '') or ''
+            qty = it._data.get('quantity_ordered', 0)
+            # format qty without trailing .0
+            qstr = ('%g' % qty) if qty else '0'
+            prod_names.append(f"{pn} x{qstr}")
+        d['product_summary'] = ', '.join(prod_names)
+        d['items_count'] = len(items)
+        result.append(d)
+    return success_response(result)
+
+
+@api_bp.route('/purchases/dashboard', methods=['GET'])
+@login_required
+def get_purchases_dashboard():
+    all_pos = PurchaseOrder().search([])
+    total = len(all_pos)
+    draft = len([p for p in all_pos if p._data.get('status') == 'draft'])
+    ordered = len([p for p in all_pos if p._data.get('status') == 'ordered'])
+    partially = len([p for p in all_pos if p._data.get('status') == 'partially_received'])
+    received = len([p for p in all_pos if p._data.get('status') == 'received'])
+    cancelled = len([p for p in all_pos if p._data.get('status') == 'cancelled'])
+    pending = draft + ordered + partially
+    total_value = sum(float(p._data.get('grand_total', 0) or 0) for p in all_pos if p._data.get('status') not in ('cancelled',))
+    return success_response({
+        'total': total,
+        'draft': draft,
+        'ordered': ordered,
+        'partially_received': partially,
+        'received': received,
+        'cancelled': cancelled,
+        'pending': pending,
+        'total_value': total_value,
+    })
+
+
+@api_bp.route('/purchases/pending', methods=['GET'])
+@login_required
+def get_purchases_pending():
+    domain = [('status', 'in', ['draft', 'ordered', 'partially_received'])]
+    purchases = PurchaseOrder().search(domain, order='id desc', limit=100)
+    result = []
+    for po in purchases:
+        d = model_to_dict(po)
+        sid = po._data.get('supplier_id')
+        if sid:
+            sup = ResPartner().browse([sid])
+            if sup:
+                d['supplier_name'] = sup[0]._data.get('name', '')
+        items = PurchaseItem().search([('purchase_id', '=', po.id)])
+        d['items'] = [model_to_dict(it) for it in items]
+        prod_names = []
+        for it in items:
+            pn = it._data.get('product_name', '') or ''
+            qty = it._data.get('quantity_ordered', 0)
+            prod_names.append(f"{pn} x{('%g' % qty)}")
+        d['product_summary'] = ', '.join(prod_names)
+        d['items_count'] = len(items)
+        result.append(d)
+    return success_response(result)
+
+
+@api_bp.route('/purchases/history', methods=['GET'])
+@login_required
+def get_purchases_history():
+    domain = [('status', 'in', ['received', 'cancelled'])]
+    purchases = PurchaseOrder().search(domain, order='id desc', limit=100)
+    result = []
+    for po in purchases:
+        d = model_to_dict(po)
+        sid = po._data.get('supplier_id')
+        if sid:
+            sup = ResPartner().browse([sid])
+            if sup:
+                d['supplier_name'] = sup[0]._data.get('name', '')
+        items = PurchaseItem().search([('purchase_id', '=', po.id)])
+        d['items'] = [model_to_dict(it) for it in items]
+        prod_names = []
+        for it in items:
+            pn = it._data.get('product_name', '') or ''
+            qty = it._data.get('quantity_ordered', 0)
+            prod_names.append(f"{pn} x{('%g' % qty)}")
+        d['product_summary'] = ', '.join(prod_names)
+        d['items_count'] = len(items)
+        result.append(d)
+    return success_response(result)
+
+
+@api_bp.route('/purchases/<int:purchase_id>', methods=['GET'])
+@login_required
+def get_purchase(purchase_id):
+    pos = PurchaseOrder().browse([purchase_id])
+    if not pos:
+        return error_response('Purchase not found', 404)
+    po = pos[0]
+    d = model_to_dict(po)
+    sid = po._data.get('supplier_id')
+    if sid:
+        sup = ResPartner().browse([sid])
+        if sup:
+            d['supplier_name'] = sup[0]._data.get('name', '')
+    cid = po._data.get('currency_id')
+    if cid:
+        cur = ResCurrency().browse([cid])
+        if cur:
+            d['currency_name'] = cur[0]._data.get('name', '')
+    items = PurchaseItem().search([('purchase_id', '=', po.id)])
+    d['items'] = [model_to_dict(it) for it in items]
+    # Include receipts
+    receipts = PurchaseReceipt().search([('purchase_id', '=', po.id)], order='id desc')
+    d['receipts'] = [model_to_dict(r) for r in receipts]
+    return success_response(d)
+
+
+@api_bp.route('/purchases/<int:purchase_id>/receipts', methods=['GET'])
+@login_required
+def get_purchase_receipts(purchase_id):
+    receipts = PurchaseReceipt().search([('purchase_id', '=', purchase_id)], order='id desc')
+    result = []
+    for r in receipts:
+        d = model_to_dict(r)
+        ritems = PurchaseReceiptItem().search([('receipt_id', '=', r.id)])
+        d['items'] = [model_to_dict(ri) for ri in ritems]
+        # enrich with product names
+        for ri in d['items']:
+            pid = ri.get('product_id')
+            if pid:
+                prod = ProductProduct().browse([pid])
+                if prod:
+                    ri['product_name'] = prod[0]._data.get('name', '')
+        result.append(d)
+    return success_response(result)
+
+
+@api_bp.route('/purchases', methods=['POST'])
+@login_required
+@permission_required('purchase.create')
+def create_purchase_api():
+    data = request.get_json() or {}
+    items = data.pop('items', data.pop('lines', []))
+    if not items or not isinstance(items, list):
+        return error_response('At least one item with positive quantity and product or new product name is required')
+    # Validate at least one valid item
+    valid = False
+    for it in items:
+        qty = float(it.get('quantity_ordered', it.get('qty', it.get('quantity', 0))) or 0)
+        has_product = it.get('product_id') or it.get('product') or it.get('product_name') or it.get('name')
+        if qty > 0 and has_product:
+            valid = True
+            break
+    if not valid:
+        return error_response('At least one item with positive quantity and product or new product name is required')
+    try:
+        from ..services.purchase_service import create_purchase
+        order = create_purchase(data, items, user_id=g.user_id)
+        d = model_to_dict(order)
+        items_created = PurchaseItem().search([('purchase_id', '=', order.id)])
+        d['items'] = [model_to_dict(it) for it in items_created]
+        log_activity('create', 'Purchase: %s' % order._data.get('name', ''))
+        return success_response(d, 'Purchase created')
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e))
+
+
+@api_bp.route('/purchases/<int:purchase_id>', methods=['PUT'])
+@login_required
+@permission_required('purchase.write')
+def update_purchase_api(purchase_id):
+    data = request.get_json() or {}
+    items = data.pop('items', data.pop('lines', None))
+    # items may be None meaning not updating items
+    try:
+        from ..services.purchase_service import update_purchase
+        order = update_purchase(purchase_id, data, items)
+        d = model_to_dict(order)
+        items_list = PurchaseItem().search([('purchase_id', '=', order.id)])
+        d['items'] = [model_to_dict(it) for it in items_list]
+        log_activity('update', 'Purchase ID: %s' % purchase_id)
+        return success_response(d, 'Purchase updated')
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e))
+
+
+@api_bp.route('/purchases/<int:purchase_id>/cancel', methods=['POST'])
+@login_required
+@permission_required('purchase.cancel')
+def cancel_purchase_api(purchase_id):
+    try:
+        from ..services.purchase_service import cancel_purchase
+        order = cancel_purchase(purchase_id, user_id=g.user_id)
+        log_activity('cancel', 'Purchase: %s' % order._data.get('name', ''))
+        return success_response(model_to_dict(order), 'Purchase cancelled')
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e))
+
+
+@api_bp.route('/purchases/<int:purchase_id>/receive', methods=['POST'])
+@login_required
+@permission_required('purchase.write')
+def receive_purchase_api(purchase_id):
+    data = request.get_json(silent=True) or {}
+    # data may contain lines: [{'purchase_item_id': id, 'quantity': qty}] or {'items': [...]} or empty
+    receive_lines = data.get('items') or data.get('lines') or data.get('receive_lines') or data.get('receipt_items') or None
+    # Also support direct list
+    if isinstance(data, list):
+        receive_lines = data
+    try:
+        from ..services.purchase_service import receive_purchase
+        result = receive_purchase(purchase_id, receive_lines, user_id=g.user_id)
+        log_activity('receive', 'Purchase ID: %s receipt %s' % (purchase_id, result.get('receipt_name', '')))
+        return success_response(result, 'Reception completed')
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e), 500)
+
+
+@api_bp.route('/customers/<int:customer_id>', methods=['DELETE'])
+@login_required
+@permission_required('customer.delete')
+def delete_customer(customer_id):
+    partners = ResPartner().browse([customer_id])
+    if not partners:
+        return error_response('Customer not found', 404)
+    # Soft delete: set active to false
+    partners[0].write({'active': False})
+    log_activity('delete', 'Customer ID: %s deactivated' % customer_id)
+    return success_response(message='Customer deactivated')
 
 
 # === COMPANY ===

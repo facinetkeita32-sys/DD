@@ -288,7 +288,7 @@ def get_products():
         domain.append(('categ_id', '=', int(args['category_id'])))
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
-    products = ProductProduct().search(domain, limit=200)
+    products = ProductProduct().search(domain, limit=500)
     return success_response(serialize_model(ProductProduct, products))
 
 

@@ -103,7 +103,8 @@ def restore_from_backup_file(env, filepath):
 
 
 def restore_from_data(env, data):
-    from ..odoo_orm import _db_cache
+    from ..odoo_orm import _db_cache, _write_cache_version, DB_ONLY_TABLES, get_conn, put_conn
+    from collections import OrderedDict
 
     results = {'restored': [], 'errors': []}
 
@@ -129,17 +130,92 @@ def restore_from_data(env, data):
         if key not in data:
             continue
         for record_data in data[key]:
-            tname = model_name.replace('.', '_')
-            if tname not in _db_cache:
-                _db_cache[tname] = {'_data': [], '_seq': 0}
-            existing = [r for r in _db_cache[tname]['_data'] if r.get('id') == record_data.get('id')]
-            if existing:
-                existing[0].update(record_data)
-                results['restored'].append(f"Updated {model_name} id={record_data.get('id')}")
-            else:
-                _db_cache[tname]['_data'].append(dict(record_data))
-                results['restored'].append(f"Added {model_name} id={record_data.get('id')}")
-
+            try:
+                if model_name in DB_ONLY_TABLES:
+                    # DB_ONLY: upsert directly to PostgreSQL
+                    conn = get_conn()
+                    try:
+                        # Build upsert
+                        cols = [k for k in record_data.keys() if k != 'id']
+                        # Ensure id is present
+                        if 'id' not in record_data:
+                            continue
+                        rid = record_data['id']
+                        # Check existing
+                        cur = conn.cursor()
+                        cur.execute('SELECT 1 FROM "{}" WHERE id=%s'.format(model_name), (rid,))
+                        exists = cur.fetchone()
+                        if exists:
+                            # Update
+                            set_clause = ', '.join(['"{}"=%s'.format(c) for c in cols])
+                            vals = [record_data[c] for c in cols] + [rid]
+                            cur.execute('UPDATE "{}" SET {} WHERE id=%s'.format(model_name, set_clause), vals)
+                        else:
+                            all_cols = ['id'] + cols
+                            placeholders = ', '.join(['%s'] * len(all_cols))
+                            qcols = ', '.join(['"{}"'.format(c) for c in all_cols])
+                            vals = [rid] + [record_data[c] for c in cols]
+                            cur.execute('INSERT INTO "{}" ({}) VALUES ({})'.format(model_name, qcols, placeholders), vals)
+                        conn.commit()
+                        cur.close()
+                    finally:
+                        put_conn(conn)
+                    results['restored'].append(f"Added {model_name} id={record_data.get('id')}")
+                else:
+                    # Cached: update _db_cache with dot key and persist
+                    if model_name not in _db_cache:
+                        _db_cache[model_name] = {'_seq': 0, '_data': OrderedDict()}
+                    tbl = _db_cache[model_name]
+                    rid = record_data.get('id')
+                    if rid is None:
+                        continue
+                    # Update seq
+                    if rid > tbl['_seq']:
+                        tbl['_seq'] = rid
+                    # Convert _data if it's list (legacy)
+                    if isinstance(tbl['_data'], list):
+                        od = OrderedDict()
+                        for r in tbl['_data']:
+                            od[r.get('id')] = r
+                        tbl['_data'] = od
+                    # Update or add
+                    if rid in tbl['_data']:
+                        tbl['_data'][rid].update(record_data)
+                        results['restored'].append(f"Updated {model_name} id={rid}")
+                    else:
+                        tbl['_data'][rid] = dict(record_data)
+                        results['restored'].append(f"Added {model_name} id={rid}")
+                    # Persist to DB for cached tables (light cols)
+                    try:
+                        from ..odoo_orm import _persist_write
+                        # Create a temporary model instance to persist
+                        # Use direct SQL for simplicity
+                        conn = get_conn()
+                        try:
+                            # Build light cols (exclude heavy)
+                            from ..odoo_orm import HEAVY_COLS
+                            cols = [k for k in record_data.keys() if k not in HEAVY_COLS and k != 'id']
+                            if cols:
+                                qcols = ['"{}"'.format(c) for c in cols]
+                                all_cols = '"id",' + ','.join(qcols)
+                                all_ph = '%s,' + ','.join(['%s' for _ in cols])
+                                update_set = ', '.join(['{}=EXCLUDED.{}'.format(q, q) for q in qcols])
+                                sql = 'INSERT INTO "{}" ({}) VALUES ({}) ON CONFLICT (id) DO UPDATE SET {}'.format(model_name, all_cols, all_ph, update_set)
+                                vals = [rid] + [record_data[c] for c in cols]
+                                cur = conn.cursor()
+                                cur.execute(sql, vals)
+                                conn.commit()
+                                cur.close()
+                        finally:
+                            put_conn(conn)
+                    except Exception:
+                        pass
+            except Exception as e:
+                results['errors'].append(f"{model_name} id={record_data.get('id')}: {str(e)}")
+    try:
+        _write_cache_version()
+    except Exception:
+        pass
     return {'success': True, 'message': f"Restored {len(results['restored'])} records", 'details': results}
 
 

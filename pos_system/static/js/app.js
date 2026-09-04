@@ -304,7 +304,8 @@ let App = {
   renderCategories() {
     const container = document.getElementById('pos-categories')
     let html = `<button class="pos-cat-btn ${!this.currentCategory ? 'active' : ''}" data-cat-id="">${I18n.t('pos.category_all', 'All')}</button>`
-    this.categories.forEach(c => {
+    const cats = this.productCategories && this.productCategories.length ? this.productCategories : this.categories
+    cats.forEach(c => {
       html += `<button class="pos-cat-btn ${this.currentCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${c.name}</button>`
     })
     container.innerHTML = html
@@ -330,8 +331,9 @@ let App = {
     const search = (document.getElementById('pos-search').value || '').toLowerCase()
     let filtered = this.products.filter(p => {
       if (this.currentCategory) {
-        const cats = p.pos_categ_ids || []
-        if (!cats.includes(this.currentCategory)) return false
+        const catId = p.categ_id ? (p.categ_id.id || p.categ_id) : null
+        const posCats = p.pos_categ_ids || []
+        if (catId !== this.currentCategory && !posCats.includes(this.currentCategory)) return false
       }
       if (search) {
         return (p.name || '').toLowerCase().includes(search) ||
@@ -950,12 +952,18 @@ let App = {
         barcode: document.getElementById('prod-barcode').value,
         expiration_date: document.getElementById('prod-expiration').value || false,
       }
-      if (catVal) data.categ_id = parseInt(catVal)
-      const posCatCbs = document.querySelectorAll('.pos-cat-cb:checked')
-      if (posCatCbs.length) {
-        data.pos_categ_ids = Array.from(posCatCbs).map(cb => parseInt(cb.value))
+      if (catVal) {
+        data.categ_id = parseInt(catVal)
+        // keep POS categories in sync with product category (unified)
+        data.pos_categ_ids = [parseInt(catVal)]
       } else {
-        data.pos_categ_ids = []
+        data.categ_id = false
+        const posCatCbs = document.querySelectorAll('.pos-cat-cb:checked')
+        if (posCatCbs.length) {
+          data.pos_categ_ids = Array.from(posCatCbs).map(cb => parseInt(cb.value))
+        } else {
+          data.pos_categ_ids = []
+        }
       }
       if (this._newImageBase64 !== undefined) {
         data.image = this._newImageBase64

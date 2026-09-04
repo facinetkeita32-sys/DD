@@ -1,10 +1,13 @@
 import json
+import threading
+import time
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
 from ..odoo_orm import env, _db_cache as _db
 from ..models.res_users import ResUsers
+from ..models.login_log import LoginLog
 from ..models.res_partner import ResPartner
 from ..models.res_currency import ResCurrency
 from ..models.res_lang import ResLang
@@ -104,6 +107,27 @@ def success_response(data=None, message=None):
     return jsonify(resp)
 
 
+def log_activity(action, details=''):
+    try:
+        uid = getattr(g, 'user_id', None) or session.get('user_id')
+        ip = request.remote_addr or ''
+        if uid:
+            # run in background thread to not block request
+            def _do():
+                try:
+                    LoginLog().create({
+                        'user_id': uid,
+                        'action': action,
+                        'details': details,
+                        'ip_address': ip,
+                    })
+                except Exception:
+                    pass
+            threading.Thread(target=_do, daemon=True).start()
+    except Exception:
+        pass
+
+
 
 # === AUTH ===
 
@@ -116,6 +140,8 @@ def auth_login():
     if users:
         session['user_id'] = users[0].id
         session['lang'] = users[0].lang
+        session['last_activity'] = time.time()
+        log_activity('login', f"User {login} logged in")
         return success_response(model_to_dict(users[0]))
     return error_response('Invalid credentials', 401)
 
@@ -123,6 +149,7 @@ def auth_login():
 @api_bp.route('/auth/logout', methods=['POST'])
 @login_required
 def auth_logout():
+    log_activity('logout', f"User {g.user_id} logged out")
     session.clear()
     return success_response(message='Logged out')
 
@@ -162,6 +189,7 @@ def create_user():
         user = ResUsers().create(data)
         d = model_to_dict(user)
         d.pop('password', None)
+        log_activity('create', f"User created: {data.get('login')}")
         return success_response(d, 'User created')
     except Exception as e:
         return error_response(str(e))
@@ -182,6 +210,7 @@ def update_user(user_id):
     users[0].write(data)
     d = model_to_dict(users[0])
     d.pop('password', None)
+    log_activity('update', f"User updated: {user_id}")
     return success_response(d, 'User updated')
 
 
@@ -195,6 +224,7 @@ def delete_user(user_id):
     if users[0].id == g.user_id:
         return error_response('Cannot delete yourself')
     users[0].unlink()
+    log_activity('delete', f"User deleted: {user_id}")
     return success_response(message='User deleted')
 
 
@@ -277,6 +307,7 @@ def create_product():
     data = request.get_json() or {}
     try:
         product = ProductProduct().create(data)
+        log_activity('create', f"Product created: {data.get('name')}")
         return success_response(model_to_dict(product), 'Product created')
     except Exception as e:
         return error_response(str(e))
@@ -291,6 +322,7 @@ def update_product(product_id):
         return error_response('Product not found', 404)
     data = request.get_json() or {}
     products[0].write(data)
+    log_activity('update', f"Product updated: {product_id}")
     return success_response(model_to_dict(products[0]), 'Product updated')
 
 
@@ -341,6 +373,7 @@ def delete_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     products[0].unlink()
+    log_activity('delete', f"Product deleted: {product_id}")
     return success_response(message='Product deleted')
 
 
@@ -432,6 +465,7 @@ def bulk_import_products():
         except Exception as e:
             results['errors'].append(str(e))
 
+    log_activity('import', f"Bulk import: {results['created']} created, {results['updated']} updated")
     return success_response(results, f"Imported: {results['created']} created, {results['updated']} updated, {len(results['errors'])} errors")
 
 
@@ -513,6 +547,7 @@ def create_customer():
     data['customer'] = True
     try:
         partner = ResPartner().create(data)
+        log_activity('create', f"Customer created: {data.get('name')}")
         return success_response(model_to_dict(partner), 'Customer created')
     except Exception as e:
         return error_response(str(e))
@@ -527,6 +562,7 @@ def update_customer(customer_id):
         return error_response('Customer not found', 404)
     data = request.get_json() or {}
     partners[0].write(data)
+    log_activity('update', f"Customer updated: {customer_id}")
     return success_response(model_to_dict(partners[0]), 'Customer updated')
 
 
@@ -670,6 +706,7 @@ def create_order():
             'amount_change': max(0, paid_total - grand_total),
             'state': 'paid',
         })
+        log_activity('create', f"Order created: {order._data.get('name')}")
         return success_response(model_to_dict(order), 'Order created')
     except Exception as e:
         return error_response(str(e))
@@ -696,6 +733,7 @@ def cancel_order(order_id):
                 current_qty = product._data.get('available_qty', 0) or 0
                 product.write({'available_qty': current_qty + qty})
     orders[0].action_cancel()
+    log_activity('cancel', f"Order cancelled: {order_id}")
     return success_response(message='Order cancelled')
 
 
@@ -1073,6 +1111,26 @@ def get_sales_report():
         'orders': order_list,
     })
 
+
+
+# === ACTIVITY LOG ===
+
+@api_bp.route('/activity-log', methods=['GET'])
+@login_required
+def get_activity_log():
+    limit = request.args.get('limit', 50, type=int)
+    logs = LoginLog().search([], order='timestamp desc', limit=limit)
+    result = []
+    for log in logs:
+        d = model_to_dict(log)
+        uid = log._data.get('user_id', 0) or 0
+        if uid:
+            user = ResUsers().browse([uid])
+            if user:
+                d['user_name'] = user[0]._data.get('name', '')
+                d['user_login'] = user[0]._data.get('login', '')
+        result.append(d)
+    return success_response(result)
 
 
 # === COMPANY ===

@@ -11,6 +11,7 @@
   "nav.users": "Utilisateurs",
   "nav.sessions": "Sessions",
   "nav.dashboard": "Tableau de Bord",
+  "nav.activity": "Activité",
   "nav.logout": "Déconnexion",
   "nav.login": "Connexion",
 
@@ -184,6 +185,19 @@
   "user.password": "Mot de passe",
   "user.no_users": "Aucun utilisateur trouvé",
   "common.status": "Statut",
+
+  "activity.title": "Journal d'Activité",
+  "activity.no_logs": "Aucune activité enregistrée.",
+  "activity.user": "Utilisateur",
+  "activity.action": "Action",
+  "activity.details": "Détails",
+  "activity.timestamp": "Date/Heure",
+  "activity.ip": "Adresse IP",
+  "activity.refresh": "Actualiser",
+  "activity.export": "Exporter CSV",
+  "activity.error": "Erreur lors du chargement du journal",
+  "activity.login": "Connexion",
+  "activity.logout": "Déconnexion",
 
   "receipt.title": "Reçu",
   "receipt.print": "Imprimer le Reçu",

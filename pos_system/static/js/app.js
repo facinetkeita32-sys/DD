@@ -115,6 +115,10 @@ let App = {
     document.getElementById('backup-download-btn').onclick = () => this.downloadBackup()
     document.getElementById('backup-save-settings-btn').onclick = () => this.saveBackupSettings()
     document.getElementById('backup-restore-btn').onclick = () => this.restoreBackup()
+    const arb = document.getElementById('activity-refresh-btn')
+    if (arb) arb.onclick = () => this.renderActivity()
+    const aeb = document.getElementById('activity-export-btn')
+    if (aeb) aeb.onclick = () => this.exportActivityLog()
 
     document.getElementById('modal-overlay').onclick = e => {
       if (e.target === document.getElementById('modal-overlay')) this.closeModal()
@@ -241,6 +245,7 @@ let App = {
     this.renderCustomersTable()
     this.renderSessionsTable()
     this.renderDashboard()
+    this.renderActivity()
     this.renderSettings()
     this.renderUsersTable()
   },
@@ -275,6 +280,7 @@ let App = {
     if (name === 'customers') this.renderCustomersTable()
     if (name === 'sessions') this.renderSessionsTable()
     if (name === 'dashboard') this.renderDashboard()
+    if (name === 'activity') this.renderActivity()
     if (name === 'reports') this.generateReport()
     if (name === 'users') this.renderUsersTable()
   },
@@ -1850,6 +1856,59 @@ let App = {
     await this.api('DELETE', `/product-categories/${id}`)
     this.productCategories = this.productCategories.filter(c => c.id !== id)
     this.renderAll()
+  },
+
+  // === ACTIVITY ===
+
+  async renderActivity() {
+    const container = document.getElementById('activity-log-container')
+    if (!container) return
+    try {
+      const res = await this.api('GET', '/activity-log?limit=100')
+      const logs = res.data || []
+      if (!logs.length) {
+        container.innerHTML = `<p style="color:var(--text-light);padding:20px">${I18n.t('activity.no_logs', 'No activity recorded yet.')}</p>`
+        return
+      }
+      container.innerHTML = `<div style="max-height:500px;overflow-y:auto"><table><thead><tr>
+        <th>${I18n.t('activity.user', 'User')}</th>
+        <th>${I18n.t('activity.action', 'Action')}</th>
+        <th>${I18n.t('activity.details', 'Details')}</th>
+        <th>${I18n.t('activity.timestamp', 'Timestamp')}</th>
+        <th>${I18n.t('activity.ip', 'IP')}</th>
+      </tr></thead><tbody>${logs.map(l => `
+        <tr>
+          <td>${this._esc(l.user_name || l.user_login || '')}</td>
+          <td><span class="status-badge status-${l.action}">${l.action}</span></td>
+          <td>${this._esc(l.details || '-')}</td>
+          <td>${(l.timestamp || '').substring(0, 19)}</td>
+          <td>${l.ip_address || '-'}</td>
+        </tr>
+      `).join('')}</tbody></table></div>`
+    } catch(e) {
+      container.innerHTML = `<p style="color:var(--danger)">${I18n.t('activity.error', 'Error loading activity log')}</p>`
+    }
+  },
+
+  exportActivityLog() {
+    this.api('GET', '/activity-log?limit=1000').then(res => {
+      const logs = res.data || []
+      const rows = [['User','Action','Details','Timestamp','IP']]
+      logs.forEach(l => rows.push([l.user_name || l.user_login || '', l.action || '', l.details || '', l.timestamp || '', l.ip_address || '']))
+      const csv = rows.map(r => r.map(v => {
+        const s = String(v)
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+      }).join(',')).join('\n')
+      const blob = new Blob([csv], {type: 'text/csv'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `activity_${new Date().toISOString().slice(0,10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }).catch(e => alert('Error: ' + e.message))
   },
 
   // === MODAL ===

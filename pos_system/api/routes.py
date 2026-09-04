@@ -289,7 +289,22 @@ def get_products():
     if args.get('pos_category_id'):
         domain.append(('pos_categ_ids', 'in', [int(args['pos_category_id'])]))
     products = ProductProduct().search(domain, limit=500)
-    return success_response(serialize_model(ProductProduct, products))
+    # use model_to_dict to return categ_id as {id,name} for frontend
+    result = []
+    for p in products:
+        d = model_to_dict(p)
+        # ensure categ_id is object with name for frontend
+        cid = p._data.get('categ_id')
+        if cid:
+            cat = ProductCategory().browse([cid])
+            if cat:
+                d['categ_id'] = {'id': cid, 'name': cat[0]._data.get('name','')}
+            else:
+                d['categ_id'] = {'id': cid, 'name': ''}
+        else:
+            d['categ_id'] = False
+        result.append(d)
+    return success_response(result)
 
 
 @api_bp.route('/products/<int:product_id>', methods=['GET'])

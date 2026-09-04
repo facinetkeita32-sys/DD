@@ -103,7 +103,14 @@ def restore_from_backup_file(env, filepath):
 
 
 def restore_from_data(env, data):
-    from ..odoo_orm import _db_cache, _write_cache_version, DB_ONLY_TABLES, get_conn, put_conn
+    try:
+        from ..odoo_orm import _db_cache, _write_cache_version, DB_ONLY_TABLES, get_conn, put_conn, HEAVY_COLS, _persist_write
+    except ImportError:
+        from ..odoo_orm import _db_cache, get_conn, put_conn
+        DB_ONLY_TABLES = set()
+        HEAVY_COLS = set()
+        _write_cache_version = lambda: None
+        _persist_write = None
     from collections import OrderedDict
 
     results = {'restored': [], 'errors': []}
@@ -187,13 +194,12 @@ def restore_from_data(env, data):
                         results['restored'].append(f"Added {model_name} id={rid}")
                     # Persist to DB for cached tables (light cols)
                     try:
-                        from ..odoo_orm import _persist_write
-                        # Create a temporary model instance to persist
+                        if _persist_write is None:
+                            raise ImportError("no persist")
                         # Use direct SQL for simplicity
                         conn = get_conn()
                         try:
                             # Build light cols (exclude heavy)
-                            from ..odoo_orm import HEAVY_COLS
                             cols = [k for k in record_data.keys() if k not in HEAVY_COLS and k != 'id']
                             if cols:
                                 qcols = ['"{}"'.format(c) for c in cols]

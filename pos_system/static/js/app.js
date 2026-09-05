@@ -634,6 +634,7 @@ let App = {
     const methodId = parseInt(document.getElementById('payment-method').value)
     const tendered = parseFloat(document.getElementById('payment-tendered').value) || total
     const change = Math.max(0, tendered - total)
+    const paidAmount = Math.min(tendered, total)
 
     const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
     const dzCost = dz ? dz.cost : 0
@@ -649,7 +650,7 @@ let App = {
 
     const payments = [{
       payment_method_id: methodId,
-      amount: total,
+      amount: paidAmount,
       is_change: change,
     }]
 
@@ -672,9 +673,13 @@ let App = {
       const res = await this.api('POST', '/orders', orderData)
       this.closeModal()
       const orderId = res.data ? res.data.id : null
-      let changeMsg = ''
+      const state = res.data ? res.data.state : 'paid'
+      const remaining = res.data ? (res.data.remaining || 0) : 0
+      let infoMsg = ''
       if (change > 0) {
-        changeMsg = `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
+        infoMsg = `${I18n.t('payment.change', 'Change')}: ${this.currencyFormat(change)}`
+      } else if (state === 'pending' && remaining > 0) {
+        infoMsg = `${I18n.t('order.remaining', 'Remaining')}: ${this.currencyFormat(remaining)}`
       }
       this.clearCart()
       const prodRes = await this.api('GET', '/products')
@@ -685,7 +690,7 @@ let App = {
       this.renderDashboard()
 
       if (orderId) {
-        const msg = changeMsg ? changeMsg + '\n\n' : ''
+        const msg = infoMsg ? infoMsg + '\n\n' : ''
         if (confirm(`${msg}${I18n.t('receipt.print', 'Print Receipt')}?`)) {
           this.openPrintReceipt(orderId)
         }
@@ -1208,13 +1213,15 @@ let App = {
       const orders = res.data || []
       const tbody = document.getElementById('orders-tbody')
       if (!orders.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('order.no_orders', 'No orders')}</td></tr>`
         return
       }
       tbody.innerHTML = orders.map(o => {
         const items = (o.lines || []).map(l =>
           `${l.product_name || 'Product'} x${l.qty}`
         ).join(', ') || '-'
+        const remaining = parseFloat(o.remaining || 0)
+        const isPending = o.state === 'pending' && remaining > 0.01
         return `<tr>
           <td>${o.name || o.id}</td>
           <td>${(o.date_order || '').substring(0, 19)}</td>
@@ -1222,13 +1229,19 @@ let App = {
           <td>${o.user_name || ''}</td>
           <td style="max-width:200px;white-space:normal">${items}</td>
           <td>${this.currencyFormat(o.amount_total)}</td>
-          <td style="color:var(--danger);font-weight:600">${this.currencyFormat(o.remaining || 0)}</td>
+          <td style="color:${remaining > 0.01 ? 'var(--danger)' : 'var(--text-light)'};font-weight:600">${this.currencyFormat(remaining)}</td>
           <td><span class="status-badge status-${o.state}">${o.state}</span></td>
-          <td><button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button></td>
+          <td style="white-space:nowrap">
+            ${isPending ? `<button class="btn btn-sm btn-success pay-order" data-id="${o.id}" style="margin-right:4px">${I18n.t('payment.validate', 'Validate')}</button>` : ''}
+            <button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button>
+          </td>
         </tr>`
       }).join('')
       tbody.querySelectorAll('.view-order').forEach(btn => {
         btn.onclick = () => this.showOrderDetail(parseInt(btn.dataset.id))
+      })
+      tbody.querySelectorAll('.pay-order').forEach(btn => {
+        btn.onclick = () => this.validatePayment(parseInt(btn.dataset.id))
       })
     } catch(e) { console.error(e) }
   },
@@ -1257,12 +1270,17 @@ let App = {
         }
       }
 
+      const paid = parseFloat(o.amount_paid || 0)
+      const remaining = parseFloat(o.remaining ?? ((o.amount_total || 0) - paid))
+      const isPending = o.state === 'pending' && remaining > 0.01
       let html = `<h3>${I18n.t('order.details', 'Order Details')}</h3>
         <div class="order-detail-grid">
           <div><span class="label">${I18n.t('order.ref', 'Order #')}</span><div class="value">${o.name || o.id}</div></div>
           <div><span class="label">${I18n.t('order.date', 'Date')}</span><div class="value">${(o.date_order || '').substring(0, 19)}</div></div>
           <div><span class="label">${I18n.t('order.customer', 'Customer')}</span><div class="value">${o.partner_name || '-'}</div></div>
           <div><span class="label">${I18n.t('order.status', 'Status')}</span><div class="value"><span class="status-badge status-${o.state}">${o.state}</span></div></div>
+          <div><span class="label">${I18n.t('payment.amount', 'Paid')}</span><div class="value">${this.currencyFormat(paid)}</div></div>
+          <div><span class="label">${I18n.t('order.remaining', 'Remaining')}</span><div class="value" style="color:${remaining > 0.01 ? 'var(--danger)' : 'var(--success)'}">${this.currencyFormat(remaining)}</div></div>
         </div>
         <table style="width:100%;margin:12px 0">
           <thead><tr><th>${I18n.t('product.name', 'Product')}</th><th>${I18n.t('pos.qty', 'Qty')}</th><th>${I18n.t('pos.price', 'Price')}</th><th>${I18n.t('pos.discount', 'Disc')}</th><th>${I18n.t('pos.subtotal', 'Subtotal')}</th></tr></thead>
@@ -1277,12 +1295,46 @@ let App = {
         </table>`
       }
       html += `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        ${isPending ? `<button class="btn btn-success" onclick="App.validatePayment(${id})">${I18n.t('payment.validate', 'Validate')}</button>` : ''}
         <button class="btn btn-primary" onclick="App.openPrintReceipt(${id})">${I18n.t('receipt.print', 'Print Receipt')}</button>
         <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">${I18n.t('common.close', 'Close')}</button>
       </div>`
       this.showModal(html)
     } catch(e) { alert('Error: ' + e.message) }
+  },
+
+  async validatePayment(id) {
+    let order = null
+    try {
+      const res = await this.api('GET', `/orders/${id}`)
+      order = res.data
+    } catch(e) { alert('Error: ' + e.message); return }
+    const remaining = parseFloat(order.remaining ?? ((order.amount_total || 0) - (order.amount_paid || 0)))
+    if (!(order.state === 'pending' && remaining > 0.01)) { alert(I18n.t('order.no_orders', 'Nothing to validate')); return }
+    const methods = (this.paymentMethods || []).map(m => `<option value="${m.id}">${m.name}</option>`).join('')
+    this.showModal(`<h3>${I18n.t('payment.validate', 'Validate payment')} - ${order.name || id}</h3>
+      <div style="text-align:center;font-size:28px;font-weight:800;margin:12px 0;color:var(--danger)">${I18n.t('order.remaining', 'Remaining')}: ${this.currencyFormat(remaining)}</div>
+      <div class="form-group"><label>${I18n.t('payment.method', 'Payment Method')}</label><select id="validate-method">${methods}</select></div>
+      <div class="form-group"><label>${I18n.t('payment.amount', 'Amount')}</label><input type="number" id="validate-amount" value="${remaining}" min="1" max="${remaining}" step="100"></div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-success" id="validate-confirm">${I18n.t('common.confirm', 'Confirm')}</button>
+        <button class="btn btn-secondary" id="validate-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`)
+    document.getElementById('validate-cancel').onclick = () => this.closeModal()
+    document.getElementById('validate-confirm').onclick = async () => {
+      const amount = parseFloat(document.getElementById('validate-amount').value) || 0
+      const methodId = parseInt(document.getElementById('validate-method').value)
+      if (amount <= 0 || amount > remaining + 0.01) { alert('Invalid amount'); return }
+      try {
+        const res = await this.api('POST', `/orders/${id}/pay`, { amount, payment_method_id: methodId })
+        this.closeModal()
+        await this.renderOrdersTable()
+        this.renderDashboard()
+        const r = res.data ? (res.data.remaining || 0) : 0
+        alert(r <= 0.01 ? I18n.t('payment.validated', 'Payment validated') || 'Paid' : `${I18n.t('order.remaining', 'Remaining')}: ${this.currencyFormat(r)}`)
+      } catch(e) { alert('Error: ' + e.message) }
+    }
   },
 
   openPrintReceipt(id) {

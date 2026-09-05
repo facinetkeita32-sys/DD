@@ -50,6 +50,8 @@
   "payment.confirm": "Confirm Payment",
   "payment.cancel": "Cancel",
   "payment.pay_later": "Pay Later",
+  "payment.validate": "Validate",
+  "payment.validated": "Payment validated",
 
   "order.title": "Order",
   "order.ref": "Order #",

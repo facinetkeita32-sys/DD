@@ -859,7 +859,7 @@ def get_receipt_share_text(order_id):
 @api_bp.route('/receipt/<int:order_id>/email', methods=['POST'])
 @login_required
 def send_receipt_email(order_id):
-    from ..services.receipt_service import generate_receipt_pdf, get_order_data
+    from ..services.receipt_service import generate_receipt_pdf, get_order_data, build_share_text
     from ..services.email_service import send_receipt_email as send_email
     data = request.get_json() or {}
     d = get_order_data(order_id)
@@ -876,7 +876,7 @@ def send_receipt_email(order_id):
         return error_response('Order not found', 404)
     ref = d['_data'].get('name', '') or f"order_{order_id}"
     subject = f"Receipt {ref}"
-    body = f"Hello {d.get('partner_name') or ''},\n\nPlease find attached receipt {ref}.\nTotal: {d['_data'].get('amount_total', 0)}\n\nThank you!"
+    body = build_share_text(order_id, lang=lang) or f"Receipt {ref}\nTotal: {d['_data'].get('amount_total', 0)}"
     ok, msg = send_email(to_email, subject, body, pdf_bytes, filename=f"receipt_{ref}.pdf")
     if not ok:
         return error_response(msg, 500)

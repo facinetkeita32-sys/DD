@@ -32,12 +32,25 @@ def send_receipt_email(to_email, subject, body, pdf_bytes=None, filename='receip
             part = MIMEApplication(pdf_bytes, _subtype='pdf')
             part.add_header('Content-Disposition', 'attachment', filename=filename)
             msg.attach(part)
-        with smtplib.SMTP(cfg['host'], cfg['port'], timeout=20) as server:
-            if cfg['use_tls']:
-                server.starttls()
-            if cfg['user']:
-                server.login(cfg['user'], cfg['password'])
-            server.send_message(msg)
+        if cfg['port'] == 465:
+            # Implicit SSL (e.g. Gmail/Outlook SSL port)
+            with smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=20) as server:
+                if cfg['user']:
+                    try:
+                        server.login(cfg['user'], cfg['password'])
+                    except smtplib.SMTPAuthenticationError:
+                        return False, 'SMTP login rejected: check SMTP_USER / SMTP_PASSWORD (for Gmail use an App Password, not your account password)'
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(cfg['host'], cfg['port'], timeout=20) as server:
+                if cfg['use_tls']:
+                    server.starttls()
+                if cfg['user']:
+                    try:
+                        server.login(cfg['user'], cfg['password'])
+                    except smtplib.SMTPAuthenticationError:
+                        return False, 'SMTP login rejected: check SMTP_USER / SMTP_PASSWORD (for Gmail use an App Password, not your account password)'
+                server.send_message(msg)
         return True, 'Email sent'
     except Exception as e:
         return False, str(e)

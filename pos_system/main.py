@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from flask import Flask, send_from_directory, request, g, session
 from .api.routes import api_bp
 from .api.backup_routes import backup_bp
@@ -9,6 +10,8 @@ from .odoo_orm import _load_cache, _db_cache, DB_PATH
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'pos-guinea-secret-key-change-in-production')
+# Session inactivity timeout in seconds (default: 1 hour)
+SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', 3600))
 
 app.register_blueprint(api_bp)
 app.register_blueprint(backup_bp)
@@ -16,6 +19,15 @@ app.register_blueprint(backup_bp)
 
 @app.before_request
 def before_request():
+    # Session inactivity timeout (API requests only)
+    if request.path.startswith('/api/') and not request.path.startswith('/api/auth/login'):
+        if 'user_id' in session:
+            last = session.get('last_activity', 0)
+            if time.time() - last > SESSION_TIMEOUT:
+                session.clear()
+                from flask import jsonify
+                return jsonify({'error': 'Session expired due to inactivity'}), 401
+            session['last_activity'] = time.time()
     lang = session.get('lang', request.args.get('lang', 'en'))
     translator.set_language(lang)
 

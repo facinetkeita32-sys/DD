@@ -119,6 +119,9 @@
   "session.end_cash": "Closing Cash",
   "session.total_sales": "Total Sales",
   "session.total_orders": "Total Orders",
+  "session.timeout_title": "Session expiring",
+  "session.timeout_warning": "You will be logged out in 5 minutes due to inactivity.",
+  "session.stay": "Stay logged in",
 
   "report.title": "Sales Report",
   "report.daily": "Daily Report",

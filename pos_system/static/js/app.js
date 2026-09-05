@@ -158,6 +158,7 @@ let App = {
       this.showScreen('pos')
       document.getElementById('main-screen').classList.add('active')
       document.getElementById('login-screen').classList.remove('active')
+      this.startIdleTimer()
     } catch(e) {
       this.showLogin()
     }
@@ -194,13 +195,54 @@ let App = {
       this.showScreen('pos')
       document.getElementById('main-screen').classList.add('active')
       document.getElementById('login-screen').classList.remove('active')
+      this.startIdleTimer()
     } catch(e) {
       document.getElementById('login-error').textContent = I18n.t('login.error', 'Invalid credentials')
     }
   },
 
+  startIdleTimer() {
+    // 1-hour inactivity: warn at 55 min, auto logout at 60 min
+    this.stopIdleTimer()
+    const warnMs = 55 * 60 * 1000
+    const logoutMs = 60 * 60 * 1000
+    const reset = () => {
+      if (!this.user) return
+      this.stopIdleTimer()
+      this.startIdleTimer()
+    }
+    this._idleReset = reset
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach(ev => document.addEventListener(ev, reset, { passive: true }))
+    this._idleWarnTimer = setTimeout(() => {
+      if (!this.user) return
+      this.showModal(`<h3>${I18n.t('session.timeout_title', 'Session expiring')}</h3>
+        <p style="font-size:14px;margin-bottom:12px">${I18n.t('session.timeout_warning', 'You will be logged out in 5 minutes due to inactivity.')}</p>
+        <div class="btn-group"><button class="btn btn-primary" id="idle-stay">${I18n.t('session.stay', 'Stay logged in')}</button></div>`)
+      document.getElementById('idle-stay').onclick = async () => {
+        try { await this.api('GET', '/auth/me') } catch(e) {}
+        this.closeModal()
+        reset()
+      }
+    }, warnMs)
+    this._idleLogoutTimer = setTimeout(() => this.doLogout(), logoutMs)
+  },
+
+  stopIdleTimer() {
+    if (this._idleWarnTimer) clearTimeout(this._idleWarnTimer)
+    if (this._idleLogoutTimer) clearTimeout(this._idleLogoutTimer)
+    this._idleWarnTimer = null
+    this._idleLogoutTimer = null
+    if (this._idleReset) {
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+      events.forEach(ev => document.removeEventListener(ev, this._idleReset))
+      this._idleReset = null
+    }
+  },
+
   async doLogout() {
-    await this.api('POST', '/auth/logout')
+    this.stopIdleTimer()
+    try { await this.api('POST', '/auth/logout') } catch(e) {}
     this.user = null
     this.showLogin()
   },

@@ -119,6 +119,9 @@
   "session.end_cash": "Caisse de Clôture",
   "session.total_sales": "Ventes Totales",
   "session.total_orders": "Total Commandes",
+  "session.timeout_title": "Session bientôt expirée",
+  "session.timeout_warning": "Vous serez déconnecté dans 5 minutes pour cause d'inactivité.",
+  "session.stay": "Rester connecté",
 
   "report.title": "Rapport de Ventes",
   "report.daily": "Rapport Quotidien",

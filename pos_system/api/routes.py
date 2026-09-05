@@ -666,6 +666,8 @@ def get_order(order_id):
         partner = ResPartner().browse([pid])
         if partner:
             d['partner_name'] = partner[0]._data.get('name', '')
+            d['partner_email'] = partner[0]._data.get('email', '') or ''
+            d['partner_phone'] = partner[0]._data.get('mobile', '') or partner[0]._data.get('phone', '') or ''
     dzid = order._data.get('delivery_zone_id', 0) or 0
     if dzid:
         zone = DeliveryZone().browse([dzid])
@@ -834,6 +836,52 @@ def get_receipt_pdf(order_id):
             'Content-Type': 'application/pdf',
         },
     )
+
+
+@api_bp.route('/receipt/<int:order_id>/share-text', methods=['GET'])
+@login_required
+def get_receipt_share_text(order_id):
+    from ..services.receipt_service import build_share_text, get_order_data
+    lang = request.args.get('lang') or session.get('lang', 'en')
+    if lang not in ('en', 'fr'):
+        lang = 'en'
+    text = build_share_text(order_id, lang=lang)
+    if text is None:
+        return error_response('Order not found', 404)
+    d = get_order_data(order_id)
+    return success_response({
+        'text': text,
+        'phone': (d.get('partner_phone') or ''),
+        'email': (d.get('partner_email') or ''),
+    })
+
+
+@api_bp.route('/receipt/<int:order_id>/email', methods=['POST'])
+@login_required
+def send_receipt_email(order_id):
+    from ..services.receipt_service import generate_receipt_pdf, get_order_data
+    from ..services.email_service import send_receipt_email as send_email
+    data = request.get_json() or {}
+    d = get_order_data(order_id)
+    if not d:
+        return error_response('Order not found', 404)
+    to_email = (data.get('email') or d.get('partner_email') or '').strip()
+    if not to_email or '@' not in to_email:
+        return error_response('Customer email is required', 400)
+    lang = data.get('lang') or session.get('lang', 'en')
+    if lang not in ('en', 'fr'):
+        lang = 'en'
+    pdf_bytes = generate_receipt_pdf(order_id, lang=lang)
+    if pdf_bytes is None:
+        return error_response('Order not found', 404)
+    ref = d['_data'].get('name', '') or f"order_{order_id}"
+    subject = f"Receipt {ref}"
+    body = f"Hello {d.get('partner_name') or ''},\n\nPlease find attached receipt {ref}.\nTotal: {d['_data'].get('amount_total', 0)}\n\nThank you!"
+    ok, msg = send_email(to_email, subject, body, pdf_bytes, filename=f"receipt_{ref}.pdf")
+    if not ok:
+        return error_response(msg, 500)
+    log_activity('email', f"Receipt {ref} emailed to {to_email}")
+    return success_response(message=f"Receipt sent to {to_email}")
 
 
 

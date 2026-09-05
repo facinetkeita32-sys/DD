@@ -144,6 +144,7 @@
   "settings.low_stock": "Seuil de Stock Faible",
 
   "common.save": "Enregistrer",
+  "common.send": "Envoyer",
   "common.cancel": "Annuler",
   "common.delete": "Supprimer",
   "common.edit": "Modifier",
@@ -224,6 +225,9 @@
   "receipt.phone": "Tél",
   "receipt.generated_by": "Généré par Shop With DD POS",
   "receipt.no_print": "Éléments non imprimables masqués",
+  "receipt.email": "Email",
+  "receipt.email_invalid": "Saisissez une adresse email valide",
+  "receipt.phone_invalid": "Saisissez un numéro de téléphone valide",
 
   "delivery.zone": "Zone de Livraison",
   "delivery.cost": "Frais de Livraison",

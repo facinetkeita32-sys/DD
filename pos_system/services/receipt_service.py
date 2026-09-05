@@ -50,10 +50,14 @@ def get_order_data(order_id):
 
     pid = order._data.get('partner_id', 0) or 0
     d['partner_name'] = '-'
+    d['partner_email'] = ''
+    d['partner_phone'] = ''
     if pid:
         partner = ResPartner().browse([pid])
         if partner:
             d['partner_name'] = partner[0]._data.get('name', '-')
+            d['partner_email'] = partner[0]._data.get('email', '') or ''
+            d['partner_phone'] = partner[0]._data.get('mobile', '') or partner[0]._data.get('phone', '') or ''
 
     uid = order._data.get('user_id', 0) or 0
     d['user_name'] = ''
@@ -151,6 +155,35 @@ RECEIPT_LABELS = {
 def _(key, lang='en'):
     labels = RECEIPT_LABELS.get(lang, RECEIPT_LABELS['en'])
     return labels.get(key, RECEIPT_LABELS['en'].get(key, key))
+
+
+def build_share_text(order_id, lang='en'):
+    """Plain-text receipt summary for sharing (WhatsApp). Returns None if order missing."""
+    d = get_order_data(order_id)
+    if not d:
+        return None
+    data = d['_data']
+    currency = d.get('currency', {})
+    ref = data.get('name', '') or f"Order #{d['id']}"
+    date_val = (data.get('date_order', '') or '')[:19]
+    total = float(data.get('amount_total', 0) or 0)
+    paid = float(data.get('amount_paid', 0) or 0)
+    remaining = round(total - paid, 2)
+    state = data.get('state', '')
+    company_name = (d.get('company') or {}).get('name', '')
+    item_lines = []
+    for line in d['lines']:
+        ld = line['_data']
+        qty = float(ld.get('qty', 0) or 0)
+        qty_str = str(int(qty)) if qty == int(qty) else str(qty)
+        subtotal = float(ld.get('price_subtotal', 0) or 0)
+        item_lines.append(f"- {line['product_name']} x{qty_str}: {currency_format(subtotal, currency)}")
+    items_txt = '\n'.join(item_lines)
+    header = company_name or _('receipt', lang)
+    text = f"{header}\n{ref} ({state})\n{date_val}\n\n{items_txt}\n\n{ _('total', lang)}: {currency_format(total, currency)}\n{ _('paid', lang)}: {currency_format(paid, currency)}"
+    if remaining > 0.01:
+        text += f"\n{ _('remaining', lang)}: {currency_format(remaining, currency)}"
+    return text
 
 
 def generate_receipt_html(order_id, lang='en'):

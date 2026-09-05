@@ -1282,10 +1282,14 @@ let App = {
           <tbody>${paymentsHtml}</tbody>
         </table>`
       }
+      const _email = this._esc(o.partner_email || '')
+      const _phone = this._esc(o.partner_phone || '')
       html += `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         ${isPending ? `<button class="btn btn-success" onclick="App.validatePayment(${id})">${I18n.t('payment.validate', 'Validate')}</button>` : ''}
         <button class="btn btn-primary" onclick="App.openPrintReceipt(${id})">${I18n.t('receipt.print', 'Print Receipt')}</button>
         <button class="btn btn-success" onclick="App.downloadReceiptPdf(${id})">${I18n.t('receipt.pdf', 'Download PDF')}</button>
+        <button class="btn btn-secondary" onclick="App.emailReceipt(${id}, '${_email}')">✉️ ${I18n.t('receipt.email', 'Email')}</button>
+        <button class="btn btn-success" onclick="App.whatsappReceipt(${id}, '${_phone}')">💬 WhatsApp</button>
         <button class="btn btn-secondary" onclick="App.closeModal()">${I18n.t('common.close', 'Close')}</button>
       </div>`
       this.showModal(html)
@@ -1323,6 +1327,47 @@ let App = {
         alert(r <= 0.01 ? I18n.t('payment.validated', 'Payment validated') || 'Paid' : `${I18n.t('order.remaining', 'Remaining')}: ${this.currencyFormat(r)}`)
       } catch(e) { alert('Error: ' + e.message) }
     }
+  },
+
+  async emailReceipt(id, defaultEmail) {
+    const email = defaultEmail || ''
+    this.showModal(`<h3>✉️ ${I18n.t('receipt.email', 'Email')} - ${I18n.t('receipt.title', 'Receipt')}</h3>
+      <div class="form-group"><label>${I18n.t('customer.email', 'Email')}</label><input id="receipt-email-to" value="${this._esc(email)}" placeholder="customer@example.com"></div>
+      <div id="receipt-email-status" style="font-size:13px;margin-bottom:8px"></div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-primary" id="receipt-email-send">${I18n.t('common.send', 'Send')}</button>
+        <button class="btn btn-secondary" id="receipt-email-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
+      </div>`)
+    document.getElementById('receipt-email-cancel').onclick = () => this.showOrderDetail(id)
+    document.getElementById('receipt-email-send').onclick = async () => {
+      const to = document.getElementById('receipt-email-to').value.trim()
+      if (!to || !to.includes('@')) { alert(I18n.t('receipt.email_invalid', 'Enter a valid email address')); return }
+      const status = document.getElementById('receipt-email-status')
+      status.textContent = I18n.t('common.loading', 'Loading...') + '...'
+      try {
+        const res = await this.api('POST', `/receipt/${id}/email`, { email: to })
+        status.style.color = 'var(--success)'
+        status.textContent = res.message || 'Sent'
+      } catch(e) {
+        status.style.color = 'var(--danger)'
+        status.textContent = 'Error: ' + e.message
+      }
+    }
+  },
+
+  async whatsappReceipt(id, defaultPhone) {
+    let text = '', phone = defaultPhone || ''
+    try {
+      const res = await this.api('GET', `/receipt/${id}/share-text`)
+      text = (res.data && res.data.text) || ''
+      phone = phone || (res.data && res.data.phone) || ''
+    } catch(e) { alert('Error: ' + e.message); return }
+    const input = prompt(I18n.t('customer.phone', 'Phone') + ' (WhatsApp)', phone || '')
+    if (input === null) return
+    let digits = (input || '').replace(/\D/g, '')
+    if (!digits) { alert(I18n.t('receipt.phone_invalid', 'Enter a valid phone number')); return }
+    if (digits.length === 9 && digits[0] === '6') digits = '224' + digits
+    window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(text), '_blank')
   },
 
   openPrintReceipt(id) {

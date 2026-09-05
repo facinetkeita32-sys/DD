@@ -135,7 +135,7 @@
   "report.date_from": "Du",
   "report.date_to": "Au",
   "report.email": "Envoyer par Email",
-  "report.email_confirm": "Envoyer ce rapport aux administrateurs et managers ?",
+  "report.email_confirm": "Envoyer ce rapport aux administrateurs ?",
   "report.email_sent": "Rapport envoyé",
 
   "settings.title": "Paramètres",

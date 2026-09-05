@@ -1238,20 +1238,20 @@ def email_sales_report():
     total_orders = len(orders)
     avg_order = total_sales / total_orders if total_orders else 0
 
-    # Recipients: active admin/manager users with an email + optional explicit list
+    # Recipients: active admin users with an email + optional explicit list
     recipients = set()
     for u in ResUsers().search([]):
         role = u._data.get('role', '')
         email = (u._data.get('email', '') or '').strip()
         active = u._data.get('active', True)
-        if role in ('admin', 'manager') and active and email and '@' in email:
+        if role == 'admin' and active and email and '@' in email:
             recipients.add(email)
     for e in (data.get('emails') or []):
         e = (e or '').strip()
         if e and '@' in e:
             recipients.add(e)
     if not recipients:
-        return error_response('No admin/manager email addresses found. Add emails in Users first.', 400)
+        return error_response('No admin email addresses found. Add emails in Users first.', 400)
 
     # Plaintext summary
     label = period.upper()

@@ -135,7 +135,7 @@
   "report.date_from": "From",
   "report.date_to": "To",
   "report.email": "Email Report",
-  "report.email_confirm": "Email this report to admin and manager users?",
+  "report.email_confirm": "Email this report to admin users?",
   "report.email_sent": "Report emailed",
 
   "settings.title": "Settings",

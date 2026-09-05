@@ -16,7 +16,8 @@ def get_smtp_config():
     }
 
 
-def send_receipt_email(to_email, subject, body, pdf_bytes=None, filename='receipt.pdf'):
+def send_mail(to_email, subject, body, attachments=None):
+    """Generic plaintext email sender. attachments: list of (filename, bytes, subtype)."""
     cfg = get_smtp_config()
     if not cfg['host']:
         return False, 'Email not configured (SMTP_HOST missing)'
@@ -28,12 +29,11 @@ def send_receipt_email(to_email, subject, body, pdf_bytes=None, filename='receip
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body or '', 'plain', 'utf-8'))
-        if pdf_bytes:
-            part = MIMEApplication(pdf_bytes, _subtype='pdf')
+        for filename, data, subtype in (attachments or []):
+            part = MIMEApplication(data, _subtype=subtype or 'octet-stream')
             part.add_header('Content-Disposition', 'attachment', filename=filename)
             msg.attach(part)
         if cfg['port'] == 465:
-            # Implicit SSL (e.g. Gmail/Outlook SSL port)
             with smtplib.SMTP_SSL(cfg['host'], cfg['port'], timeout=20) as server:
                 if cfg['user']:
                     try:
@@ -54,3 +54,8 @@ def send_receipt_email(to_email, subject, body, pdf_bytes=None, filename='receip
         return True, 'Email sent'
     except Exception as e:
         return False, str(e)
+
+
+def send_receipt_email(to_email, subject, body, pdf_bytes=None, filename='receipt.pdf'):
+    attachments = [(filename, pdf_bytes, 'pdf')] if pdf_bytes else None
+    return send_mail(to_email, subject, body, attachments)

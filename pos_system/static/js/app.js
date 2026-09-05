@@ -92,6 +92,11 @@ let App = {
     document.getElementById('open-session-btn').onclick = () => this.openSession()
     document.getElementById('generate-report-btn').onclick = () => this.generateReport()
     document.getElementById('export-csv-btn').onclick = () => this.exportReportCsv()
+    document.getElementById('email-report-btn').onclick = () => this.emailReport()
+    document.getElementById('report-period').onchange = () => {
+      const show = document.getElementById('report-period').value === 'custom'
+      document.getElementById('report-date-range').style.display = show ? 'inline' : 'none'
+    }
     document.getElementById('bulk-delete-btn').onclick = () => this.bulkDeleteProducts()
     document.getElementById('settings-save-btn').onclick = () => this.saveSettings()
     document.getElementById('add-user-btn').onclick = () => this.showUserModal()
@@ -1543,10 +1548,22 @@ let App = {
 
   // === REPORTS ===
 
-  async generateReport() {
+  _reportQuery() {
     const period = document.getElementById('report-period').value
+    let q = `period=${period}`
+    if (period === 'custom') {
+      const df = document.getElementById('report-date-from').value
+      const dt = document.getElementById('report-date-to').value
+      if (df) q += `&date_from=${df}`
+      if (dt) q += `&date_to=${dt}`
+    }
+    return { period, query: q }
+  },
+
+  async generateReport() {
+    const { query } = this._reportQuery()
     try {
-      const res = await this.api('GET', `/reports/sales?period=${period}`)
+      const res = await this.api('GET', `/reports/sales?${query}`)
       const r = res.data
       const container = document.getElementById('report-results')
       container.innerHTML = `
@@ -1566,9 +1583,9 @@ let App = {
   },
 
   async exportReportCsv() {
-    const period = document.getElementById('report-period').value
+    const { period, query } = this._reportQuery()
     try {
-      const res = await fetch(`/api/reports/sales/export?period=${period}`, { credentials: 'same-origin' })
+      const res = await fetch(`/api/reports/sales/export?${query}`, { credentials: 'same-origin' })
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -1581,6 +1598,20 @@ let App = {
       URL.revokeObjectURL(url)
     } catch(e) {
       alert('Export error: ' + e.message)
+    }
+  },
+
+  async emailReport() {
+    const { period, query } = this._reportQuery()
+    void query
+    const df = document.getElementById('report-date-from').value
+    const dt = document.getElementById('report-date-to').value
+    if (!confirm(I18n.t('report.email_confirm', 'Email this report to admin and manager users?'))) return
+    try {
+      const res = await this.api('POST', '/reports/sales/email', { period, date_from: df || null, date_to: dt || null })
+      alert(res.message || I18n.t('report.email_sent', 'Report emailed'))
+    } catch(e) {
+      alert('Error: ' + e.message)
     }
   },
 

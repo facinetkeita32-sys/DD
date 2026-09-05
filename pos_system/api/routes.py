@@ -1086,35 +1086,58 @@ def get_dashboard():
 
 # === REPORTS ===
 
+def _get_sales_orders(period='daily', date_from=None, date_to=None):
+    now = datetime.now()
+
+    if date_from or date_to:
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        orders = []
+        for o in all_orders:
+            d = (o._data.get('date_order', '') or '')[:10]
+            if date_from and d < date_from:
+                continue
+            if date_to and d > date_to:
+                continue
+            orders.append(o)
+        return orders
+
+    if period == 'daily':
+        date_str = now.strftime('%Y-%m-%d')
+        return PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
+    elif period == 'weekly':
+        from datetime import timedelta
+        week_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        return [o for o in all_orders if o._data.get('date_order', '')[:10] >= week_ago]
+    elif period == 'biweekly':
+        from datetime import timedelta
+        two_weeks_ago = (now - timedelta(days=14)).strftime('%Y-%m-%d')
+        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+        return [o for o in all_orders if o._data.get('date_order', '')[:10] >= two_weeks_ago]
+    elif period == 'monthly':
+        month_str = now.strftime('%Y-%m')
+        return PosOrder().search([('date_order', 'like', month_str), ('state', 'in', ['paid', 'done'])])
+    elif period == 'annual':
+        year_str = now.strftime('%Y')
+        return PosOrder().search([('date_order', 'like', year_str), ('state', 'in', ['paid', 'done'])])
+    elif period == 'custom':
+        # custom without dates = everything
+        return PosOrder().search([('state', 'in', ['paid', 'done'])])
+    else:
+        return PosOrder().search([('state', 'in', ['paid', 'done'])])
+
+
 @api_bp.route('/reports/sales/export', methods=['GET'])
 @login_required
 @permission_required('report.read')
 def export_sales_report_csv():
     period = request.args.get('period', 'daily')
     fmt = request.args.get('format', 'csv')
+    date_from = request.args.get('date_from') or None
+    date_to = request.args.get('date_to') or None
     now = datetime.now()
 
-    if period == 'daily':
-        date_str = now.strftime('%Y-%m-%d')
-        orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
-    elif period == 'weekly':
-        from datetime import timedelta
-        week_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
-        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
-        orders = [o for o in all_orders if o._data.get('date_order', '')[:10] >= week_ago]
-    elif period == 'biweekly':
-        from datetime import timedelta
-        two_weeks_ago = (now - timedelta(days=14)).strftime('%Y-%m-%d')
-        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
-        orders = [o for o in all_orders if o._data.get('date_order', '')[:10] >= two_weeks_ago]
-    elif period == 'monthly':
-        month_str = now.strftime('%Y-%m')
-        orders = PosOrder().search([('date_order', 'like', month_str), ('state', 'in', ['paid', 'done'])])
-    elif period == 'annual':
-        year_str = now.strftime('%Y')
-        orders = PosOrder().search([('date_order', 'like', year_str), ('state', 'in', ['paid', 'done'])])
-    else:
-        orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+    orders = _get_sales_orders(period, date_from, date_to)
 
     total_sales = sum(o.amount_total for o in orders)
     avg_order = total_sales / len(orders) if orders else 0
@@ -1161,29 +1184,11 @@ def export_sales_report_csv():
 @login_required
 def get_sales_report():
     period = request.args.get('period', 'daily')
+    date_from = request.args.get('date_from') or None
+    date_to = request.args.get('date_to') or None
     now = datetime.now()
 
-    if period == 'daily':
-        date_str = now.strftime('%Y-%m-%d')
-        orders = PosOrder().search([('date_order', 'like', date_str), ('state', 'in', ['paid', 'done'])])
-    elif period == 'weekly':
-        from datetime import timedelta
-        week_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
-        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
-        orders = [o for o in all_orders if o._data.get('date_order', '')[:10] >= week_ago]
-    elif period == 'biweekly':
-        from datetime import timedelta
-        two_weeks_ago = (now - timedelta(days=14)).strftime('%Y-%m-%d')
-        all_orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
-        orders = [o for o in all_orders if o._data.get('date_order', '')[:10] >= two_weeks_ago]
-    elif period == 'monthly':
-        month_str = now.strftime('%Y-%m')
-        orders = PosOrder().search([('date_order', 'like', month_str), ('state', 'in', ['paid', 'done'])])
-    elif period == 'annual':
-        year_str = now.strftime('%Y')
-        orders = PosOrder().search([('date_order', 'like', year_str), ('state', 'in', ['paid', 'done'])])
-    else:
-        orders = PosOrder().search([('state', 'in', ['paid', 'done'])])
+    orders = _get_sales_orders(period, date_from, date_to)
 
     total_sales = sum(o.amount_total for o in orders)
     total_orders = len(orders)
@@ -1216,6 +1221,90 @@ def get_sales_report():
         'avg_order': round(avg_order, 2),
         'orders': order_list,
     })
+
+
+@api_bp.route('/reports/sales/email', methods=['POST'])
+@login_required
+@permission_required('report.read')
+def email_sales_report():
+    from ..services.email_service import send_mail
+    data = request.get_json() or {}
+    period = data.get('period', 'daily')
+    date_from = data.get('date_from') or None
+    date_to = data.get('date_to') or None
+
+    orders = _get_sales_orders(period, date_from, date_to)
+    total_sales = sum(float(o._data.get('amount_total', 0) or 0) for o in orders)
+    total_orders = len(orders)
+    avg_order = total_sales / total_orders if total_orders else 0
+
+    # Recipients: active admin/manager users with an email + optional explicit list
+    recipients = set()
+    for u in ResUsers().search([]):
+        role = u._data.get('role', '')
+        email = (u._data.get('email', '') or '').strip()
+        active = u._data.get('active', True)
+        if role in ('admin', 'manager') and active and email and '@' in email:
+            recipients.add(email)
+    for e in (data.get('emails') or []):
+        e = (e or '').strip()
+        if e and '@' in e:
+            recipients.add(e)
+    if not recipients:
+        return error_response('No admin/manager email addresses found. Add emails in Users first.', 400)
+
+    # Plaintext summary
+    label = period.upper()
+    if date_from or date_to:
+        label = f"CUSTOM {date_from or '...'} to {date_to or '...'}"
+    lines = [
+        f"Sales Report - {label}",
+        f"Total Sales: {total_sales:.2f}",
+        f"Total Orders: {total_orders}",
+        f"Avg Order: {avg_order:.2f}",
+        "",
+        "Order Ref | Date | Total | Status",
+    ]
+    for o in orders:
+        d = o._data
+        lines.append(f"{d.get('name', '') or o.id} | {(d.get('date_order', '') or '')[:19]} | {float(d.get('amount_total', 0) or 0):.2f} | {d.get('state', '')}")
+    body = '\n'.join(lines)
+
+    # CSV attachment
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Period', label])
+    writer.writerow(['Total Sales', f'{total_sales:.2f}'])
+    writer.writerow(['Total Orders', total_orders])
+    writer.writerow(['Avg Order', f'{avg_order:.2f}'])
+    writer.writerow([])
+    writer.writerow(['Order Ref', 'Date', 'Total', 'Status'])
+    for o in orders:
+        d = o._data
+        writer.writerow([
+            d.get('name', '') or f"Order #{o.id}",
+            (d.get('date_order', '') or '')[:19],
+            f"{float(d.get('amount_total', 0) or 0):.2f}",
+            d.get('state', ''),
+        ])
+    csv_bytes = output.getvalue().encode('utf-8')
+    filename = f"sales_report_{period}_{datetime.now().strftime('%Y%m%d')}.csv"
+
+    sent, failed = [], []
+    for email in sorted(recipients):
+        ok, msg = send_mail(email, f"Sales Report - {label}", body, [(filename, csv_bytes, 'csv')])
+        if ok:
+            sent.append(email)
+        else:
+            failed.append(f"{email}: {msg}")
+    log_activity('email_report', f"Sales report {label} sent to {', '.join(sent)}")
+    if not sent:
+        return error_response(failed[0] if failed else 'Email failed', 500)
+    result = {'sent': sent}
+    if failed:
+        result['failed'] = failed
+    return success_response(result, f"Report sent to {', '.join(sent)}")
 
 
 

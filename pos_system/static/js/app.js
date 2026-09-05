@@ -612,6 +612,7 @@ let App = {
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
+        <button class="btn btn-warning btn-lg btn-block" id="payment-paylater" style="padding:12px 28px;font-size:16px;margin-top:8px">${I18n.t('payment.pay_later', 'Pay Later')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
       </div>`
 
@@ -625,6 +626,7 @@ let App = {
     }
     document.getElementById('payment-tendered').dispatchEvent(new Event('input'))
     document.getElementById('payment-confirm').onclick = () => this.confirmPayment(total)
+    document.getElementById('payment-paylater').onclick = () => this.payLater(total)
     document.getElementById('payment-cancel').onclick = () => this.closeModal()
   },
 
@@ -691,6 +693,42 @@ let App = {
     } catch(e) {
       alert('Error: ' + e.message)
     }
+  },
+
+  async payLater(total) {
+    const methodId = parseInt(document.getElementById('payment-method').value)
+    const dz = this.selectedDeliveryZone ? (this.deliveryZones || []).find(z => z.id === this.selectedDeliveryZone) : null
+    const dzCost = dz ? dz.cost : 0
+    const lines = this.cart.map(item => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      qty: item.qty,
+      price_unit: item.price_unit,
+      discount: item.discount || 0,
+      price_subtotal: (item.qty * item.price_unit) * (1 - (item.discount || 0) / 100),
+    }))
+    const orderData = {
+      lines,
+      payments: [],
+      partner_id: this.cartCustomer || false,
+      amount_total: total,
+      delivery_cost: dzCost,
+      delivery_contact_name: (document.getElementById('delivery-contact-name') || {}).value || '',
+      delivery_contact_phone: (document.getElementById('delivery-contact-phone') || {}).value || '',
+      state: 'pending',
+    }
+    if (dz) orderData.delivery_zone_id = dz.id
+    try {
+      const res = await this.api('POST', '/orders', orderData)
+      this.closeModal()
+      this.clearCart()
+      const prodRes = await this.api('GET', '/products')
+      this.products = prodRes.data || []
+      this.renderProducts()
+      this.renderOrdersTable()
+      this.renderDashboard()
+      alert('Order saved as pending - remaining: ' + this.currencyFormat(total))
+    } catch(e) { alert('Error: ' + e.message) }
   },
 
   // === CUSTOMER SELECT ===
@@ -1184,6 +1222,7 @@ let App = {
           <td>${o.user_name || ''}</td>
           <td style="max-width:200px;white-space:normal">${items}</td>
           <td>${this.currencyFormat(o.amount_total)}</td>
+          <td style="color:var(--danger);font-weight:600">${this.currencyFormat(o.remaining || 0)}</td>
           <td><span class="status-badge status-${o.state}">${o.state}</span></td>
           <td><button class="btn btn-sm btn-primary view-order" data-id="${o.id}">${I18n.t('common.edit', 'View')}</button></td>
         </tr>`

@@ -626,6 +626,7 @@ def get_orders():
                     pd_data['payment_method_name'] = method[0]._data.get('name', '')
             payments_data.append(pd_data)
         d['payments'] = payments_data
+        d['remaining'] = round(float(d.get('amount_total',0) or 0) - float(d.get('amount_paid',0) or 0), 2)
         pid = order._data.get('partner_id', 0) or 0
         if pid:
             partner = ResPartner().browse([pid])
@@ -659,6 +660,7 @@ def get_order(order_id):
         d['lines'].append(ld)
     payments = PosPayment().search([('order_id', '=', order.id)])
     d['payments'] = [model_to_dict(p) for p in payments]
+    d['remaining'] = round(float(d.get('amount_total',0) or 0) - float(d.get('amount_paid',0) or 0), 2)
     pid = order._data.get('partner_id', 0) or 0
     if pid:
         partner = ResPartner().browse([pid])
@@ -714,15 +716,25 @@ def create_order():
             pmt = PosPayment().create(pmt_data)
             paid_total += pmt.amount
 
+        # Pay later: if paid < total, mark as pending with remaining balance
+        remaining = grand_total - paid_total
+        if paid_total < grand_total - 0.01:
+            state = 'pending'
+            change = 0
+        else:
+            state = 'paid'
+            change = max(0, paid_total - grand_total)
         order.write({
             'amount_total': grand_total,
             'delivery_cost': delivery_cost,
             'amount_paid': paid_total,
-            'amount_change': max(0, paid_total - grand_total),
-            'state': 'paid',
+            'amount_change': change,
+            'state': state,
         })
-        log_activity('create', f"Order created: {order._data.get('name')}")
-        return success_response(model_to_dict(order), 'Order created')
+        log_activity('create', f"Order created: {order._data.get('name')} state={state} paid={paid_total}/{grand_total}")
+        d = model_to_dict(order)
+        d['remaining'] = round(remaining, 2)
+        return success_response(d, 'Order created')
     except Exception as e:
         return error_response(str(e))
 
@@ -751,6 +763,40 @@ def cancel_order(order_id):
     log_activity('cancel', f"Order cancelled: {order_id}")
     return success_response(message='Order cancelled')
 
+
+@api_bp.route('/orders/<int:order_id>/pay', methods=['POST'])
+@login_required
+def pay_order(order_id):
+    orders = PosOrder().browse([order_id])
+    if not orders:
+        return error_response('Order not found', 404)
+    order = orders[0]
+    if order._data.get('state') not in ('pending', 'draft'):
+        return error_response('Only pending orders can be paid', 400)
+    data = request.get_json() or {}
+    amount = float(data.get('amount', 0) or 0)
+    if amount <= 0:
+        return error_response('Amount must be positive', 400)
+    paid = float(order._data.get('amount_paid', 0) or 0)
+    total = float(order._data.get('amount_total', 0) or 0)
+    remaining = total - paid
+    if amount > remaining + 0.01:
+        return error_response(f"Amount exceeds remaining {remaining:.2f}", 400)
+    # create payment
+    pm_id = data.get('payment_method_id')
+    if not pm_id:
+        # default to first payment method
+        methods = PosPaymentMethod().search([('active', '=', True)], limit=1)
+        pm_id = methods[0].id if methods else 1
+    PosPayment().create({'order_id': order.id, 'payment_method_id': pm_id, 'amount': amount})
+    new_paid = paid + amount
+    new_remaining = total - new_paid
+    new_state = 'paid' if new_remaining <= 0.01 else 'pending'
+    order.write({'amount_paid': new_paid, 'amount_change': 0, 'state': new_state})
+    log_activity('pay', f"Order {order._data.get('name')} paid {amount:.2f} remaining {new_remaining:.2f}")
+    d = model_to_dict(order)
+    d['remaining'] = round(new_remaining, 2)
+    return success_response(d, 'Payment recorded')
 
 
 # === RECEIPTS ===

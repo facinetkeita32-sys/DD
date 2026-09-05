@@ -49,6 +49,7 @@
   "payment.change": "Monnaie",
   "payment.confirm": "Confirmer le Paiement",
   "payment.cancel": "Annuler",
+  "payment.pay_later": "Payer plus tard",
 
   "order.title": "Commande",
   "order.ref": "Commande #",
@@ -56,6 +57,7 @@
   "order.customer": "Client",
   "order.cashier": "Caissier",
   "order.total": "Total",
+  "order.remaining": "Reste",
   "order.status": "Statut",
   "order.items": "Articles",
   "order.details": "Détails de la Commande",

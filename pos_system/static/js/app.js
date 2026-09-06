@@ -454,7 +454,12 @@ let App = {
     this._lastBarcodeTime = now
     const product = this.products.find(p => p.barcode && p.barcode.trim() === barcode)
     if (product) {
-      this.addToCart(product.id)
+      const added = this.addToCart(product.id)
+      if (added === false) {
+        this.showBarcodeFeedback(`${I18n.t('pos.out_of_stock', 'Out of stock')}: ${product.name}`, 'error')
+        if (input) { input.value = ''; input.focus() }
+        return
+      }
       this.showBarcodeFeedback(`${product.name} ${I18n.t('pos.added', 'added')}!`, 'success')
       const card = document.querySelector(`.product-card[data-id="${product.id}"]`)
       if (card) {
@@ -484,7 +489,13 @@ let App = {
   addToCart(productId) {
     const product = this.products.find(p => p.id === productId)
     if (!product) return
+    const maxQty = product.available_qty || 0
     const existing = this.cart.find(c => c.product_id === productId)
+    const currentQty = existing ? existing.qty : 0
+    if (maxQty <= 0 || currentQty >= maxQty) {
+      alert(I18n.t('pos.out_of_stock', 'Out of stock') + ': ' + product.name)
+      return false
+    }
     if (existing) {
       existing.qty += 1
     } else {
@@ -493,7 +504,7 @@ let App = {
         product_name: product.name,
         price_unit: product.list_price,
         qty: 1,
-        discount: 0,
+        discount: parseFloat(product.discount) || 0,
       })
     }
     this.renderCart()
@@ -516,7 +527,16 @@ let App = {
     if (qty <= 0) {
       this.cart.splice(index, 1)
     } else {
-      this.cart[index].qty = qty
+      const item = this.cart[index]
+      const product = this.products.find(p => p.id === item.product_id)
+      const maxQty = product ? (product.available_qty || 0) : qty
+      if (product && qty > maxQty) {
+        alert(I18n.t('pos.out_of_stock', 'Out of stock') + ': ' + product.name + ` (max ${maxQty})`)
+        item.qty = maxQty
+        if (item.qty <= 0) this.cart.splice(index, 1)
+      } else {
+        item.qty = qty
+      }
     }
     this.renderCart()
   },
@@ -557,10 +577,11 @@ let App = {
       const discAmt = lineTotal * (item.discount || 0) / 100
       const st = lineTotal - discAmt
       subtotal += st
+      const discBadge = (item.discount || 0) > 0 ? ` <span class="cart-disc-badge">-${item.discount}%</span>` : ''
       return `
         <div class="cart-item" style="animation-delay:${i * 30}ms">
           <div class="cart-item-info">
-            <div class="cart-item-name">${item.product_name}</div>
+            <div class="cart-item-name">${item.product_name}${discBadge}</div>
             <div class="cart-item-details">${this.currencyFormat(item.price_unit)} &times; ${item.qty} = <strong>${this.currencyFormat(st)}</strong></div>
           </div>
           <div class="cart-item-actions">
@@ -850,7 +871,7 @@ let App = {
     })
 
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
+      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</td></tr>`
       document.getElementById('select-all-products').checked = false
       this._updateBulkDeleteBar()
       return
@@ -893,6 +914,7 @@ let App = {
         <td>${p.name || ''}</td>
         <td>${this.currencyFormat(p.list_price)}</td>
         <td>${this.currencyFormat(p.cost_price)}</td>
+        <td>${(parseFloat(p.discount) || 0) > 0 ? `<span class="cart-disc-badge">-${p.discount}%</span>` : '-'}</td>
         <td>${qty}</td>
         <td>${stockHtml}</td>
         <td>${expHtml}</td>
@@ -986,6 +1008,7 @@ let App = {
       </div>
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
+      <div class="form-group"><label data-i18n="product.discount">Discount (%)</label><input id="prod-discount" type="number" min="0" max="100" step="1" value="${product ? product.discount || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" value="${product ? this._esc(product.barcode || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
@@ -1037,6 +1060,7 @@ let App = {
         name: document.getElementById('prod-name').value,
         list_price: parseFloat(document.getElementById('prod-price').value) || 0,
         cost_price: parseFloat(document.getElementById('prod-cost').value) || 0,
+        discount: Math.min(100, Math.max(0, parseFloat(document.getElementById('prod-discount').value) || 0)),
         available_qty: parseFloat(document.getElementById('prod-qty').value) || 0,
         barcode: document.getElementById('prod-barcode').value,
         expiration_date: document.getElementById('prod-expiration').value || false,
@@ -1202,6 +1226,7 @@ let App = {
       <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">${ids.length} product${ids.length !== 1 ? 's' : ''} selected. Leave blank to keep current value.</p>
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="bulk-price" type="number" step="100" placeholder="New price"></div>
       <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="bulk-cost" type="number" step="100" placeholder="New cost"></div>
+      <div class="form-group"><label data-i18n="product.discount">Discount (%)</label><input id="bulk-discount" type="number" min="0" max="100" step="1" placeholder="New discount %"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="bulk-qty" type="number" step="1" placeholder="New quantity"></div>
       <div class="form-group"><label data-i18n="product.category">Category</label>
         <select id="bulk-category">${catOpts}</select>
@@ -1217,6 +1242,8 @@ let App = {
       if (priceEl.value) data.list_price = parseFloat(priceEl.value)
       const costEl = document.getElementById('bulk-cost')
       if (costEl.value) data.cost_price = parseFloat(costEl.value)
+      const discEl = document.getElementById('bulk-discount')
+      if (discEl.value !== '' && discEl.value !== null) data.discount = Math.min(100, Math.max(0, parseFloat(discEl.value) || 0))
       const qtyEl = document.getElementById('bulk-qty')
       if (qtyEl.value) data.available_qty = parseFloat(qtyEl.value)
       const catEl = document.getElementById('bulk-category')

@@ -349,7 +349,7 @@ def bulk_update_products():
     ids = data.pop('ids', [])
     if not ids:
         return error_response('No product IDs provided', 400)
-    allowed = {'list_price', 'cost_price', 'available_qty', 'categ_id'}
+    allowed = {'list_price', 'cost_price', 'available_qty', 'categ_id', 'discount'}
     update_vals = {k: v for k, v in data.items() if k in allowed and v is not None}
     if not update_vals:
         return error_response('No valid fields to update', 400)
@@ -441,6 +441,7 @@ def bulk_import_products():
         'name': 'name', 'Name': 'name', 'product': 'name',
         'price': 'list_price', 'Price': 'list_price', 'list_price': 'list_price',
         'cost': 'cost_price', 'Cost': 'cost_price', 'cost_price': 'cost_price',
+        'discount': 'discount', 'Discount': 'discount',
         'qty': 'available_qty', 'Qty': 'available_qty', 'quantity': 'available_qty',
         'barcode': 'barcode', 'Barcode': 'barcode',
         'category': 'categ_id', 'Category': 'categ_id',
@@ -688,6 +689,21 @@ def create_order():
     if session_id:
         data['session_id'] = session_id
     try:
+        # Server-side stock validation
+        for line_data in lines_data:
+            prod_id = line_data.get('product_id')
+            qty = float(line_data.get('qty', 0) or 0)
+            if prod_id and qty:
+                products = ProductProduct().browse([prod_id])
+                if products:
+                    product = products[0]
+                    current_qty = product._data.get('available_qty', 0) or 0
+                    if current_qty < qty:
+                        return error_response(
+                            f"Insufficient stock for '{product.name}': "
+                            f"requested {qty}, only {current_qty} available"
+                        )
+
         order = PosOrder().create(data)
         total = 0
         for line_data in lines_data:

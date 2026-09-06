@@ -70,6 +70,7 @@
   "product.name": "Name",
   "product.price": "Price",
   "product.cost": "Cost",
+  "product.discount": "Discount",
   "product.qty": "Quantity",
   "product.category": "Category",
   "product.barcode": "Barcode",

@@ -14,6 +14,7 @@ class ProductProduct(Model):
     description_sale = Text(string='Sale Description')
     list_price = Float(string='Sales Price', digits=(16, 2), required=True, default=0.0)
     cost_price = Float(string='Cost Price', digits=(16, 2), default=0.0)
+    discount = Float(string='Discount (%)', digits=(5, 2), default=0.0)
     categ_id = Many2one('product.category', string='Category')
     type = Selection([
         ('product', 'Stockable Product'),

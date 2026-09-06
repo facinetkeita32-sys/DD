@@ -571,6 +571,7 @@ let App = {
       return
     }
 
+    const DISC_OPTS = [0, 5, 10, 20]
     let subtotal = 0
     container.innerHTML = this.cart.map((item, i) => {
       const lineTotal = item.qty * item.price_unit
@@ -578,11 +579,18 @@ let App = {
       const st = lineTotal - discAmt
       subtotal += st
       const discBadge = (item.discount || 0) > 0 ? ` <span class="cart-disc-badge">-${item.discount}%</span>` : ''
+      const discBtns = DISC_OPTS.map(d =>
+        `<button class="disc-btn${(item.discount || 0) === d ? ' active' : ''}" data-index="${i}" data-disc="${d}">${d}%</button>`
+      ).join('')
       return `
         <div class="cart-item" style="animation-delay:${i * 30}ms">
           <div class="cart-item-info">
             <div class="cart-item-name">${item.product_name}${discBadge}</div>
             <div class="cart-item-details">${this.currencyFormat(item.price_unit)} &times; ${item.qty} = <strong>${this.currencyFormat(st)}</strong></div>
+            <div class="cart-discount-row">
+              <span class="disc-label">${I18n.t('pos.discount', 'Disc')}:</span>
+              ${discBtns}
+            </div>
           </div>
           <div class="cart-item-actions">
             <input type="number" value="${item.qty}" min="0.5" step="0.5" data-index="${i}" class="cart-qty-input">
@@ -642,6 +650,13 @@ let App = {
     })
     container.querySelectorAll('.cart-item-remove').forEach(el => {
       el.onclick = () => this.removeFromCart(parseInt(el.dataset.index))
+    })
+    container.querySelectorAll('.disc-btn').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.index)
+        this.cart[idx].discount = parseInt(btn.dataset.disc) || 0
+        this.renderCart()
+      }
     })
   },
 

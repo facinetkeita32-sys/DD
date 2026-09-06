@@ -175,6 +175,11 @@ tr.row-expiring td { background: #fffbeb; }
 .cart-item-remove { color: var(--danger); cursor: pointer; font-size: 20px; line-height: 1; transition: all var(--transition); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .cart-item-remove:hover { background: var(--danger-light); transform: scale(1.1); }
 .cart-disc-badge { display: inline-block; background: var(--success-light); color: #065f46; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+.cart-discount-row { display: flex; gap: 4px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+.cart-discount-row .disc-label { font-size: 11px; color: var(--text-light); margin-right: 2px; }
+.disc-btn { padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-card); color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
+.disc-btn:hover { border-color: var(--primary); color: var(--primary); }
+.disc-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
 .cart-delivery { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg); }
 .cart-delivery label { font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }

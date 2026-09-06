@@ -321,6 +321,9 @@ def get_product(product_id):
 def create_product():
     data = request.get_json() or {}
     try:
+        if data.get('image'):
+            from ..services.image_utils import resize_image_b64
+            data['image'] = resize_image_b64(data['image'])
         product = ProductProduct().create(data)
         log_activity('create', f"Product created: {data.get('name')}")
         return success_response(model_to_dict(product), 'Product created')
@@ -336,9 +339,40 @@ def update_product(product_id):
     if not products:
         return error_response('Product not found', 404)
     data = request.get_json() or {}
+    if data.get('image'):
+        from ..services.image_utils import resize_image_b64
+        data['image'] = resize_image_b64(data['image'])
     products[0].write(data)
     log_activity('update', f"Product updated: {product_id}")
     return success_response(model_to_dict(products[0]), 'Product updated')
+
+
+@api_bp.route('/products/recompress-images', methods=['POST'])
+@login_required
+@permission_required('product.write')
+def recompress_images():
+    """One-time shrink of all stored product images (800px JPEG)."""
+    from ..services.image_utils import resize_image_b64
+    shrunk, skipped, before, after = 0, 0, 0, 0
+    for p in ProductProduct().search([]):
+        raw = p._data.get('image') or ''
+        if not raw:
+            skipped += 1
+            continue
+        before += len(raw)
+        new = resize_image_b64(raw)
+        after += len(new)
+        if new != raw:
+            p.write({'image': new})
+            shrunk += 1
+        else:
+            skipped += 1
+    log_activity('update', f"Recompressed images: {shrunk} shrunk, {skipped} skipped")
+    return success_response(
+        {'shrunk': shrunk, 'skipped': skipped,
+         'before_kb': round(before / 1024), 'after_kb': round(after / 1024)},
+        f"{shrunk} images shrunk ({round(before/1024)}KB -> {round(after/1024)}KB)"
+    )
 
 
 @api_bp.route('/products/bulk-update', methods=['PUT'])
@@ -409,6 +443,8 @@ def upload_product_image():
         return error_response('Empty file')
     try:
         img_data = base64.b64encode(file.read()).decode('utf-8')
+        from ..services.image_utils import resize_image_b64
+        img_data = resize_image_b64(img_data)
         products[0].write({'image': img_data})
         return success_response({'id': product_id, 'image': img_data}, 'Image uploaded')
     except Exception as e:

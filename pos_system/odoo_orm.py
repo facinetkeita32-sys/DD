@@ -460,7 +460,15 @@ class Model(metaclass=BaseModel):
             if order.startswith('-'):
                 reverse = True
                 order_field = order[1:]
-            results.sort(key=lambda x: x._data.get(order_field, ''), reverse=reverse)
+            elif order.lower().endswith(' desc'):
+                reverse = True
+                order_field = order[:-5].strip()
+            elif order.lower().endswith(' asc'):
+                order_field = order[:-4].strip()
+            if order_field == 'id':
+                results.sort(key=lambda x: x.id, reverse=reverse)
+            else:
+                results.sort(key=lambda x: x._data.get(order_field, ''), reverse=reverse)
         if offset:
             results = results[offset:]
         if limit:

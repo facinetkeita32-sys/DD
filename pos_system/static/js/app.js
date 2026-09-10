@@ -1092,14 +1092,23 @@ let App = {
         data.image = this._newImageBase64
       }
       try {
+        let saved = null
         if (product) {
-          await this.api('PUT', `/products/${product.id}`, data)
+          const r = await this.api('PUT', `/products/${product.id}`, data)
+          saved = r.data
         } else {
-          await this.api('POST', '/products', data)
+          const r = await this.api('POST', '/products', data)
+          saved = r.data
         }
         this.closeModal()
-        const res = await this.api('GET', '/products')
-        this.products = res.data || []
+        if (saved && saved.id) {
+          const idx = this.products.findIndex(p => p.id === saved.id)
+          if (idx >= 0) this.products[idx] = Object.assign({}, this.products[idx], saved)
+          else this.products.unshift(saved)
+        } else {
+          const res = await this.api('GET', '/products')
+          this.products = res.data || []
+        }
         this.renderAll()
       } catch(e) { alert('Error: ' + e.message) }
     }

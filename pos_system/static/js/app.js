@@ -1990,7 +1990,12 @@ let App = {
       <div class="form-group"><label data-i18n="login.username">Login</label><input id="u-login" value="${user ? this._esc(user.login || '') : ''}" ${user ? 'readonly' : ''}></div>
       <div class="form-group"><label data-i18n="user.full_name">Full Name</label><input id="u-name" value="${user ? this._esc(user.name || '') : ''}"></div>
       <div class="form-group"><label data-i18n="user.email">Email</label><input id="u-email" value="${user ? this._esc(user.email || '') : ''}"></div>
-      <div class="form-group"><label data-i18n="user.password">Password</label><input type="password" id="u-password" value="" ${user ? `placeholder="Leave empty to keep current"` : ''}></div>
+      <div class="form-group"><label data-i18n="user.password">Password</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="password" id="u-password" value="" style="flex:1" ${user ? `placeholder="Leave empty to keep current"` : ''}>
+          <button class="btn btn-sm btn-secondary" id="u-password-toggle" title="Show/hide password" style="white-space:nowrap">👁️</button>
+        </div>
+      </div>
       <div class="form-group"><label data-i18n="user.role">Role</label><select id="u-role">
         <option value="admin" ${user && user.role === 'admin' ? 'selected' : ''}>Administrator</option>
         <option value="manager" ${user && user.role === 'manager' ? 'selected' : ''}>Manager</option>
@@ -2004,6 +2009,12 @@ let App = {
         <button class="btn btn-secondary" id="u-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
       </div>`
     this.showModal(html)
+    document.getElementById('u-password-toggle').onclick = () => {
+      const inp = document.getElementById('u-password')
+      const show = inp.type === 'password'
+      inp.type = show ? 'text' : 'password'
+      document.getElementById('u-password-toggle').textContent = show ? '🙈' : '👁️'
+    }
     document.getElementById('u-save').onclick = async () => {
       const data = {
         name: document.getElementById('u-name').value,

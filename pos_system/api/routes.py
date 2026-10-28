@@ -5,6 +5,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, g, session, Response
 
 from ..odoo_orm import env, _db_cache as _db
+from ..session_security import session_generation
 from ..models.res_users import ResUsers
 from ..models.login_log import LoginLog
 from ..models.res_partner import ResPartner
@@ -32,6 +33,9 @@ def login_required(f):
         user_id = session.get('user_id')
         if not user_id:
             return jsonify({'error': 'Unauthorized'}), 401
+        if session.get('generation') != session_generation():
+            session.clear()
+            return jsonify({'error': 'Session expired; please sign in again'}), 401
         user = ResUsers().browse(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 401
@@ -134,6 +138,7 @@ def auth_login():
     users = ResUsers().search([('login', '=', login), ('password', '=', password)])
     if users:
         session['user_id'] = users[0].id
+        session['generation'] = session_generation()
         session['lang'] = users[0].lang
         session['last_activity'] = time.time()
         log_activity('login', f"User {login} logged in")

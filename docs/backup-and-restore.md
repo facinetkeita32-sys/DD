@@ -13,7 +13,8 @@ To recover, select the JSON file under **Restore Backup** and confirm. Version 3
 restores replace the application data, including removal of records that were
 created after the backup. Validation and all database writes run in one
 transaction. A failed restore leaves the database and application cache unchanged.
-After success, sign in again using credentials from the restored backup.
+After success, all browsers must sign in again using credentials from the
+restored backup. Sessions also require a fresh login after a server restart.
 
 Older version 1/2 exports can still be restored. Tables included in those files
 are replaced, while omitted tables are retained. The UI shows a warning because
@@ -29,6 +30,8 @@ The ORM stores its live cache in the web process. The supplied Gunicorn commands
 use **one worker with four threads**, with API access and backups coordinated by
 a shared lock. Keep the app on one process/instance so every request observes the
 same restored cache. Restart/redeploy the service to apply updated startup commands.
+Remote backup uploads release the database lock after taking their snapshot, so
+waiting for the backup server does not block sales or other API requests.
 
 The database adapter supports SQLite and PostgreSQL. Backup rows preserve IDs,
 stored image text, timestamps, and relationships; restore uses backend-specific

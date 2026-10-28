@@ -3,7 +3,7 @@ services:
     name: shop-with-dd-pos
     runtime: python
     repo: https://github.com/facinetkeita32-sys/DD
-    branch: master
+    branch: main
     plan: starter
     region: frankfurt
     buildCommand: pip install -r requirements.txt

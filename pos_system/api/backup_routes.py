@@ -1,5 +1,5 @@
 import json
-from flask import Blueprint, request, jsonify, session, Response
+from flask import Blueprint, request, jsonify, session, Response, g
 from ..services.backup_service import (
     export_full_backup,
     push_backup,
@@ -8,7 +8,7 @@ from ..services.backup_service import (
     get_backup_status,
     save_backup_settings,
 )
-from ..odoo_orm import env
+from ..odoo_orm import env, _db_lock
 from .routes import login_required
 
 backup_bp = Blueprint('backup', __name__, url_prefix='/api/backup')
@@ -41,7 +41,15 @@ def handle_push():
     if not url:
         return jsonify({'success': False, 'error': 'Backup URL is required'}), 400
     api_key = body.get('api_key', '').strip() or None
-    result = push_backup(url, api_key, env)
+    try:
+        data = export_full_backup(env)
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 502
+    # Authentication and the snapshot are complete. The upload only uses the
+    # detached snapshot, so other API requests can proceed during network I/O.
+    if g.pop('db_lock_held', False):
+        _db_lock.release()
+    result = push_backup(url, api_key, env, backup_data=data)
     if result['success']:
         return jsonify(result)
     return jsonify(result), 502

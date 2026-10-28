@@ -4,8 +4,9 @@ import copy
 import json
 import os
 import tempfile
-import time
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 
@@ -82,6 +83,15 @@ class BackupIntegrationTests(unittest.TestCase):
         tables = self.service.export_full_backup()['tables']
         return {name: sorted(json.dumps(row, sort_keys=True) for row in rows)
                 for name, rows in tables.items()}
+
+    def login_client(self):
+        client = self.app.test_client()
+        user = next(row for row in self.baseline['tables']['res.users'] if row['id'] == 1)
+        response = client.post('/api/auth/login', json={
+            'login': user['login'], 'password': user['password'],
+        })
+        self.assertEqual(200, response.status_code)
+        return client
 
     def test_full_round_trip_replaces_all_tables_and_survives_cache_reload(self):
         expected = self.snapshot()
@@ -162,10 +172,7 @@ class BackupIntegrationTests(unittest.TestCase):
                          self.service.export_full_backup()['tables']['login.log'])
 
     def test_download_and_restore_endpoints_and_session_reset(self):
-        client = self.app.test_client()
-        with client.session_transaction() as session:
-            session['user_id'] = 1
-            session['last_activity'] = time.time()
+        client = self.login_client()
         response = client.get('/api/backup/download')
         self.assertEqual(200, response.status_code)
         data = response.get_json()
@@ -184,6 +191,72 @@ class BackupIntegrationTests(unittest.TestCase):
         with client.session_transaction() as session:
             self.assertNotIn('user_id', session)
         self.assertEqual(401, client.get('/api/backup/export').status_code)
+
+    def test_restore_invalidates_other_browsers_and_allows_fresh_login(self):
+        restoring_client = self.login_client()
+        other_client = self.login_client()
+        failure = restoring_client.post('/api/backup/restore', json={
+            'data': {'version': '99.0'},
+        })
+        self.assertEqual(400, failure.status_code)
+        self.assertEqual(200, other_client.get('/api/auth/me').status_code)
+        restored = copy.deepcopy(self.baseline)
+        user = next(row for row in restored['tables']['res.users'] if row['id'] == 1)
+        user['password'] = 'restored-password'
+        response = restoring_client.post('/api/backup/restore', json={'data': restored})
+        self.assertEqual(200, response.status_code)
+        for client in (restoring_client, other_client):
+            self.assertEqual(401, client.get('/api/auth/me').status_code)
+            self.assertEqual(401, client.get('/api/backup/export').status_code)
+        self.assertEqual(401, other_client.post('/api/auth/login', json={
+            'login': user['login'], 'password': 'admin',
+        }).status_code)
+        self.assertEqual(200, other_client.post('/api/auth/login', json={
+            'login': user['login'], 'password': user['password'],
+        }).status_code)
+        self.assertEqual(200, other_client.get('/api/auth/me').status_code)
+
+    def test_service_restore_also_invalidates_sessions(self):
+        client = self.login_client()
+        result = self.service.restore_from_data(None, copy.deepcopy(self.baseline))
+        self.assertTrue(result['success'], result)
+        self.assertEqual(401, client.get('/api/auth/me').status_code)
+
+    def test_remote_upload_does_not_block_other_api_requests(self):
+        uploading_client = self.login_client()
+        other_client = self.login_client()
+        upload_started = threading.Event()
+        finish_upload = threading.Event()
+        uploaded = []
+
+        def stalled_upload(request, timeout):
+            uploaded.append(json.loads(request.data))
+            upload_started.set()
+            if not finish_upload.wait(10):
+                raise TimeoutError('Test upload was not released')
+            return response
+
+        with patch.object(self.service.urllib.request, 'urlopen') as urlopen:
+            response = urlopen.return_value
+            response.__enter__.return_value.read.return_value = b'ok'
+            urlopen.side_effect = stalled_upload
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                upload = executor.submit(uploading_client.post, '/api/backup/push', json={
+                    'url': 'https://example.test/backup', 'api_key': 'test-key',
+                })
+                try:
+                    self.assertTrue(upload_started.wait(5), 'Upload never started')
+                    other_request = executor.submit(other_client.get, '/api/auth/me')
+                    self.assertEqual(200, other_request.result(timeout=3).status_code)
+                    self.assertFalse(upload.done())
+                    self.assertEqual(self.baseline['tables']['product.product'],
+                                     uploaded[0]['tables']['product.product'])
+                finally:
+                    finish_upload.set()
+                result = upload.result(timeout=5)
+                self.assertEqual(200, result.status_code)
+                self.assertTrue(result.get_json()['success'])
+        self.assertEqual(200, uploading_client.get('/api/auth/me').status_code)
 
     def test_auto_backup_settings_persist_and_worker_is_replaced(self):
         values = {'url': 'https://example.test/backup', 'api_key': 'key',

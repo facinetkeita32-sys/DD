@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 from .. import db
 from ..odoo_orm import Model, Many2many, Boolean, _db_cache, _db_lock
+from ..session_security import invalidate_sessions
 
 _last_backup_time = None
 _auto_backup_thread = None
@@ -100,10 +101,11 @@ def export_full_backup(env=None):
     }
 
 
-def push_backup(url, api_key=None, env=None):
+def push_backup(url, api_key=None, env=None, *, backup_data=None):
     global _last_backup_time
     try:
-        payload = json.dumps(export_full_backup(env)).encode('utf-8')
+        data = export_full_backup(env) if backup_data is None else backup_data
+        payload = json.dumps(data).encode('utf-8')
         req = urllib.request.Request(url, data=payload, method='POST')
         req.add_header('Content-Type', 'application/json')
         if api_key:
@@ -258,6 +260,7 @@ def restore_from_data(env, data):
         # identity because routes and startup code hold references to it.
         _db_cache.clear()
         _db_cache.update(cache)
+        invalidate_sessions()
         if 'backup.settings' in tables:
             load_backup_settings(env)
         count = sum(len(rows) for rows in tables.values())

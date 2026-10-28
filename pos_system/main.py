@@ -22,6 +22,7 @@ app.register_blueprint(backup_bp)
 def before_request():
     # The ORM has a process-local cache. Hold a shared lock across each API
     # request so a restore cannot interleave with a sale or a background backup.
+    # Backup uploads release it early once their detached snapshot is ready.
     if request.path.startswith('/api/'):
         _db_lock.acquire()
         g.db_lock_held = True

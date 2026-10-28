@@ -1,5 +1,4 @@
 import json
-import threading
 import time
 from datetime import datetime
 from functools import wraps
@@ -112,18 +111,14 @@ def log_activity(action, details=''):
         uid = getattr(g, 'user_id', None) or session.get('user_id')
         ip = request.remote_addr or ''
         if uid:
-            # run in background thread to not block request
-            def _do():
-                try:
-                    LoginLog().create({
-                        'user_id': uid,
-                        'action': action,
-                        'details': details,
-                        'ip_address': ip,
-                    })
-                except Exception:
-                    pass
-            threading.Thread(target=_do, daemon=True).start()
+            # Finish within the request's database lock, so a restore cannot
+            # receive a delayed log entry from the previous database contents.
+            LoginLog().create({
+                'user_id': uid,
+                'action': action,
+                'details': details,
+                'ip_address': ip,
+            })
     except Exception:
         pass
 

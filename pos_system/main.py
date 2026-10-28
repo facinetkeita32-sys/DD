@@ -6,7 +6,8 @@ from .api.routes import api_bp
 from .api.backup_routes import backup_bp
 from .i18n import translator
 from .init_data import load_demo_data
-from .odoo_orm import _load_cache, _db_cache, DB_PATH
+from .odoo_orm import _load_cache, _db_cache, _db_lock, DB_PATH
+from .services.backup_service import load_backup_settings
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'pos-guinea-secret-key-change-in-production')
@@ -19,6 +20,11 @@ app.register_blueprint(backup_bp)
 
 @app.before_request
 def before_request():
+    # The ORM has a process-local cache. Hold a shared lock across each API
+    # request so a restore cannot interleave with a sale or a background backup.
+    if request.path.startswith('/api/'):
+        _db_lock.acquire()
+        g.db_lock_held = True
     # Session inactivity timeout (API requests only)
     if request.path.startswith('/api/') and not request.path.startswith('/api/auth/login'):
         if 'user_id' in session:
@@ -30,6 +36,12 @@ def before_request():
             session['last_activity'] = time.time()
     lang = session.get('lang', request.args.get('lang', 'en'))
     translator.set_language(lang)
+
+
+@app.teardown_request
+def release_database_lock(error=None):
+    if g.pop('db_lock_held', False):
+        _db_lock.release()
 
 
 @app.route('/')
@@ -58,6 +70,7 @@ def create_app():
             break
     if not has_data:
         load_demo_data()
+    load_backup_settings()
     return app
 
 

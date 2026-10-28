@@ -9,7 +9,7 @@ from flask import g
 from . import db
 
 _db_cache = {}
-_db_lock = threading.Lock()
+_db_lock = threading.RLock()
 
 def _get_db_path():
     env_db = os.environ.get('DB_PATH') or os.environ.get('RENDER_DISK_PATH')

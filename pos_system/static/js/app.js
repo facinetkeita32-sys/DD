@@ -1926,13 +1926,15 @@ let App = {
         if (res.success) {
           msg.textContent = I18n.t('backup.restore_done', 'Restore completed') + ` (${res.message || ''})`
           msg.style.color = 'var(--success)'
+          alert([msg.textContent, ...(res.warnings || []), 'Please sign in using the restored account credentials.'].join('\n\n'))
+          window.location.reload()
         } else {
           msg.textContent = res.error || 'Restore failed'
           msg.style.color = 'var(--danger)'
         }
         setTimeout(() => msg.textContent = '', 5000)
       } catch (err) {
-        alert('Invalid JSON file: ' + err.message)
+        alert('Restore failed: ' + err.message)
       }
     }
     reader.readAsText(file)

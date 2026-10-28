@@ -55,7 +55,11 @@ def handle_restore():
     if not data:
         return jsonify({'success': False, 'error': 'Backup data is required'}), 400
     result = restore_from_data(env, data)
-    return jsonify(result)
+    if result['success']:
+        # The restored users/credentials may differ from the current session.
+        session.clear()
+        return jsonify(result)
+    return jsonify(result), 400
 
 
 @backup_bp.route('/status', methods=['GET'])
@@ -69,4 +73,4 @@ def handle_status():
 def handle_save_settings():
     body = request.get_json(force=True) or {}
     result = save_backup_settings(body, env)
-    return jsonify(result)
+    return jsonify(result), 200 if result['success'] else 400

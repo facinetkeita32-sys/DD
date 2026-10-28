@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 5000
 
-CMD gunicorn pos_system.main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+CMD gunicorn pos_system.main:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120

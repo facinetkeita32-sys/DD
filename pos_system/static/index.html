@@ -36,20 +36,20 @@
   </div>
 
   <div id="main-screen" class="screen">
-    <nav id="navbar">
-      <button id="nav-toggle" class="nav-toggle" aria-label="Menu">☰</button>
-      <div class="nav-brand"><img id="nav-logo-img" class="nav-logo" style="display:none"><span id="nav-brand-text">🛒</span><span data-i18n="app.name">Shop With DD POS</span></div>
+    <nav id="navbar" aria-label="Main navigation">
+      <button id="nav-toggle" class="nav-toggle" aria-label="Menu" aria-controls="nav-links" aria-expanded="false">☰</button>
+      <div class="nav-brand"><img id="nav-logo-img" class="nav-logo" alt="" style="display:none"><span id="nav-brand-text" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3h2l3 12h11l3-9H6M9 20h.01M19 20h.01"/></svg></span><span data-i18n="app.name">Shop With DD POS</span></div>
       <div class="nav-links" id="nav-links">
-        <a class="nav-link active" data-screen="pos" data-i18n="nav.pos">POS</a>
-        <a class="nav-link" data-screen="products" data-i18n="nav.products">Products</a>
-        <a class="nav-link" data-screen="orders" data-i18n="nav.orders">Orders</a>
-        <a class="nav-link" data-screen="customers" data-i18n="nav.customers">Customers</a>
-        <a class="nav-link" data-screen="sessions" data-i18n="nav.sessions">Sessions</a>
-        <a class="nav-link" data-screen="reports" data-i18n="nav.reports">Reports</a>
-        <a class="nav-link" data-screen="dashboard" data-i18n="nav.dashboard">Dashboard</a>
-        <a class="nav-link" data-screen="activity" data-i18n="nav.activity">Activity</a>
-        <a class="nav-link nav-link-users" data-screen="users" data-i18n="nav.users" style="display:none">Users</a>
-        <a class="nav-link" data-screen="settings" data-i18n="nav.settings">Settings</a>
+        <button type="button" class="nav-link active" data-screen="pos" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h2l3 12h11l3-9H6M9 20h.01M19 20h.01"/></svg><span data-i18n="nav.pos">POS</span></button>
+        <button type="button" class="nav-link" data-screen="products"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/></svg><span data-i18n="nav.products">Products</span></button>
+        <button type="button" class="nav-link" data-screen="orders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h6"/></svg><span data-i18n="nav.orders">Orders</span></button>
+        <button type="button" class="nav-link" data-screen="customers"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-4a6 6 0 0 1 12 0v4M16 4a3 3 0 0 1 0 6M18 13a5 5 0 0 1 3 4v4"/></svg><span data-i18n="nav.customers">Customers</span></button>
+        <button type="button" class="nav-link" data-screen="sessions"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M7 3v6M17 3v6M3 11h18M8 16h3"/></svg><span data-i18n="nav.sessions">Sessions</span></button>
+        <button type="button" class="nav-link" data-screen="reports"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M8 16v-5M13 16V6M18 16V9"/></svg><span data-i18n="nav.reports">Reports</span></button>
+        <button type="button" class="nav-link" data-screen="dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span data-i18n="nav.dashboard">Dashboard</span></button>
+        <button type="button" class="nav-link" data-screen="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-i18n="nav.activity">Activity</span></button>
+        <button type="button" class="nav-link nav-link-users" data-screen="users" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg><span data-i18n="nav.users">Users</span></button>
+        <button type="button" class="nav-link" data-screen="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h6l1-3 3-2v-3l2-2-2-4-3-1-1-3H9Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="nav.settings">Settings</span></button>
       </div>
       <div class="nav-right">
         <span id="nav-user" class="nav-user"></span>

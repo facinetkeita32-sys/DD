@@ -37,21 +37,31 @@ let App = {
 
     const navLinks = document.getElementById('nav-links')
     const navToggle = document.getElementById('nav-toggle')
+    const setMenuOpen = open => {
+      navLinks.classList.toggle('open', open)
+      navToggle.textContent = open ? '✕' : '☰'
+      navToggle.setAttribute('aria-expanded', String(open))
+    }
     navToggle.onclick = (e) => {
       e.stopPropagation()
-      navLinks.classList.toggle('open')
-      navToggle.textContent = navLinks.classList.contains('open') ? '✕' : '☰'
+      setMenuOpen(!navLinks.classList.contains('open'))
     }
     document.addEventListener('click', (e) => {
       if (navLinks.classList.contains('open') && !e.target.closest('#navbar')) {
-        navLinks.classList.remove('open')
-        navToggle.textContent = '☰'
+        setMenuOpen(false)
       }
     })
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && navLinks.classList.contains('open')) {
+        setMenuOpen(false)
+        navToggle.focus()
+      }
+    })
+    window.matchMedia('(max-width: 768px)').addEventListener('change', () => setMenuOpen(false))
 
     document.querySelectorAll('.nav-link').forEach(link => {
       link.onclick = () => {
-        navLinks.classList.remove('open')
+        setMenuOpen(false)
         this.showScreen(link.dataset.screen)
       }
     })
@@ -319,8 +329,12 @@ let App = {
     this.applyNavPermissions()
     document.querySelectorAll('.content-screen').forEach(s => s.classList.remove('active'))
     document.getElementById('screen-' + name)?.classList.add('active')
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'))
-    document.querySelector(`.nav-link[data-screen="${name}"]`)?.classList.add('active')
+    document.querySelectorAll('.nav-link').forEach(link => {
+      const active = link.dataset.screen === name
+      link.classList.toggle('active', active)
+      if (active) link.setAttribute('aria-current', 'page')
+      else link.removeAttribute('aria-current')
+    })
     if (name === 'pos') this.refreshAndRenderProducts()
     if (name === 'products') this.refreshAndRenderProducts()
     if (name === 'orders') this.renderOrdersTable()

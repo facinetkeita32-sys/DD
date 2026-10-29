@@ -1,0 +1,137 @@
+/* BI presentation is scoped to the dashboard; POS and shared tables keep their styles. */
+#screen-dashboard { background: #f6f8fc; }
+#screen-dashboard [hidden] { display: none !important; }
+#screen-dashboard .bi-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+#screen-dashboard .bi-eyebrow { color: var(--primary); font-size: 10px; font-weight: 750; letter-spacing: 1.6px; margin-bottom: 8px; }
+#screen-dashboard h2 { font-size: 28px; font-weight: 800; letter-spacing: -.8px; }
+#screen-dashboard .bi-subtitle { margin-top: 7px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+#screen-dashboard .bi-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+#screen-dashboard .btn:disabled { cursor: wait; opacity: .6; transform: none; }
+#screen-dashboard .bi-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; padding: 16px 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: #fff; box-shadow: 0 2px 5px #0f172a03; }
+#screen-dashboard .bi-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#screen-dashboard .bi-field label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+#screen-dashboard .bi-field select, #screen-dashboard .bi-field input { min-width: 0; max-width: 100%; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--text); padding: 9px 12px; height: 38px; font-size: 12px; }
+#screen-dashboard .bi-date-fields { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
+#screen-dashboard .bi-date-fields .btn { min-height: 38px; }
+#screen-dashboard .bi-scope { margin-left: auto; align-self: center; font-size: 11px; color: #66528d; background: #f4efff; border-radius: 100px; padding: 7px 12px; font-weight: 600; }
+#screen-dashboard .bi-scope:empty { display: none; }
+#screen-dashboard .bi-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 14px 2px 18px; font-size: 11px; color: var(--text-secondary); min-height: 14px; }
+#screen-dashboard #dashboard-updated { color: #64748b; }
+#screen-dashboard .bi-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+#screen-dashboard .bi-kpi { min-width: 0; padding: 19px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 3px 10px #0f172a03; transition: box-shadow var(--transition); }
+#screen-dashboard .bi-kpi:hover { box-shadow: 0 6px 18px #0f172a08; }
+#screen-dashboard .bi-kpi-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+#screen-dashboard .bi-kpi-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; }
+#screen-dashboard .bi-tone-revenue { color: #7c3aed; background: #f3edff; }
+#screen-dashboard .bi-tone-orders { color: #2563eb; background: #edf4ff; }
+#screen-dashboard .bi-tone-average { color: #059669; background: #eafaf3; }
+#screen-dashboard .bi-tone-outstanding { color: #b77908; background: #fff6e5; }
+#screen-dashboard .bi-kpi-value { display: block; margin-top: 16px; font-size: clamp(20px, 1.8vw, 30px); font-weight: 800; letter-spacing: -.8px; line-height: 1.3; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+#screen-dashboard .bi-kpi-note { min-height: 30px; margin-top: 6px; color: #64748b; font-size: 10px; line-height: 1.5; }
+#screen-dashboard .bi-comparison { display: flex; flex-wrap: wrap; gap: 5px; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 12px; font-size: 10px; color: #64748b; line-height: 1.5; }
+#screen-dashboard .bi-comparison > :first-child { font-weight: 700; }
+#screen-dashboard .bi-positive { color: #047857; }
+#screen-dashboard .bi-negative { color: #be3446; }
+#screen-dashboard .bi-neutral { color: #64748b; }
+#screen-dashboard .bi-main-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); gap: 20px; margin-bottom: 20px; }
+#screen-dashboard .bi-panel { min-width: 0; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 3px 10px #0f172a03; }
+#screen-dashboard .bi-panel-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; padding: 20px 22px; }
+#screen-dashboard .bi-panel h3 { font-size: 14px; font-weight: 750; letter-spacing: -.15px; }
+#screen-dashboard .bi-panel-heading p { margin-top: 6px; font-size: 10px; color: #64748b; line-height: 1.6; }
+#screen-dashboard .bi-legend { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 10px; white-space: nowrap; }
+#screen-dashboard .bi-legend i { height: 7px; width: 7px; background: var(--primary); border-radius: 50%; }
+#screen-dashboard #dashboard-chart { position: relative; padding: 0 22px 16px; }
+#screen-dashboard .bi-chart-scale { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 4px; }
+#screen-dashboard .bi-chart-plot { position: relative; height: 220px; }
+#screen-dashboard .bi-chart-plot > svg { width: 100%; height: 100%; overflow: visible; }
+#screen-dashboard .bi-grid-line { stroke: #edf0f7; stroke-dasharray: 4 5; }
+#screen-dashboard .bi-chart-line { fill: none; stroke: #7c3aed; stroke-width: 2.5px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+#screen-dashboard .bi-chart-dot { fill: #fff; stroke: #7c3aed; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+#screen-dashboard .bi-chart-targets { position: absolute; inset: 0 1.2%; display: flex; }
+#screen-dashboard .bi-chart-targets button { flex: 1; min-width: 0; position: relative; border: 0; background: transparent; cursor: pointer; border-radius: 4px; }
+#screen-dashboard .bi-chart-targets button:hover, #screen-dashboard .bi-chart-targets button:focus-visible, #screen-dashboard .bi-chart-targets button[aria-pressed="true"] { background: #7c3aed09; outline: 1px solid #7c3aed33; }
+#screen-dashboard .bi-chart-tooltip { display: none; position: absolute; left: 50%; top: 28px; transform: translateX(-50%); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); padding: 9px 12px; background: #fff; color: var(--text-secondary); width: max-content; max-width: 190px; font-size: 10px; text-align: left; pointer-events: none; z-index: 2; }
+#screen-dashboard .bi-chart-tooltip strong { display: block; margin-top: 5px; color: var(--primary); font-size: 12px; }
+#screen-dashboard .bi-chart-targets button:first-child .bi-chart-tooltip { left: 0; transform: none; }
+#screen-dashboard .bi-chart-targets button:last-child .bi-chart-tooltip { left: auto; right: 0; transform: none; }
+#screen-dashboard .bi-chart-targets button:hover .bi-chart-tooltip, #screen-dashboard .bi-chart-targets button:focus-visible .bi-chart-tooltip { display: block; }
+#screen-dashboard .bi-chart-axis { display: flex; justify-content: space-between; gap: 10px; color: #64748b; font-size: 10px; margin-top: 4px; }
+#screen-dashboard .bi-chart-detail { margin-top: 13px; min-height: 30px; color: var(--text-secondary); background: #f8f9fd; padding: 9px 11px; border-radius: 6px; font-size: 10px; line-height: 1.5; }
+#screen-dashboard .bi-chart-data { margin-top: 12px; }
+#screen-dashboard .bi-chart-data summary { color: var(--primary); cursor: pointer; font-size: 10px; padding: 4px 0; }
+#screen-dashboard .bi-chart-data .bi-table-scroll { max-height: 240px; margin-top: 10px; overflow: auto; }
+#screen-dashboard .bi-product-list { list-style: none; padding: 0 22px 12px; }
+#screen-dashboard .bi-product-list li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+#screen-dashboard .bi-product-list li:last-child { border: 0; }
+#screen-dashboard .bi-rank { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; background: #f5f3ff; color: #7c3aed; font-size: 10px; font-weight: 700; }
+#screen-dashboard .bi-product-info { flex: 1; min-width: 0; }
+#screen-dashboard .bi-product-info > div:first-child { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+#screen-dashboard .bi-product-info strong { overflow-wrap: anywhere; font-weight: 650; }
+#screen-dashboard .bi-product-info > div > span { color: var(--text-secondary); font-weight: 650; }
+#screen-dashboard .bi-product-info p { margin-top: 5px; font-size: 10px; color: #64748b; }
+#screen-dashboard .bi-product-track { background: #f1edfa; height: 4px; border-radius: 5px; overflow: hidden; margin-top: 9px; }
+#screen-dashboard .bi-product-track > span { display: block; height: 100%; background: linear-gradient(90deg, #a78bfa, #7c3aed); border-radius: inherit; }
+#screen-dashboard .bi-stock { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 22px; margin-bottom: 20px; }
+#screen-dashboard .bi-stock-title { color: #64748b; font-size: 10px; margin-bottom: 16px; }
+#screen-dashboard .bi-stock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 18px; }
+#screen-dashboard .bi-stock-grid > div { display: flex; flex-direction: column; gap: 6px; }
+#screen-dashboard .bi-stock-grid span { color: var(--text-secondary); font-size: 11px; }
+#screen-dashboard .bi-stock-grid strong { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#screen-dashboard .bi-stock-grid small { color: #64748b; font-size: 9px; line-height: 1.5; }
+#screen-dashboard .bi-table-scroll { overflow-x: auto; }
+#screen-dashboard .bi-recent table { min-width: 540px; }
+#screen-dashboard .bi-recent th { background: #f8fafd; font-size: 10px; text-transform: none; letter-spacing: 0; }
+#screen-dashboard .bi-recent td { font-size: 11px; padding: 14px 22px; }
+#screen-dashboard .bi-recent th { padding: 12px 22px; }
+#screen-dashboard .bi-order-ref { font-weight: 650; max-width: 300px; overflow-wrap: anywhere; }
+#screen-dashboard .bi-order-total { font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#screen-dashboard .bi-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 100px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+#screen-dashboard .bi-status::before { content: ''; width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
+#screen-dashboard .bi-status-paid, #screen-dashboard .bi-status-done { color: #047857; background: #edf9f3; }
+#screen-dashboard .bi-status-pending_status { color: #a16207; background: #fff7e5; }
+#screen-dashboard .bi-status-cancelled { color: #b63b4e; background: #fff0f2; }
+#screen-dashboard .bi-status-refunded { color: #6d5cc0; background: #f3f0ff; }
+#screen-dashboard .bi-panel-empty { padding: 40px 22px; color: #64748b; font-size: 12px; text-align: center; line-height: 1.7; }
+#screen-dashboard .bi-notice { margin-bottom: 20px; padding: 16px 20px; background: #f0edff; color: #625089; border: 1px solid #e6dfff; border-radius: var(--radius); font-size: 12px; line-height: 1.6; }
+#screen-dashboard .bi-error { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; border: 1px solid #fecdd3; border-radius: var(--radius-lg); background: #fff5f6; color: #a63146; font-size: 13px; line-height: 1.6; }
+#screen-dashboard .bi-footnote { margin: 16px 2px 0; font-size: 10px; color: #64748b; line-height: 1.8; }
+#screen-dashboard .bi-skeleton { background: linear-gradient(100deg, #f2f4f8 20%, #fff 45%, #f2f4f8 70%); background-size: 250% 100%; animation: biShimmer 1.5s linear infinite; }
+#screen-dashboard .bi-kpi.bi-skeleton { min-height: 190px; }
+#screen-dashboard .bi-skeleton span, #screen-dashboard .bi-skeleton strong { display: block; height: 12px; width: 60%; background: #e5e9f0; border-radius: 5px; margin: 12px 0; }
+#screen-dashboard .bi-skeleton strong { height: 28px; width: 80%; }
+#screen-dashboard .bi-loading-block { min-height: 220px; margin: 0 16px 16px; border-radius: 8px; }
+@keyframes biShimmer { to { background-position: -250% 0; } }
+@media (max-width: 1200px) {
+  #screen-dashboard .bi-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #screen-dashboard .bi-main-grid { grid-template-columns: minmax(0, 1fr); }
+  #screen-dashboard .bi-kpi-value { font-size: 26px; }
+}
+@media (max-width: 768px) {
+  #screen-dashboard .bi-heading { align-items: flex-start; margin-bottom: 20px; }
+  #screen-dashboard h2 { font-size: 23px; }
+  #screen-dashboard .bi-subtitle { font-size: 12px; }
+  #screen-dashboard .bi-heading > .btn { padding: 8px; }
+  #screen-dashboard .bi-heading > .btn span { display: none; }
+  #screen-dashboard .bi-filters { padding: 14px; gap: 12px; }
+  #screen-dashboard .bi-filters > .bi-field { flex: 1; }
+  #screen-dashboard .bi-date-fields { width: 100%; }
+  #screen-dashboard .bi-date-fields > .bi-field { flex: 1 1 100px; }
+  #screen-dashboard .bi-scope { margin-left: 0; }
+  #screen-dashboard .bi-kpis { gap: 10px; }
+  #screen-dashboard .bi-kpi { padding: 14px; }
+  #screen-dashboard .bi-kpi-value { font-size: 22px; }
+  #screen-dashboard .bi-kpi-top { font-size: 11px; }
+  #screen-dashboard .bi-kpi-icon { width: 28px; height: 28px; border-radius: 8px; }
+  #screen-dashboard .bi-kpi-icon svg { width: 16px; height: 16px; }
+  #screen-dashboard .bi-panel-heading { padding: 18px 16px; }
+  #screen-dashboard #dashboard-chart { padding: 0 16px 16px; }
+  #screen-dashboard .bi-product-list { padding: 0 16px 10px; }
+  #screen-dashboard .bi-error { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 380px) {
+  #screen-dashboard .bi-kpis { grid-template-columns: minmax(0, 1fr); }
+  #screen-dashboard .bi-stock-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #screen-dashboard, #screen-dashboard * { animation: none !important; transition: none !important; }
+}

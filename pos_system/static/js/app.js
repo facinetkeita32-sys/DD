@@ -134,6 +134,7 @@ let App = {
     if (arb) arb.onclick = () => this.renderActivity()
     const aeb = document.getElementById('activity-export-btn')
     if (aeb) aeb.onclick = () => this.exportActivityLog()
+    Dashboard.bind(this)
 
     document.getElementById('modal-overlay').onclick = e => {
       if (e.target === document.getElementById('modal-overlay')) this.closeModal()
@@ -1626,31 +1627,7 @@ let App = {
   // === DASHBOARD ===
 
   async renderDashboard() {
-    try {
-      const res = await this.api('GET', '/dashboard')
-      const d = res.data
-      const cards = document.getElementById('dashboard-cards')
-      const isAdmin = this.user && this.user.role === 'admin'
-      cards.innerHTML = `
-        <div class="dash-card"><div class="dash-icon">💰</div><div class="dash-value">${this.currencyFormat(d.today_sales || 0)}</div><div class="dash-label">${I18n.t('dashboard.today_sales', "Today's Sales")}</div></div>
-        <div class="dash-card"><div class="dash-icon">📋</div><div class="dash-value">${d.today_orders || 0}</div><div class="dash-label">${I18n.t('dashboard.today_orders', 'Orders Today')}</div></div>
-        <div class="dash-card"><div class="dash-icon">📦</div><div class="dash-value">${d.total_products || 0}</div><div class="dash-label">${I18n.t('dashboard.active_products', 'Active Products')}</div></div>
-        ${isAdmin ? `<div class="dash-card"><div class="dash-icon">💎</div><div class="dash-value">${this.currencyFormat(d.inventory_value || 0)}</div><div class="dash-label">${I18n.t('dashboard.inventory_value', 'Inventory Value')}</div></div>` : ''}
-        <div class="dash-card"><div class="dash-icon">👥</div><div class="dash-value">${d.total_customers || 0}</div><div class="dash-label">${I18n.t('dashboard.active_customers', 'Active Customers')}</div></div>
-      `
-
-      const orderRes = await this.api('GET', '/orders')
-      const orders = (orderRes.data || []).slice(0, 10)
-      const container = document.getElementById('dashboard-orders')
-      if (!orders.length) {
-        container.innerHTML = `<p style="color:var(--text-light);padding:16px">${I18n.t('order.no_orders', 'No orders')}</p>`
-      } else {
-        container.innerHTML = `<div style="background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto">
-          <table><thead><tr><th>${I18n.t('order.ref', 'Order')}</th><th>${I18n.t('order.total', 'Total')}</th><th>${I18n.t('order.status', 'Status')}</th></tr></thead><tbody>
-          ${orders.map(o => `<tr><td>${o.name || o.id}</td><td>${this.currencyFormat(o.amount_total)}</td><td><span class="status-badge status-${o.state}">${o.state}</span></td></tr>`).join('')}
-        </tbody></table></div>`
-      }
-    } catch(e) { console.error(e) }
+    if (this.hasScreen('dashboard')) return Dashboard.render(this)
   },
 
   // === REPORTS ===

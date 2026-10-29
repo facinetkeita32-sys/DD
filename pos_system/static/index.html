@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-i18n="app.name">Shop With DD POS</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
 <div id="app">
@@ -240,11 +241,31 @@
     </div>
 
     <div id="screen-dashboard" class="content-screen">
-      <div class="screen-header"><h2 data-i18n="dashboard.title">Dashboard</h2></div>
-      <div class="dashboard-cards" id="dashboard-cards"></div>
-      <div class="dashboard-recent">
-        <h3 data-i18n="dashboard.recent_orders">Recent Orders</h3>
-        <div id="dashboard-orders"></div>
+      <div class="bi-heading">
+        <div><p class="bi-eyebrow" data-i18n="bi.eyebrow">PILOTAGE DE L’ACTIVITÉ</p><h2 data-i18n="bi.title">Tableau de bord</h2><p class="bi-subtitle" data-i18n="bi.subtitle">Une vue claire de vos ventes et de votre activité.</p></div>
+        <button type="button" class="btn btn-secondary" id="dashboard-refresh" aria-label="Actualiser les indicateurs"><svg class="bi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg><span data-i18n="bi.refresh">Actualiser</span></button>
+      </div>
+      <form id="dashboard-filters" class="bi-filters">
+        <div class="bi-field"><label for="dashboard-period" data-i18n="bi.period">Période d’analyse</label><select id="dashboard-period"><option value="today" data-i18n="bi.today">Aujourd’hui</option><option value="7d" data-i18n="bi.7d">7 derniers jours</option><option value="30d" selected data-i18n="bi.30d">30 derniers jours</option><option value="90d" data-i18n="bi.90d">90 derniers jours</option><option value="custom" data-i18n="bi.custom">Période personnalisée</option></select></div>
+        <div id="dashboard-custom-dates" class="bi-date-fields" hidden>
+          <div class="bi-field"><label for="dashboard-from" data-i18n="bi.from">Du</label><input type="date" id="dashboard-from" lang="fr"></div>
+          <div class="bi-field"><label for="dashboard-to" data-i18n="bi.to">Au</label><input type="date" id="dashboard-to" lang="fr"></div>
+          <button type="submit" class="btn btn-primary" data-i18n="bi.apply">Appliquer</button>
+        </div>
+        <p id="dashboard-scope" class="bi-scope"></p>
+      </form>
+      <div class="bi-meta"><p id="dashboard-range"></p><p id="dashboard-updated" role="status" aria-live="polite"></p></div>
+      <div id="dashboard-error" class="bi-error" role="alert" hidden><span id="dashboard-error-text"></span><button type="button" class="btn btn-secondary" id="dashboard-retry" data-i18n="bi.retry">Réessayer</button></div>
+      <div id="dashboard-content" aria-busy="false">
+        <div class="bi-kpis" id="dashboard-cards"></div>
+        <div id="dashboard-empty" class="bi-notice" hidden data-i18n="bi.empty_period">Aucune commande sur cette période. Vos indicateurs apparaîtront ici dès les premières ventes.</div>
+        <div class="bi-main-grid">
+          <section class="bi-panel bi-trend"><div class="bi-panel-heading"><div><h3 data-i18n="bi.sales_trend">Évolution des ventes</h3><p data-i18n="bi.trend_hint">Sélectionnez un point pour consulter le détail des ventes.</p></div><span class="bi-legend"><i></i><span data-i18n="bi.revenue">Chiffre d’affaires</span></span></div><div id="dashboard-chart"></div></section>
+          <section class="bi-panel"><div class="bi-panel-heading"><div><h3 data-i18n="bi.top_products">Produits les plus vendus</h3><p data-i18n="bi.top_hint">Classés par chiffre d’affaires, hors livraison.</p></div></div><div id="dashboard-top-products"></div></section>
+        </div>
+        <div id="dashboard-stock"></div>
+        <section class="bi-panel bi-recent"><div class="bi-panel-heading"><div><h3 data-i18n="bi.recent_orders">Commandes récentes</h3><p id="dashboard-orders-caption"></p></div></div><div id="dashboard-orders"></div></section>
+        <p class="bi-footnote" data-i18n="bi.methodology">Chiffre d’affaires TTC et livraison incluse : commandes réglées ou terminées uniquement. Comparaison avec la période précédente de même durée. Les dates suivent l’horloge du serveur.</p>
       </div>
     </div>
 
@@ -369,6 +390,7 @@
 </div>
 
 <script src="js/i18n.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

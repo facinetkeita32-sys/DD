@@ -1102,6 +1102,26 @@ def delete_delivery_zone(zone_id):
 
 # === DASHBOARD ===
 
+@api_bp.route('/dashboard/analytics', methods=['GET'])
+@login_required
+def get_dashboard_analytics():
+    from ..permissions import role_has_screen
+    from ..services.dashboard_service import get_dashboard_analytics, DashboardScopeError
+    if not role_has_screen(g.user_role, 'dashboard'):
+        return error_response('Accès au tableau de bord non autorisé.', 403)
+    # Reject client-controlled scopes rather than silently widening access.
+    if set(request.args) - {'period', 'date_from', 'date_to'}:
+        return error_response('Filtre non pris en charge.', 400)
+    try:
+        response = success_response(get_dashboard_analytics(request.args, g.user_id, g.user_role))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except DashboardScopeError as e:
+        return error_response(str(e), 409)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
 @api_bp.route('/dashboard', methods=['GET'])
 @login_required
 def get_dashboard():

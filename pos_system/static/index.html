@@ -243,13 +243,13 @@
     <div id="screen-dashboard" class="content-screen">
       <div class="bi-heading">
         <div><p class="bi-eyebrow" data-i18n="bi.eyebrow">PILOTAGE DE L’ACTIVITÉ</p><h2 data-i18n="bi.title">Tableau de bord</h2><p class="bi-subtitle" data-i18n="bi.subtitle">Une vue claire de vos ventes et de votre activité.</p></div>
-        <button type="button" class="btn btn-secondary" id="dashboard-refresh" aria-label="Actualiser les indicateurs"><svg class="bi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg><span data-i18n="bi.refresh">Actualiser</span></button>
+        <button type="button" class="btn btn-secondary" id="dashboard-refresh" aria-label="Actualiser" data-i18n-aria-label="bi.refresh"><svg class="bi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg><span data-i18n="bi.refresh">Actualiser</span></button>
       </div>
       <form id="dashboard-filters" class="bi-filters">
         <div class="bi-field"><label for="dashboard-period" data-i18n="bi.period">Période d’analyse</label><select id="dashboard-period"><option value="today" data-i18n="bi.today">Aujourd’hui</option><option value="7d" data-i18n="bi.7d">7 derniers jours</option><option value="30d" selected data-i18n="bi.30d">30 derniers jours</option><option value="90d" data-i18n="bi.90d">90 derniers jours</option><option value="custom" data-i18n="bi.custom">Période personnalisée</option></select></div>
         <div id="dashboard-custom-dates" class="bi-date-fields" hidden>
-          <div class="bi-field"><label for="dashboard-from" data-i18n="bi.from">Du</label><input type="date" id="dashboard-from" lang="fr"></div>
-          <div class="bi-field"><label for="dashboard-to" data-i18n="bi.to">Au</label><input type="date" id="dashboard-to" lang="fr"></div>
+          <div class="bi-field"><label for="dashboard-from" data-i18n="bi.from">Du</label><input type="date" id="dashboard-from"></div>
+          <div class="bi-field"><label for="dashboard-to" data-i18n="bi.to">Au</label><input type="date" id="dashboard-to"></div>
           <button type="submit" class="btn btn-primary" data-i18n="bi.apply">Appliquer</button>
         </div>
         <p id="dashboard-scope" class="bi-scope"></p>

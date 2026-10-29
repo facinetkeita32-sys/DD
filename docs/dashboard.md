@@ -59,7 +59,7 @@ inventory, customer, purchasing, or payment workflow changes are made.
   products are excluded from low/out-of-stock counts. Inventory valuation uses
   the prior dashboard convention: positive cost, otherwise selling price.
 - Dates follow the server's existing local clock; timezone behavior is unchanged.
-- French number grouping is presentation-only. The configured currency symbol,
+- Localized French/English number grouping is presentation-only. The configured currency symbol,
   symbol position, and decimal places are retained, defaulting to FG/GNF and zero
   decimal places when unconfigured. No currency conversion is performed.
 
@@ -69,7 +69,10 @@ The reusable `Dashboard` module and scoped `dashboard.css` reuse the application
 buttons, typography, navigation, and color tokens. Filters, refresh, keyboard-
 accessible chart points/data table, loading skeletons, empty/error states, and
 stale-response guards are included. BI keys use the existing dictionaries; they
-are intentionally French in both dictionaries per this dashboard's requirement.
+provide French and English labels selected through the existing language selector.
+Dates, number grouping, chart details, error messages, and accessible labels follow
+the selected language. Language changes wait for their dictionary before refreshing
+dynamic indicators, and late translation responses cannot overwrite a newer choice.
 Light mode follows the current application. Reduced-motion preferences are honored.
 Reporting loads only when the dashboard is visible, not during checkout updates.
 

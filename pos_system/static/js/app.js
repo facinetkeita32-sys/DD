@@ -30,9 +30,10 @@ let App = {
       I18n.setLang(e.target.value)
     }
     document.getElementById('logout-btn').onclick = () => this.doLogout()
-    document.getElementById('nav-lang').onchange = e => {
-      I18n.setLang(e.target.value)
-      this.refreshUI()
+    document.getElementById('nav-lang').onchange = async e => {
+      const lang = e.target.value
+      await I18n.setLang(lang)
+      if (I18n.currentLang === lang) this.refreshUI()
     }
 
     const navLinks = document.getElementById('nav-links')

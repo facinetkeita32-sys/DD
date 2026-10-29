@@ -3,34 +3,38 @@ const Dashboard = {
   requestId: 0,
   data: null,
   labels: {
-    loading: 'Chargement des indicateurs…', updated: 'Mis à jour à',
-    business: 'Vue de l’activité', personal: 'Mes ventes uniquement',
-    revenue: 'Chiffre d’affaires', orders: 'Commandes réglées', average: 'Panier moyen',
-    outstanding: 'Reste à encaisser', pending: 'Commandes en attente de la période',
-    compared: 'par rapport à la période précédente', no_baseline: 'Pas de référence précédente',
-    unchanged: 'Aucune variation', revenue_note: 'Ventes réglées et terminées',
-    average_note: 'Chiffre d’affaires / commandes réglées',
-    error: 'Impossible de charger les indicateurs. Vérifiez votre connexion puis réessayez.',
-    invalid_dates: 'Choisissez deux dates valides, dans l’ordre, sur 366 jours maximum et sans date future.',
-    from: 'Du', to: 'au', comparison: 'Comparaison', empty_sales: 'Aucune vente réglée sur cette période.',
-    chart_detail: 'Sélectionnez un point du graphique pour afficher ses valeurs.',
-    chart_table: 'Consulter les données du graphique', date: 'Date',
-    product_fallback: 'Produit archivé', units: 'unités vendues',
-    products: 'Produits actifs', low_stock: 'Stock faible', out_stock: 'Ruptures de stock',
-    inventory: 'Valeur du stock', stock_now: 'Situation actuelle du catalogue · indépendante de la période',
-    stock_method: 'Coût d’achat, ou prix de vente si le coût n’est pas renseigné.',
-    reference: 'Référence', total: 'Montant', status: 'Statut',
-    paid: 'Réglée', done: 'Terminée', pending_status: 'En attente', cancelled: 'Annulée', refunded: 'Remboursée',
-    no_orders: 'Aucune commande sur cette période.', recent_count: 'commandes affichées sur',
-    recent_limit: 'Les 50 commandes les plus récentes de la période, hors brouillons.',
+    loading: 'Loading metrics…', updated: 'Updated at',
+    business: 'Business overview', personal: 'My sales only',
+    revenue: 'Revenue', orders: 'Paid orders', average: 'Average order value',
+    outstanding: 'Outstanding balance', pending: 'Pending orders from this period',
+    compared: 'compared with the previous period', no_baseline: 'No previous reference',
+    unchanged: 'No change', revenue_note: 'Paid and completed sales',
+    average_note: 'Revenue / paid orders',
+    error: 'Unable to load metrics. Check your connection and try again.',
+    invalid_dates: 'Choose two valid dates in order, covering at most 366 days and no future dates.',
+    scope_error: 'A company reporting scope must be defined before viewing these metrics.',
+    currency_error: 'Multiple currencies are configured; these sales cannot be combined.',
+    access_error: 'You do not have access to this dashboard.',
+    from: 'From', to: 'to', empty_sales: 'No paid sales in this period.',
+    chart_detail: 'Select a chart point to display its values.',
+    chart_table: 'View chart data', date: 'Date', refresh: 'Refresh',
+    product_fallback: 'Archived product', units: 'units sold',
+    products: 'Active products', low_stock: 'Low stock', out_stock: 'Out of stock',
+    inventory: 'Inventory value', stock_now: 'Current catalogue snapshot · independent of the selected period',
+    stock_method: 'Purchase cost, or selling price when no cost is recorded.',
+    reference: 'Reference', total: 'Amount', status: 'Status',
+    paid: 'Paid', done: 'Completed', pending_status: 'Pending', cancelled: 'Cancelled', refunded: 'Refunded',
+    no_orders: 'No orders in this period.', recent_count: 'orders displayed out of',
+    recent_limit: 'The 50 most recent orders in the period, excluding drafts.',
   },
 
   t(key) { return I18n.t('bi.' + key, this.labels[key] || key) },
+  locale() { return I18n.currentLang === 'fr' ? 'fr-FR' : 'en-GB' },
   escape(value) {
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]))
   },
   number(value, decimals = 0) {
-    return Number(value || 0).toLocaleString('fr-FR', {minimumFractionDigits: decimals, maximumFractionDigits: decimals})
+    return Number(value || 0).toLocaleString(this.locale(), {minimumFractionDigits: decimals, maximumFractionDigits: decimals})
   },
   money(value) {
     const c = this.data?.currency || {symbol: 'FG', decimal_places: 0, position: 'before'}
@@ -40,7 +44,7 @@ const Dashboard = {
   date(value, withTime = false) {
     const parsed = new Date(String(value).replace(' ', 'T') + (String(value).length === 10 ? 'T12:00:00' : ''))
     if (Number.isNaN(parsed.getTime())) return '—'
-    return parsed.toLocaleString('fr-FR', withTime
+    return parsed.toLocaleString(this.locale(), withTime
       ? {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}
       : {day: '2-digit', month: 'short', year: 'numeric'})
   },
@@ -92,6 +96,8 @@ const Dashboard = {
     // Other screens already call App.renderDashboard after a sale; do not make
     // their workflow wait for BI queries or fetch hidden financial data.
     if (!screen.classList.contains('active') || !app.user) return
+    screen.lang = I18n.currentLang
+    document.getElementById('dashboard-refresh').setAttribute('aria-label', this.t('refresh'))
     const id = ++this.requestId
     const user = app.user
     const content = document.getElementById('dashboard-content')
@@ -121,13 +127,16 @@ const Dashboard = {
       if (!result.success || !result.data) throw new Error(this.t('error'))
       this.data = result.data
       this.draw()
-      updated.textContent = `${this.t('updated')} ${new Date(this.data.generated_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`
+      updated.textContent = `${this.t('updated')} ${new Date(this.data.generated_at).toLocaleTimeString(this.locale(), {hour: '2-digit', minute: '2-digit'})}`
     } catch (e) {
       if (id !== this.requestId || app.user !== user) return
       content.hidden = true
       updated.textContent = ''
-      const knownError = e.message === this.t('invalid_dates') || /^(Le périmètre|Plusieurs devises|Choisissez|Veuillez|Période|Accès)/.test(e.message)
-      document.getElementById('dashboard-error-text').textContent = knownError ? e.message : this.t('error')
+      const errorKey = /^Le périmètre/.test(e.message) ? 'scope_error'
+        : /^Plusieurs devises/.test(e.message) ? 'currency_error'
+        : /^Accès/.test(e.message) ? 'access_error'
+        : /^(Choisissez|Veuillez|Période)/.test(e.message) || e.message === this.t('invalid_dates') ? 'invalid_dates' : 'error'
+      document.getElementById('dashboard-error-text').textContent = this.t(errorKey)
       error.hidden = false
     } finally {
       if (id === this.requestId) {

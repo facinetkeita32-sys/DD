@@ -4,6 +4,7 @@ The application initializes its ORM at import time. A subprocess prevents the
 backup suite's global ORM connection settings from leaking into these scenarios.
 """
 import copy
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -168,6 +169,22 @@ class DashboardScenarios:
 
 
 class DashboardIntegrationTests(unittest.TestCase):
+    def test_dashboard_translation_dictionaries_are_complete(self):
+        folder = Path(__file__).resolve().parents[1] / 'pos_system' / 'i18n'
+        dictionaries = {}
+        for language in ('en', 'fr'):
+            with (folder / (language + '.json')).open(encoding='utf-8') as source:
+                dictionaries[language] = {key: value for key, value in json.load(source).items()
+                                          if key.startswith('bi.')}
+        self.assertEqual(set(dictionaries['en']), set(dictionaries['fr']))
+        self.assertGreater(len(dictionaries['en']), 60)
+        for key in dictionaries['en']:
+            for language in dictionaries:
+                self.assertTrue(dictionaries[language][key].strip(), (language, key))
+        self.assertEqual('Dashboard', dictionaries['en']['bi.title'])
+        self.assertEqual('Tableau de bord', dictionaries['fr']['bi.title'])
+        self.assertNotEqual(dictionaries['en']['bi.error'], dictionaries['fr']['bi.error'])
+
     def test_isolated_dashboard_scenarios(self):
         with tempfile.TemporaryDirectory() as temp:
             environment = dict(os.environ, DATABASE_URL='', DB_PATH=os.path.join(temp, 'dashboard.db'))

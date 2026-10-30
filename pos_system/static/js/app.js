@@ -19,6 +19,8 @@ let App = {
   async init() {
     await I18n.init('en')
     this.bindEvents()
+    const offline = await Offline.init(this)
+    if (offline?.needsSetup) return
     this.checkLogin()
   },
 
@@ -285,7 +287,7 @@ let App = {
       if (this.config && this.config.currency) {
         this.currency = this.config.currency
       }
-      this.lowStockThreshold = (this.config && this.config.low_stock_threshold) || 5
+      this.lowStockThreshold = this.config?.low_stock_threshold ?? 5
       this.ensureDefaultCurrency()
       this.displayLogo(this.company ? this.company.logo : null)
       this.renderAll()
@@ -307,6 +309,7 @@ let App = {
     this.renderActivity()
     this.renderSettings()
     this.renderUsersTable()
+    Offline.refresh(this)
   },
 
   refreshUI() {
@@ -415,7 +418,7 @@ let App = {
       grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-light)">${I18n.t('product.no_products', 'No products')}</div>`
       return
     }
-    const threshold = this.lowStockThreshold || 5
+    const threshold = this.lowStockThreshold ?? 5
     grid.innerHTML = filtered.map((p, idx) => {
       const qty = p.available_qty || 0
       const isLow = qty <= threshold && qty > 0
@@ -711,7 +714,7 @@ let App = {
       <div id="payment-change" style="font-size:20px;font-weight:700;margin:12px 0;text-align:center"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn btn-success btn-lg btn-block" id="payment-confirm" style="padding:16px 28px;font-size:18px">${I18n.t('payment.confirm', 'Confirm Payment')}</button>
-        <button class="btn btn-warning btn-lg btn-block" id="payment-paylater" style="padding:12px 28px;font-size:16px;margin-top:8px">${I18n.t('payment.pay_later', 'Pay Later')}</button>
+        <button class="btn btn-warning btn-lg btn-block" id="payment-paylater" style="padding:12px 28px;font-size:16px;margin-top:8px;${this.offlineMode ? 'display:none' : ''}">${I18n.t('payment.pay_later', 'Pay Later')}</button>
         <button class="btn btn-secondary btn-lg btn-block" id="payment-cancel">${I18n.t('payment.cancel', 'Cancel')}</button>
       </div>`
 
@@ -894,7 +897,7 @@ let App = {
       if (search && !(p.name || '').toLowerCase().includes(search) && !(p.barcode || '').toLowerCase().includes(search)) return false
       if (catFilter && (p.categ_id?.id || 0) != catFilter) return false
       const qty = p.available_qty || 0
-      const threshold = this.lowStockThreshold || 5
+      const threshold = this.lowStockThreshold ?? 5
       if (stockFilter === 'in' && qty <= threshold) return false
       if (stockFilter === 'low' && (qty > threshold || qty <= 0)) return false
       if (stockFilter === 'out' && qty > 0) return false
@@ -907,7 +910,7 @@ let App = {
       this._updateBulkDeleteBar()
       return
     }
-    const threshold = this.lowStockThreshold || 5
+    const threshold = this.lowStockThreshold ?? 5
     const canEdit = this.hasAction('product.write')
     const canDelete = this.hasAction('product.delete')
     const allSelected = filtered.length > 0 && filtered.every(p => selected.has(p.id))
@@ -1029,6 +1032,7 @@ let App = {
     const product = id ? this.products.find(p => p.id === id) : null
     const title = product ? I18n.t('product.edit', 'Edit Product') : I18n.t('product.add', 'Add Product')
     const existingImg = product ? (product.image || '') : ''
+    const unknownCost = this.offlineMode && product?.offline_cost_known === false
     const cats = this.productCategories || []
     const catOpts = cats.map(c => `<option value="${c.id}" ${product && product.categ_id && product.categ_id.id === c.id ? 'selected' : ''}>${this._esc(c.name)}</option>`).join('')
     let html = `<h3>${title}</h3>
@@ -1038,10 +1042,10 @@ let App = {
         <button class="btn btn-sm btn-secondary" id="prod-add-cat" style="margin-top:4px" data-i18n="category.add">+ Add Category</button>
       </div>
       <div class="form-group"><label data-i18n="product.price">Price</label><input id="prod-price" type="number" step="100" value="${product ? product.list_price || 0 : 0}"></div>
-      <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}"></div>
+      <div class="form-group"><label data-i18n="product.cost">Cost</label><input id="prod-cost" type="number" step="100" value="${product ? product.cost_price || 0 : 0}" ${unknownCost ? 'disabled' : ''}>${unknownCost ? `<p class="offline-help">${I18n.t('offline.unknown_cost', 'Sign in online as a manager and synchronize to load the purchase cost.')}</p>` : ''}</div>
       <div class="form-group"><label data-i18n="product.discount">Discount (%)</label><input id="prod-discount" type="number" min="0" max="100" step="1" value="${product ? product.discount || 0 : 0}"></div>
       <div class="form-group"><label data-i18n="product.qty">Quantity</label><input id="prod-qty" type="number" step="1" value="${product ? product.available_qty || 0 : 0}"></div>
-      <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" value="${product ? this._esc(product.barcode || '') : ''}"></div>
+      <div class="form-group"><label data-i18n="product.barcode">Barcode</label><input id="prod-barcode" maxlength="13" value="${product ? this._esc(product.barcode || '') : ''}"></div>
       <div class="form-group"><label data-i18n="product.expiration">Expiration Date</label><input id="prod-expiration" type="date" value="${product ? (product.expiration_date || '').substring(0, 10) : ''}"></div>
       <div class="form-group">
         <label data-i18n="product.image">Image</label>
@@ -1099,7 +1103,7 @@ let App = {
       if (catVal) {
         data.categ_id = parseInt(catVal)
         // keep POS categories in sync with product category (unified)
-        data.pos_categ_ids = [parseInt(catVal)]
+        data.pos_categ_ids = this.offlineMode && !this.categories.some(c => c.id === parseInt(catVal)) ? [] : [parseInt(catVal)]
       } else {
         data.categ_id = false
         data.pos_categ_ids = []
@@ -1107,6 +1111,8 @@ let App = {
       if (this._newImageBase64 !== undefined) {
         data.image = this._newImageBase64
       }
+      if (unknownCost) delete data.cost_price
+      if (this.offlineMode && product?.offline_revision) data.offline_revision = product.offline_revision
       try {
         let saved = null
         if (product) {
@@ -1713,9 +1719,9 @@ let App = {
       document.getElementById('settings-company').value = this.company.name || ''
       this.displayLogo(this.company.logo)
     }
-    document.getElementById('settings-low-stock').value = this.lowStockThreshold || 5
+    document.getElementById('settings-low-stock').value = this.lowStockThreshold ?? 5
     this.renderDeliveryZonesSettings()
-    this.renderBackupSettings()
+    if (!this.offlineMode) this.renderBackupSettings()
   },
 
   async renderDeliveryZonesSettings() {
@@ -1734,7 +1740,7 @@ let App = {
         <td>${this._esc(z.name)}</td>
         <td>${this.currencyFormat(z.cost)}</td>
         <td><button class="btn btn-sm btn-primary edit-dz" data-id="${z.id}">${I18n.t('common.edit', 'Edit')}</button>
-            <button class="btn btn-sm btn-danger delete-dz" data-id="${z.id}">${I18n.t('common.delete', 'Delete')}</button></td>
+            ${this.offlineMode ? '' : `<button class="btn btn-sm btn-danger delete-dz" data-id="${z.id}">${I18n.t('common.delete', 'Delete')}</button>`}</td>
       </tr>`).join('')}
     </tbody></table>`
     container.querySelectorAll('.edit-dz').forEach(btn => {
@@ -1816,8 +1822,11 @@ let App = {
     }
     this._newLogoBase64 = null
 
-    const threshold = parseInt(document.getElementById('settings-low-stock').value) || 5
-    await this.api('PUT', '/config', { low_stock_threshold: threshold })
+    const enteredThreshold = parseInt(document.getElementById('settings-low-stock').value)
+    const threshold = Number.isInteger(enteredThreshold) && enteredThreshold >= 0 ? enteredThreshold : 5
+    const settings = { low_stock_threshold: threshold }
+    if (this.offlineMode) settings.currency_id = parseInt(document.getElementById('settings-currency').value)
+    await this.api('PUT', '/config', settings)
     this.lowStockThreshold = threshold
 
     const compRes = await this.api('GET', '/company')

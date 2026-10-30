@@ -1,4 +1,6 @@
 pos_data.db
+*.db-shm
+*.db-wal
 cookies.txt
 *.pyc
 __pycache__/

@@ -217,6 +217,9 @@ def _build_cache(conn, models, sequences):
 
 
 def restore_from_data(env, data):
+    from . import offline_store
+    if offline_store.local_mode():
+        return {'success': False, 'error': 'Offline terminal databases cannot be replaced by a server backup.'}
     models, relations = _registry()
     with _db_lock:
         conn = db.get_conn()
@@ -250,6 +253,7 @@ def restore_from_data(env, data):
                             cur.execute(f'ALTER SEQUENCE {sequence} RESTART WITH {cache[table]["_seq"] + 1}')
             finally:
                 cur.close()
+            offline_store.restored_database(conn)
             conn.commit()
         except Exception as e:
             conn.rollback()

@@ -135,14 +135,27 @@ def auth_login():
     data = request.get_json() or {}
     login = data.get('login', '')
     password = data.get('password', '')
-    users = ResUsers().search([('login', '=', login), ('password', '=', password)])
+    from ..services.offline_store import local_mode
+    if local_mode():
+        from ..services.offline_client import authenticate
+        from ..services.offline_server import SyncError, public_user
+        try:
+            users = authenticate(login, password)
+        except SyncError as e:
+            return jsonify(success=False, error=str(e), code=e.code), e.status
+    else:
+        users = ResUsers().search([('login', '=', login), ('password', '=', password)])
     if users:
         session['user_id'] = users[0].id
         session['generation'] = session_generation()
         session['lang'] = users[0].lang
         session['last_activity'] = time.time()
+        if local_mode():
+            opened = PosSession.search([('user_id', '=', users[0].id), ('state', '=', 'opened')], limit=1)
+            if opened:
+                session['session_id'] = opened[0].id
         log_activity('login', f"User {login} logged in")
-        return success_response(model_to_dict(users[0]))
+        return success_response(public_user(users[0]) if local_mode() else model_to_dict(users[0]))
     return error_response('Invalid credentials', 401)
 
 
@@ -157,6 +170,10 @@ def auth_logout():
 @api_bp.route('/auth/me', methods=['GET'])
 @login_required
 def auth_me():
+    from ..services.offline_store import local_mode
+    if local_mode():
+        from ..services.offline_server import public_user
+        return success_response(public_user(g.user))
     return success_response(model_to_dict(g.user))
 
 
@@ -233,6 +250,15 @@ def delete_user(user_id):
 def get_my_permissions():
     from ..permissions import get_role_screens, get_role_actions
     role = g.user_role
+    from ..services.offline_store import local_mode
+    if local_mode():
+        return success_response({
+            'role': role,
+            'screens': get_role_screens(role),
+            'actions': [name for name in get_role_actions(role)
+                        if name in ('order.create', 'session.open', 'session.close', 'product.create',
+                                    'product.write', 'settings.read', 'settings.write', 'report.read', 'user.read')],
+        })
     return success_response({
         'role': role,
         'screens': get_role_screens(role),
@@ -1003,7 +1029,11 @@ def close_session(session_id):
 
 @api_bp.route('/payment-methods', methods=['GET'])
 def get_payment_methods():
-    methods = PosPaymentMethod().search([('active', '=', True)])
+    from ..services.offline_store import local_mode
+    domain = [('active', '=', True)]
+    if local_mode():
+        domain.append(('is_cash', '=', True))
+    methods = PosPaymentMethod().search(domain)
     return success_response(serialize_model(PosPaymentMethod, methods))
 
 

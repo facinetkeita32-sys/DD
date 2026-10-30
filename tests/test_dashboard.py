@@ -187,7 +187,8 @@ class DashboardIntegrationTests(unittest.TestCase):
 
     def test_isolated_dashboard_scenarios(self):
         with tempfile.TemporaryDirectory() as temp:
-            environment = dict(os.environ, DATABASE_URL='', DB_PATH=os.path.join(temp, 'dashboard.db'))
+            environment = dict(os.environ, DATABASE_URL='', DB_PATH=os.path.join(temp, 'dashboard.db'),
+                               POS_OFFLINE_MODE='', OFFLINE_SYNC_ENABLED='')
             result = subprocess.run([sys.executable, str(Path(__file__).resolve()), '--isolated'],
                                     cwd=Path(__file__).resolve().parents[1], env=environment,
                                     capture_output=True, text=True, timeout=90)

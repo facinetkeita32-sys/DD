@@ -1,11 +1,13 @@
 import os
 import sys
 import sqlite3
+from contextvars import ContextVar
 from datetime import datetime
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 _use_pg = bool(DATABASE_URL)
 _param = '%s' if _use_pg else '?'
+_transaction_connection = ContextVar('transaction_connection', default=None)
 
 FIELD_MAP = {
     'Char': ('TEXT', 'VARCHAR'),
@@ -39,6 +41,9 @@ def _get_sqlite_conn():
 
 
 def get_conn():
+    shared = _transaction_connection.get()
+    if shared is not None:
+        return shared
     if _use_pg:
         return _get_pg_conn()
     return _get_sqlite_conn()
@@ -57,9 +62,9 @@ def get_tables(conn):
     if _use_pg:
         cur = conn.cursor()
         cur.execute("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public'")
-        return [row[0] for row in cur.fetchall() if not row[0].endswith('_rel')]
+        return [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and not row[0].startswith('_offline_')]
     cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    return [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence']
+    return [row[0] for row in cur.fetchall() if not row[0].endswith('_rel') and row[0] != 'sqlite_sequence' and not row[0].startswith('_offline_')]
 
 
 def get_table_columns(conn, table):

@@ -4,6 +4,7 @@ import time
 from flask import Flask, send_from_directory, request, g, session
 from .api.routes import api_bp
 from .api.backup_routes import backup_bp
+from .api.offline_routes import offline_bp
 from .i18n import translator
 from .init_data import load_demo_data
 from .odoo_orm import _load_cache, _db_cache, _db_lock, DB_PATH
@@ -11,11 +12,14 @@ from .services.backup_service import load_backup_settings
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'pos-guinea-secret-key-change-in-production')
+if os.environ.get('POS_OFFLINE_MODE') == '1':
+    app.config['SESSION_COOKIE_NAME'] = os.environ.get('OFFLINE_COOKIE_NAME', 'shopdd_offline')
 # Session inactivity timeout in seconds (default: 1 hour)
 SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', 3600))
 
 app.register_blueprint(api_bp)
 app.register_blueprint(backup_bp)
+app.register_blueprint(offline_bp)
 
 
 @app.before_request
@@ -26,6 +30,10 @@ def before_request():
     if request.path.startswith('/api/'):
         _db_lock.acquire()
         g.db_lock_held = True
+    from .services.offline_local import before_request as offline_before_request
+    offline_response = offline_before_request()
+    if offline_response is not None:
+        return offline_response
     # Session inactivity timeout (API requests only)
     if request.path.startswith('/api/') and not request.path.startswith('/api/auth/login'):
         if 'user_id' in session:
@@ -41,8 +49,16 @@ def before_request():
 
 @app.teardown_request
 def release_database_lock(error=None):
+    from .services.offline_local import teardown
+    teardown()
     if g.pop('db_lock_held', False):
         _db_lock.release()
+
+
+@app.after_request
+def finish_offline_transaction(response):
+    from .services.offline_local import after_request
+    return after_request(response)
 
 
 @app.route('/')
@@ -63,15 +79,27 @@ def get_translations(lang):
 
 
 def create_app():
+    from .services import offline_store
+    from . import db
+    if offline_store.local_mode() and db._use_pg:
+        raise RuntimeError('Offline terminals require a separate local SQLite database.')
+    offline_store.initialize()
     _load_cache()
+    if (offline_store.local_mode() and not offline_store.get('meta', 'client')
+            and any(table['_data'] for table in _db_cache.values())):
+        raise RuntimeError('Refusing to provision over an existing business database. Use a fresh terminal folder.')
     has_data = False
     for tname, tdata in _db_cache.items():
         if tdata['_data'] and tname not in ('sqlite_sequence',):
             has_data = True
             break
-    if not has_data:
+    if not has_data and not offline_store.local_mode():
         load_demo_data()
-    load_backup_settings()
+    if not offline_store.local_mode():
+        load_backup_settings()
+    else:
+        from .services.offline_client import start_worker
+        start_worker()
     return app
 
 

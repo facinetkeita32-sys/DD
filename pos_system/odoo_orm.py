@@ -110,7 +110,7 @@ def _persist_write(cls, obj_id):
             field = cls._fields.get(k)
             if field and isinstance(field, (One2many, Many2many)):
                 continue
-            if isinstance(v, bool):
+            if isinstance(v, bool) and not db._use_pg:
                 v = 1 if v else 0
             cols[k] = v
         if not cols:

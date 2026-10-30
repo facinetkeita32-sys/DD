@@ -153,7 +153,8 @@ def get_dashboard_analytics(args, user_id, role, today=None):
             'out': sum(_number(p._data, 'available_qty') <= 0 for p in stocked),
             'threshold': threshold,
         }
-        if role == 'admin':
+        from .offline_store import local_mode
+        if role == 'admin' and not local_mode():
             stock['inventory_value'] = sum(
                 _number(p._data, 'available_qty') *
                 (_number(p._data, 'cost_price') if _number(p._data, 'cost_price') > 0

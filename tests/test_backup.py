@@ -16,6 +16,7 @@ class BackupIntegrationTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.environment = patch.dict(os.environ, {
             'DATABASE_URL': '', 'DB_PATH': os.path.join(cls.temp.name, 'test.db'),
+            'POS_OFFLINE_MODE': '', 'OFFLINE_SYNC_ENABLED': '',
         })
         cls.environment.start()
         from pos_system.main import app

@@ -11,8 +11,50 @@ import time
 import socket
 import webbrowser
 import signal
+import hashlib
+import secrets
+from pathlib import Path
 
 PORT = None
+_instance_lock = None
+
+
+def configure_offline():
+    global _instance_lock
+    base = Path(os.environ.get('POS_OFFLINE_DATA_DIR') or
+                str(Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share')
+                    / 'ShopWithDD' / 'OfflinePOS'))
+    base.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _instance_lock = open(base / 'terminal.lock', 'a+b')
+    try:
+        # Do not read the locked byte: Windows rejects that read before a
+        # second instance can report a friendly "already running" message.
+        _instance_lock.seek(0, os.SEEK_END)
+        if _instance_lock.tell() == 0:
+            _instance_lock.write(b'1')
+            _instance_lock.flush()
+        _instance_lock.seek(0)
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(_instance_lock.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(_instance_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        _instance_lock.close()
+        _instance_lock = None
+        raise RuntimeError('This offline terminal is already running.')
+    keyfile = base / 'session.key'
+    if not keyfile.exists():
+        fd = os.open(str(keyfile), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as output:
+            output.write(secrets.token_hex(32))
+    os.environ['SECRET_KEY'] = keyfile.read_text().strip()
+    os.environ['DATABASE_URL'] = ''
+    os.environ['POS_OFFLINE_MODE'] = '1'
+    os.environ['DB_PATH'] = str(base / 'terminal.db')
+    os.environ['OFFLINE_COOKIE_NAME'] = 'shopdd_' + hashlib.sha256(str(base.resolve()).encode()).hexdigest()[:12]
+    return os.environ['DB_PATH']
 
 
 def find_free_port():
@@ -22,8 +64,7 @@ def find_free_port():
 
 
 def start_server(port):
-    from pos_system.main import create_app
-    app = create_app()
+    from pos_system.main import app
     app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
 
 
@@ -46,11 +87,7 @@ def main():
     global PORT
     PORT = find_free_port()
 
-    # Determine DB path
-    if getattr(sys, 'frozen', False):
-        db_path = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), 'pos_data.db')
-    else:
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pos_data.db')
+    db_path = configure_offline()
 
     t = threading.Thread(target=start_server, args=(PORT,), daemon=True)
     t.start()
@@ -60,7 +97,7 @@ def main():
         sys.exit(1)
 
     print(f"  Server: http://127.0.0.1:{PORT}")
-    print(f"  Login:  admin / admin")
+    print("  Register this terminal with your server account before the first login.")
     print(f"  DB:     {db_path}")
     print("=" * 60)
 

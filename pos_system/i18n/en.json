@@ -16,7 +16,7 @@
   "offline.blocked": "Authorization required",
   "offline.attention": "Needs attention",
   "offline.terminal_status": "Offline terminal status",
-  "offline.cash_only": "Cash sales, receipts and cashier sessions work offline. Admins and managers can also queue the product and business-setting changes allowed by their roles.",
+  "offline.cash_only": "Sales can record any active configured payment method, including Cash, Orange Money and Credit Card. Selecting a method records the payment; it does not charge a payment provider. Authorized product and settings changes can also be queued.",
   "offline.management_hint": "Authorized product and business-setting edits are saved locally and queued for synchronization. Quantity edits synchronize as stock adjustments. Deletion, security administration and server backups use the central application.",
   "offline.users_central": "These are the users verified on this terminal. Manage user accounts, passwords and access rights on the central server.",
   "offline.backup_central": "Manage central backups on the server. Preserve this terminal’s database folder to protect pending operations.",

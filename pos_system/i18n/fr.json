@@ -16,7 +16,7 @@
   "offline.blocked": "Autorisation requise",
   "offline.attention": "Intervention requise",
   "offline.terminal_status": "État du terminal hors ligne",
-  "offline.cash_only": "Les ventes en espèces, reçus et sessions de caisse fonctionnent hors ligne. Les administrateurs et responsables peuvent aussi préparer les modifications de produits et paramètres autorisées par leur rôle.",
+  "offline.cash_only": "Les ventes peuvent enregistrer tout moyen de paiement actif configuré, notamment Espèces, Orange Money et Carte bancaire. Ce choix enregistre le paiement sans débiter un prestataire. Les modifications autorisées de produits et paramètres peuvent aussi être mises en attente.",
   "offline.management_hint": "Les modifications autorisées de produits et paramètres sont enregistrées localement puis synchronisées. Les changements de quantité sont des ajustements de stock. Suppressions, sécurité et sauvegardes serveur utilisent l’application centrale.",
   "offline.users_central": "Cette liste contient les utilisateurs vérifiés sur ce terminal. Gérez les comptes, mots de passe et droits d’accès sur le serveur central.",
   "offline.backup_central": "Gérez les sauvegardes centrales sur le serveur. Conservez le dossier de la base de ce terminal pour protéger les opérations en attente.",

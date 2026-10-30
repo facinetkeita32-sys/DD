@@ -59,7 +59,7 @@ def before_request():
                     qty, price, discount = (_finite(line.get('qty')), _finite(line.get('price_unit')),
                                             _finite(line.get('discount', 0)))
                     if qty <= 0 or price < 0 or not 0 <= discount <= 100:
-                        raise SyncError('Invalid cash sale line.')
+                        raise SyncError('Invalid sale line.')
                     quantities[line['product_id']] += qty
                 if not quantities:
                     raise SyncError('A sale must contain products.')

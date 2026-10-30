@@ -227,7 +227,7 @@ def capture(kind, record_id, user_id):
     if kind == 'sale':
         record = PosOrder.browse(record_id)[0]
         if record.state != 'paid':
-            raise SyncError('Offline mode supports fully paid cash sales only.')
+            raise SyncError('Offline mode supports fully paid sales only.')
         payload = dict(record._data)
         payload['uuid'] = _uuid('pos.order', record_id)
         settings = config()
@@ -250,8 +250,8 @@ def capture(kind, record_id, user_id):
         from ..models.pos_payment_method import PosPaymentMethod
         for payment in payload['payments']:
             methods = PosPaymentMethod.browse(payment['payment_method_id'])
-            if not methods or not methods[0].is_cash:
-                raise SyncError('Offline mode supports cash payments only.')
+            if not methods or not methods[0].active:
+                raise SyncError('Select an active configured payment method.')
     else:
         record = PosSession.browse(record_id)[0]
         if record._data.get('user_id') != user_id:

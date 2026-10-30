@@ -214,7 +214,7 @@ def _sale(device_id, payload, user, company_id):
         payload['delivery_zone_id'] = resolve(device_id, 'delivery.zone', payload['delivery_ref'])
     lines, payments = payload.get('lines'), payload.get('payments')
     if not isinstance(lines, list) or not lines or len(lines) > 500 or not isinstance(payments, list) or not payments:
-        raise SyncError('A cash sale must contain lines and payments.')
+        raise SyncError('A sale must contain lines and payments.')
     quantities, total = Counter(), 0
     for line in lines:
         qty, price, discount = (_finite(line.get('qty')), _finite(line.get('price_unit')),
@@ -239,8 +239,8 @@ def _sale(device_id, payload, user, company_id):
     paid = 0
     for payment in payments:
         methods = PosPaymentMethod.browse(payment.get('payment_method_id', 0))
-        if not methods or not methods[0].active or not methods[0].is_cash:
-            raise SyncError('Offline sales support cash payments only.', 409, 'conflict')
+        if not methods or not methods[0].active:
+            raise SyncError('The recorded payment method is unavailable; the sale remains queued.', 409, 'conflict')
         amount = _finite(payment.get('amount'))
         if amount < 0:
             raise SyncError('Invalid payment amount.')
@@ -276,7 +276,8 @@ def _sale(device_id, payload, user, company_id):
                                  tax_ids=line.get('tax_ids') or []))
     for payment in payments:
         PosPayment.create({'order_id': record.id, 'payment_method_id': payment['payment_method_id'],
-                           'amount': payment['amount'], 'payment_date': payment.get('payment_date')})
+                           'amount': payment['amount'], 'payment_date': payment.get('payment_date'),
+                           'reference': payment.get('reference') or ''})
     for pid, qty in quantities.items():
         products[pid].write({'available_qty': max(0, products[pid].available_qty - qty)})
     return record.id

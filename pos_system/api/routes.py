@@ -1029,11 +1029,7 @@ def close_session(session_id):
 
 @api_bp.route('/payment-methods', methods=['GET'])
 def get_payment_methods():
-    from ..services.offline_store import local_mode
-    domain = [('active', '=', True)]
-    if local_mode():
-        domain.append(('is_cash', '=', True))
-    methods = PosPaymentMethod().search(domain)
+    methods = PosPaymentMethod().search([('active', '=', True)])
     return success_response(serialize_model(PosPaymentMethod, methods))
 
 

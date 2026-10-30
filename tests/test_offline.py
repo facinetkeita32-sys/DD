@@ -103,12 +103,14 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(200, code, data)
         return data['data']
 
-    def sale(self, amount=None, method=1):
+    def sale(self, amount=None, method=1, reference=None):
         product = self.state('local')['products'][0]
         payload = {'lines': [{'product_id': product['id'], 'product_name': 'Test product',
                                'qty': 2, 'price_unit': product['price'], 'discount': 0}],
                    'payments': [{'payment_method_id': method,
                                  'amount': product['price'] * 2 if amount is None else amount}]}
+        if reference is not None:
+            payload['payments'][0]['reference'] = reference
         return self.call('local', '/api/orders', payload)
 
     def test_offline_restart_lost_ack_and_exactly_once_cash_sale(self):
@@ -155,13 +157,13 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.state('local', {'sync': True})
         self.assertEqual(1, len(self.state('server')['orders']))
 
-    def test_local_queue_failure_and_non_cash_sales_roll_back(self):
+    def test_local_queue_failure_and_invalid_or_unpaid_sales_roll_back(self):
         self.pair()
         before = self.state('local')
         self.state('local', {'capture_error': True})
         self.assertEqual(400, self.sale()[0])
         self.state('local', {'capture_error': False})
-        self.assertEqual(400, self.sale(method=2)[0])
+        self.assertEqual(400, self.sale(method=999999)[0])
         self.assertEqual(400, self.sale(amount=1)[0])
         after = self.state('local')
         self.assertEqual(before['orders'], after['orders'])
@@ -502,6 +504,63 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertNotIn('<script>bad()</script>', html)
         self.assertIn('&lt;img', html)
         self.assertIn('&lt;script&gt;bad()', html)
+
+    def test_orange_money_and_credit_card_names_receipts_and_sync(self):
+        self.pair()
+        methods = self.call('local', '/api/payment-methods')[1]['data']
+        by_name = {row['name']: row for row in methods}
+        for name in ('Cash', 'Orange Money', 'Credit Card'):
+            self.assertIn(name, by_name)
+        self.state('local', {'online': False})
+        expected = []
+        price = self.state('local')['products'][0]['price']
+        for name, reference in [('Orange Money', 'OM-LOCAL-001'), ('Credit Card', 'CARD-LOCAL-002')]:
+            code, result = self.sale(method=by_name[name]['id'], reference=reference)
+            self.assertEqual(200, code, result)
+            order = result['data']
+            self.assertEqual(price * 2, order['amount_total'])  # No added provider fee.
+            code, html = self.call('local', f'/api/receipt/{order["id"]}/html')
+            self.assertEqual(200, code)
+            self.assertIn(name, html)
+            expected.append((order['name'], name, reference))
+        self.assertEqual([], self.state('server')['orders'])
+        terminal = self.state('local', {'online': True, 'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        self.assertTrue(all(row['status'] == 'sent' for _, row in terminal['queue']))
+        central = self.call('server', '/api/orders')[1]['data']
+        for ref, name, reference in expected:
+            records = [row for row in central if row['name'] == ref]
+            self.assertEqual(1, len(records))
+            self.assertEqual(price * 2, records[0]['amount_total'])
+            payment = records[0]['payments'][0]
+            self.assertEqual(name, payment['payment_method_name'])
+            self.assertEqual(reference, payment['reference'])
+            self.assertEqual(price * 2, payment['amount'])
+        self.state('local', {'sync': True})
+        self.assertEqual(2, len(self.state('server')['orders']))
+
+    def test_inactive_payment_method_is_hidden_and_preserves_queued_sale(self):
+        self.pair()
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.sale(method=2)[0])
+        self.state('server', {'payment_method_id': 2, 'payment_method_active': False})
+        terminal = self.state('local', {'online': True, 'sync': True})
+        self.assertEqual('conflict', terminal['client']['error'])
+        self.assertEqual('pending', terminal['queue'][0][1]['status'])
+        self.assertEqual([], self.state('server')['orders'])
+        self.state('server', {'payment_method_id': 2, 'payment_method_active': True})
+        terminal = self.state('local', {'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        self.assertEqual(1, len(self.state('server')['orders']))
+        self.state('local', {'payment_method_id': 4, 'payment_method_active': False})
+        methods = self.call('local', '/api/payment-methods')[1]['data']
+        self.assertNotIn('Credit Card', [row['name'] for row in methods])
+        before = self.state('local')
+        self.assertEqual(400, self.sale(method=4)[0])
+        after = self.state('local')
+        self.assertEqual(before['orders'], after['orders'])
+        self.assertEqual(before['products'], after['products'])
+        self.assertEqual(before['queue'], after['queue'])
 
 
 if __name__ == '__main__':

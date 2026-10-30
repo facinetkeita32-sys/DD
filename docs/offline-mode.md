@@ -13,7 +13,8 @@ business tables or columns are deleted, replaced, or migrated. Older application
 backups retain their existing registered-table schema and remain restorable.
 Rolling code back does not require deleting the new metadata tables.
 
-Supported on terminals: fully paid **cash sales**, local HTML/PDF receipts,
+Supported on terminals: fully paid sales using active configured payment-method
+names (including **Cash, Orange Money and Credit Card**), local HTML/PDF receipts,
 cashier sessions, existing customer selection, local reporting, English/French,
 automatic retry and manual synchronization. Admins and managers can create/edit
 products and categories offline, including images, prices, costs and stock
@@ -25,7 +26,7 @@ existing product-management permissions; admin-only settings stay admin-only.
 The original role-based screens are visible, including Settings for admins and
 Products for managers. The local Users screen is a read-only list of users verified
 on that terminal. Account/password/role administration, server backup/restore,
-electronic payments, credit, cancellations, deletion, bulk import, customer editing
+credit, cancellations, deletion, bulk import, customer editing
 and purchasing use the central application. Their controls are hidden or explicitly
 disabled with explanatory notices, rather than pretending an unsupported write
 was saved. Server role definitions and normal online APIs are unchanged.
@@ -108,7 +109,7 @@ online login on that terminal before they can sign in offline there.
 
 ## Durable synchronization
 
-A local cash sale follows the existing checkout route inside an opt-in unit of
+A local sale follows the existing checkout route inside an opt-in unit of
 work. The order, lines, payments, stock changes, unique reference, and outbox event
 commit **together**. Failure rolls them all back, including the ORM cache. Cashier
 session changes use the same mechanism. Normal central web requests continue to
@@ -128,6 +129,14 @@ terminal was disconnected. Historical local orders/receipts therefore keep valid
 product references. Existing already-queued events remain compatible with the new
 protocol, and metadata is upgraded additively. Customer records still originate
 centrally. Historical sale prices/subtotals are retained, not repriced.
+
+Payment-method selection is recordkeeping, matching the central POS workflow.
+Choosing Orange Money or Credit Card does not initiate, authorize or verify a
+provider charge. There is no new gateway integration, confirmation workflow or
+fee calculation. Receipts and payment records retain the configured method name
+and amount; synchronization also retains any existing optional reference. Inactive
+or missing methods are rejected locally, or keep a queued sale pending if removed
+centrally before upload. Unpaid/credit sales remain unavailable offline.
 
 Catalogue edits and their outbox entries commit together. Edits send only changed
 fields with their prior values: a server edit to an unrelated field is preserved;
@@ -208,7 +217,7 @@ by the ordinary retry button.
 `python -m unittest discover -s tests -v` runs existing regression tests plus real
 HTTP tests with independent temporary server and terminal databases. The offline
 tests cover first pairing/login, hashed local passwords, seven-day expiry, restart
-while disconnected, atomic rollback, cash-only restrictions, lost acknowledgements,
+while disconnected, atomic rollback, payment-method validity, lost acknowledgements,
 exactly-once retry, stock conflicts, revocation, and restored-server epoch changes.
 They also cover admin/manager offline edits, cashier restrictions, server-side
 permission tampering, stock deltas during concurrent central sales, field-level

@@ -11,6 +11,7 @@ from flask import request, jsonify
 from pos_system.models.pos_order import PosOrder
 from pos_system.models.pos_session import PosSession
 from pos_system.models.product_product import ProductProduct
+from pos_system.models.pos_payment_method import PosPaymentMethod
 from pos_system.models.res_users import ResUsers
 from pos_system.services import offline_store as store, backup_service
 
@@ -69,6 +70,8 @@ def debug():
             ProductProduct.browse(body['product_id'])[0].write({'available_qty': body['stock']})
         if 'edit_product' in body:
             ProductProduct.browse(body['product_id'])[0].write(body['edit_product'])
+        if 'payment_method_active' in body:
+            PosPaymentMethod.browse(body['payment_method_id'])[0].write({'active': body['payment_method_active']})
         if body.get('sync'):
             offline_client.synchronize()
         if body.get('expire'):

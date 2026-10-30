@@ -103,6 +103,7 @@ def main():
 
     try:
         import webview
+        webview.settings['ALLOW_DOWNLOADS'] = True
         webview.create_window(
             "Shop With DD POS",
             f"http://127.0.0.1:{PORT}",

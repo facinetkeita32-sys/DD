@@ -235,6 +235,10 @@ tr:hover td { background: var(--hover); }
 .modal .form-group input, .modal .form-group select, .modal .form-group textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; transition: border var(--transition); }
 .modal .form-group input:focus, .modal .form-group select:focus, .modal .form-group textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
 .modal .btn-group { margin-top: 20px; gap: 10px; justify-content: flex-end; }
+.receipt-preview { width: min(520px, 80vw); }
+.receipt-preview iframe { display: block; width: 100%; height: min(55vh, 520px); margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+.receipt-preview [role="status"] { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.receipt-preview [role="status"].error-message { color: var(--danger); }
 
 /* === Dashboard === */
 .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }

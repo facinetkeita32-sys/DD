@@ -1,4 +1,8 @@
 {
+  "receipt.preview": "Receipt preview",
+  "receipt.loading": "Loading the receipt…",
+  "receipt.ready": "Receipt ready. Choose Print to select your printer.",
+  "receipt.print_failed": "The sale is saved. Unable to open printing; try Download PDF or sign in again.",
   "offline.setup": "Set up this terminal",
   "offline.setup_hint": "Connect once with a manager account to download your catalogue and enable offline sales.",
   "offline.server": "Server address",

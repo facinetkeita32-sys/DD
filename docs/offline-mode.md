@@ -152,6 +152,26 @@ retry. Temporary network failures never remove queue entries. The local dashboar
 reports this terminal's records; the central dashboard consolidates synced sales.
 Counts also include queued product/settings changes.
 
+## Offline receipts and printing
+
+Printing loads the receipt from the terminal's authenticated local backend into
+a sandboxed in-app preview. It does not open an external browser with a different
+cookie jar. Choose **Print** in the preview to open the Windows/WebView2 print UI,
+or **Download PDF** to open the native Save As dialog. Desktop downloads are enabled
+explicitly. HTML and PDF receipts work without contacting the central server and
+honor the selected English/French language. Receipt text is HTML-escaped before
+embedding, and print failures do not recreate or modify a saved sale.
+
+Windows must have a working printer/driver. An internet outage does not prevent a
+USB printer from working; a Wi-Fi/Ethernet printer still requires its local network
+connection. Choose the receipt printer and its supported paper width in the print
+dialog. Opening the dialog confirms the software path, not physical paper output.
+
+Updating the desktop requires closing the application and replacing the executable.
+Its data stays in the same application-data folder; pairing and pending operations
+remain available after signing in again. Updating Hostinger alone does not replace
+the executable/assets already installed on a desktop.
+
 ## Stock conflicts and server recovery
 
 Offline stock cannot be reserved across disconnected terminals. If a sale cannot
@@ -194,6 +214,11 @@ They also cover admin/manager offline edits, cashier restrictions, server-side
 permission tampering, stock deltas during concurrent central sales, field-level
 conflicts/review, barcode collisions, settings and delivery-zone changes, and
 stable product/category IDs across numeric collisions and terminal restarts.
+Receipt checks cover authenticated local HTML/PDF access without a server
+connection, explicit language selection, read-only behavior and safe HTML text.
+Browser checks exercise the in-app preview, print action and PDF download without
+opening a new browser session. Native Windows checks visually confirm the embedded
+print preview and detect/cancel the Save As dialog; no paper job is submitted.
 Neither installed POS data nor the Hostinger database is used by these tests.
 Launcher regression checks also verify duplicate-instance rejection, release of
 the OS lock on exit, and preservation of the private session key after restarting.

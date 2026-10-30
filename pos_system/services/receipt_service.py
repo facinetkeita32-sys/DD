@@ -1,6 +1,7 @@
 import base64
 import io
 from datetime import datetime
+from html import escape
 from fpdf import FPDF
 from ..odoo_orm import env
 from ..models.pos_order import PosOrder
@@ -194,8 +195,11 @@ def generate_receipt_html(order_id, lang='en'):
     data = d['_data']
     lines = d['lines']
     payments = d['payments']
-    company = d['company']
+    company = {key: escape(str(value or ''), quote=True) for key, value in d['company'].items()}
     currency = d.get('currency', {})
+
+    def money(amount):
+        return escape(currency_format(amount, currency), quote=True)
 
     logo_html = ''
     if company.get('logo'):
@@ -204,7 +208,7 @@ def generate_receipt_html(order_id, lang='en'):
     items_rows = ''
     for line in lines:
         ld = line['_data']
-        name = line['product_name']
+        name = escape(str(line['product_name'] or ''), quote=True)
         qty = float(ld.get('qty', 0) or 0)
         price = float(ld.get('price_unit', 0) or 0)
         disc = float(ld.get('discount', 0) or 0)
@@ -212,38 +216,38 @@ def generate_receipt_html(order_id, lang='en'):
         items_rows += f'''<tr>
             <td style="padding:4px 0">{name}</td>
             <td style="text-align:center">{qty}</td>
-            <td style="text-align:right">{currency_format(price, currency)}</td>
-            <td style="text-align:right">{currency_format(subtotal, currency)}</td>
+            <td style="text-align:right">{money(price)}</td>
+            <td style="text-align:right">{money(subtotal)}</td>
         </tr>'''
 
     payments_rows = ''
     for pmt in payments:
         pd = pmt['_data']
-        pmt_name = pmt['payment_method_name']
+        pmt_name = escape(str(pmt['payment_method_name'] or ''), quote=True)
         amt = float(pd.get('amount', 0) or 0)
-        payments_rows += f'<tr><td>{pmt_name}</td><td style="text-align:right">{currency_format(amt, currency)}</td></tr>'
+        payments_rows += f'<tr><td>{pmt_name}</td><td style="text-align:right">{money(amt)}</td></tr>'
 
-    date_val = (data.get('date_order', '') or '')[:19]
+    date_val = escape(str(data.get('date_order', '') or '')[:19], quote=True)
     total = float(data.get('amount_total', 0) or 0)
     delivery_cost = float(d.get('delivery_cost', 0) or 0)
     items_total = total - delivery_cost
     paid = float(data.get('amount_paid', 0) or 0)
     change = float(data.get('amount_change', 0) or 0)
     remaining = round(total - paid, 2)
-    state = data.get('state', '')
-    ref = data.get('name', '') or f"{_('order', lang)} #{d['id']}"
-    paid_row = f'<tr><td>{_("paid", lang)}:</td><td style="text-align:right">{currency_format(paid, currency)}</td></tr>'
-    remaining_row = f'<tr style="font-weight:bold"><td>{_("remaining", lang)}:</td><td style="text-align:right">{currency_format(remaining, currency)}</td></tr>' if remaining > 0.01 else ''
+    state = escape(str(data.get('state', '') or ''), quote=True)
+    ref = escape(str(data.get('name', '') or f"{_('order', lang)} #{d['id']}"), quote=True)
+    paid_row = f'<tr><td>{_("paid", lang)}:</td><td style="text-align:right">{money(paid)}</td></tr>'
+    remaining_row = f'<tr style="font-weight:bold"><td>{_("remaining", lang)}:</td><td style="text-align:right">{money(remaining)}</td></tr>' if remaining > 0.01 else ''
 
     delivery_contact_html = ''
     if d.get('delivery_contact_name') or d.get('delivery_contact_phone'):
         parts = []
         if d['delivery_contact_name']:
-            parts.append(d['delivery_contact_name'])
+            parts.append(escape(str(d['delivery_contact_name']), quote=True))
         if d['delivery_contact_phone']:
-            parts.append(d['delivery_contact_phone'])
+            parts.append(escape(str(d['delivery_contact_phone']), quote=True))
         contact_str = ' - '.join(parts)
-        dz_name = d.get('delivery_zone_name', '')
+        dz_name = escape(str(d.get('delivery_zone_name', '') or ''), quote=True)
         delivery_contact_html = f'<div class="info-grid"><span><strong>{_("delivery", lang)}:</strong> {dz_name}</span></div><div class="info-grid"><span>{contact_str}</span></div>'
 
     html_lang = 'fr' if lang == 'fr' else 'en'
@@ -304,8 +308,8 @@ def generate_receipt_html(order_id, lang='en'):
     <span><strong>{_('date', lang)}:</strong> {date_val}</span>
   </div>
   <div class="info-grid">
-    <span><strong>{_('cashier', lang)}:</strong> {d['user_name']}</span>
-    <span><strong>{_('customer', lang)}:</strong> {d['partner_name']}</span>
+     <span><strong>{_('cashier', lang)}:</strong> {escape(str(d['user_name'] or ''), quote=True)}</span>
+     <span><strong>{_('customer', lang)}:</strong> {escape(str(d['partner_name'] or ''), quote=True)}</span>
   </div>
   {delivery_contact_html}
 
@@ -321,10 +325,10 @@ def generate_receipt_html(order_id, lang='en'):
   <div class="divider"></div>
 
   <table class="totals-table">
-    <tr><td style="text-align:right;width:70%">{_('subtotal', lang)}:</td><td style="text-align:right;width:30%">{currency_format(items_total, currency)}</td></tr>
-    {delivery_cost > 0 and f'<tr><td style="text-align:right">{_("delivery", lang)}:</td><td style="text-align:right">{currency_format(delivery_cost, currency)}</td></tr>' or ''}
-    <tr><td style="text-align:right">{_('discount', lang)}:</td><td style="text-align:right">{currency_format(0, currency)}</td></tr>
-    <tr class="total-row"><td style="text-align:right">{_('total', lang).upper()}:</td><td style="text-align:right">{currency_format(total, currency)}</td></tr>
+    <tr><td style="text-align:right;width:70%">{_('subtotal', lang)}:</td><td style="text-align:right;width:30%">{money(items_total)}</td></tr>
+    {delivery_cost > 0 and f'<tr><td style="text-align:right">{_("delivery", lang)}:</td><td style="text-align:right">{money(delivery_cost)}</td></tr>' or ''}
+    <tr><td style="text-align:right">{_('discount', lang)}:</td><td style="text-align:right">{money(0)}</td></tr>
+    <tr class="total-row"><td style="text-align:right">{_('total', lang).upper()}:</td><td style="text-align:right">{money(total)}</td></tr>
   </table>
 
   {company.get('receipt_header', '') and '<div class="divider"></div><div class="company-info">' + company['receipt_header'] + '</div>'}
@@ -335,7 +339,7 @@ def generate_receipt_html(order_id, lang='en'):
     {payments_rows}
     {paid_row}
     {remaining_row}
-    <tr><td>{_('change', lang)}:</td><td style="text-align:right">{currency_format(change, currency)}</td></tr>
+    <tr><td>{_('change', lang)}:</td><td style="text-align:right">{money(change)}</td></tr>
   </table>
 
   {company.get('receipt_footer', '') and '<div class="divider"></div><div class="footer">' + company['receipt_footer'] + '</div>'}

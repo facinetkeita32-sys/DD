@@ -463,6 +463,46 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertTrue(all('cost_price' not in row for row in snapshot['tables']['product.product']))
         self.assertEqual(10, len(self.call('server', '/api/products')[1]['data']))
 
+    def test_offline_receipt_stays_authenticated_local_and_read_only(self):
+        self.pair()
+        self.state('local', {'online': False})
+        code, sale = self.sale()
+        self.assertEqual(200, code, sale)
+        order_id = sale['data']['id']
+        before = self.state('local')
+        # An external browser does not inherit the desktop WebView cookie jar.
+        with self.assertRaises(urllib.error.HTTPError) as missing_session:
+            urllib.request.urlopen(self.urls['local'] + f'/api/receipt/{order_id}/html')
+        self.assertEqual(401, missing_session.exception.code)
+        code, html = self.call('local', f'/api/receipt/{order_id}/html?lang=fr')
+        self.assertEqual(200, code)
+        self.assertIn('<html lang="fr">', html)
+        self.assertIn('REÇU', html)
+        self.assertIn(sale['data']['name'], html)
+        request = urllib.request.Request(self.urls['local'] + f'/api/receipt/{order_id}/pdf?lang=fr')
+        with self.local.open(request, timeout=10) as response:
+            self.assertEqual('application/pdf', response.headers.get_content_type())
+            self.assertTrue(response.read().startswith(b'%PDF'))
+        after = self.state('local')
+        self.assertEqual(before['orders'], after['orders'])
+        self.assertEqual(before['products'], after['products'])
+        self.assertEqual(before['queue'], after['queue'])
+
+    def test_receipt_html_escapes_names_before_embedding(self):
+        self.pair()
+        self.state('local', {'online': False})
+        _, sale = self.sale()
+        product_id = self.state('local')['products'][0]['id']
+        malicious = '<img src=x onerror="window.parent.receiptInjected=true">'
+        self.assertEqual(200, self.call('local', f'/api/products/{product_id}', {'name': malicious}, method='PUT')[0])
+        self.assertEqual(200, self.call('local', '/api/company', {'name': '<script>bad()</script>'}, method='PUT')[0])
+        code, html = self.call('local', f'/api/receipt/{sale["data"]["id"]}/html')
+        self.assertEqual(200, code)
+        self.assertNotIn(malicious, html)
+        self.assertNotIn('<script>bad()</script>', html)
+        self.assertIn('&lt;img', html)
+        self.assertIn('&lt;script&gt;bad()', html)
+
 
 if __name__ == '__main__':
     unittest.main()

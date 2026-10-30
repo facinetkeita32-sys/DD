@@ -1,4 +1,8 @@
 {
+  "receipt.preview": "Aperçu du reçu",
+  "receipt.loading": "Chargement du reçu…",
+  "receipt.ready": "Reçu prêt. Choisissez Imprimer pour sélectionner votre imprimante.",
+  "receipt.print_failed": "La vente est enregistrée. Impossible d’ouvrir l’impression ; essayez Télécharger le PDF ou reconnectez-vous.",
   "offline.setup": "Configurer ce terminal",
   "offline.setup_hint": "Connectez-vous une première fois avec un compte responsable pour télécharger le catalogue et activer les ventes hors ligne.",
   "offline.server": "Adresse du serveur",

@@ -1490,13 +1490,69 @@ let App = {
     window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(text), '_blank')
   },
 
-  openPrintReceipt(id) {
-    window.open(`/api/receipt/${id}/html`, '_blank', 'width=500,height=700,menubar=no,toolbar=no,scrollbars=yes')
+  async openPrintReceipt(id) {
+    const receiptId = Number(id)
+    if (!Number.isSafeInteger(receiptId) || receiptId <= 0) return
+    const escape = value => this._esc(String(value ?? ''))
+    const requestId = this._receiptPreviewRequest = (this._receiptPreviewRequest || 0) + 1
+    const user = this.user
+    this.showModal(`<div class="receipt-preview">
+      <h3>${escape(I18n.t('receipt.title', 'Receipt'))}</h3>
+      <p id="receipt-preview-status" role="status" aria-live="polite">${escape(I18n.t('receipt.loading', 'Loading the receipt…'))}</p>
+      <iframe id="receipt-preview-frame" title="${escape(I18n.t('receipt.preview', 'Receipt preview'))}" sandbox="allow-same-origin allow-modals" referrerpolicy="no-referrer"></iframe>
+      <div class="btn-group">
+        <button type="button" id="receipt-preview-print" class="btn btn-primary" disabled>${escape(I18n.t('receipt.print', 'Print Receipt'))}</button>
+        <button type="button" id="receipt-preview-pdf" class="btn btn-success">${escape(I18n.t('receipt.pdf', 'Download PDF'))}</button>
+        <button type="button" id="receipt-preview-close" class="btn btn-secondary">${escape(I18n.t('common.close', 'Close'))}</button>
+      </div>
+    </div>`)
+    const frame = document.getElementById('receipt-preview-frame')
+    const status = document.getElementById('receipt-preview-status')
+    const print = document.getElementById('receipt-preview-print')
+    const current = () => this._receiptPreviewRequest === requestId && this.user === user && document.getElementById('receipt-preview-frame') === frame
+    const failure = () => {
+      if (current()) {
+        status.textContent = I18n.t('receipt.print_failed', 'The sale is saved. Unable to open printing; try Download PDF or sign in again.')
+        status.classList.add('error-message')
+      }
+    }
+    document.getElementById('receipt-preview-close').onclick = () => this.closeModal()
+    document.getElementById('receipt-preview-pdf').onclick = () => this.downloadReceiptPdf(receiptId)
+    print.onclick = () => {
+      try {
+        // A same-origin preview keeps the embedded browser's authenticated
+        // session; window.open would hand it to a different, logged-out browser.
+        frame.contentWindow.focus()
+        frame.contentWindow.print()
+      } catch (error) { failure() }
+    }
+    try {
+      const response = await fetch(`/api/receipt/${receiptId}/html?lang=${encodeURIComponent(I18n.currentLang)}`, {credentials: 'same-origin'})
+      if (!response.ok) throw new Error('Receipt could not be loaded')
+      const html = await response.text()
+      if (!current()) return
+      frame.onload = async () => {
+        if (!current()) return
+        const document = frame.contentDocument
+        if (!document?.querySelector('.receipt')) { failure(); return }
+        document.querySelectorAll('.no-print').forEach(element => { element.hidden = true })
+        // Wait for embedded logos before enabling Print, without waiting forever
+        // for a damaged image. The receipt has no remote assets to fetch offline.
+        await Promise.race([
+          Promise.all(Array.from(document.images, image => image.decode?.().catch(() => {}) || Promise.resolve())),
+          new Promise(resolve => setTimeout(resolve, 5000)),
+        ])
+        if (!current()) return
+        print.disabled = false
+        status.textContent = I18n.t('receipt.ready', 'Receipt ready. Choose Print to select your printer.')
+      }
+      frame.srcdoc = html
+    } catch (error) { failure() }
   },
 
   downloadReceiptPdf(id) {
     const a = document.createElement('a')
-    a.href = `/api/receipt/${id}/pdf`
+    a.href = `/api/receipt/${id}/pdf?lang=${encodeURIComponent(I18n.currentLang)}`
     a.download = ''
     document.body.appendChild(a)
     a.click()

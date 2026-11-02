@@ -580,7 +580,7 @@ let App = {
 
     if (this.cartCustomer) {
       const c = this.customers.find(x => x.id === this.cartCustomer)
-      customerEl.innerHTML = `<span class="customer-icon">👤</span> ${c ? c.name : 'Customer'} <span class="customer-hint">${I18n.t('common.change', 'change')}</span>`
+      customerEl.innerHTML = `<span class="customer-icon">👤</span> ${this._esc(c ? c.name : 'Customer')} <span class="customer-hint">${I18n.t('common.change', 'change')}</span>`
     } else {
       customerEl.innerHTML = `<span class="customer-icon">➕</span> ${I18n.t('pos.add_customer', 'Add Customer')}`
     }
@@ -851,7 +851,7 @@ let App = {
       </div>
       <div style="max-height:300px;overflow-y:auto">`
     this.customers.forEach(c => {
-      html += `<div class="customer-option" data-id="${c.id}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);border-radius:4px">${c.name} ${c.phone ? '- ' + c.phone : ''}</div>`
+      html += `<div class="customer-option" data-id="${c.id}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);border-radius:4px">${this._esc(c.name || '')} ${c.phone ? '- ' + this._esc(c.phone) : ''}</div>`
     })
     html += `</div>
       <div class="btn-group" style="margin-top:12px">
@@ -1571,17 +1571,18 @@ let App = {
 
   renderCustomersTable() {
     const tbody = document.getElementById('customers-tbody')
+    document.getElementById('add-customer-btn').hidden = !this.hasAction('customer.create')
     if (!this.customers.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-light)">${I18n.t('customer.title', 'No customers')}</td></tr>`
       return
     }
     tbody.innerHTML = this.customers.map(c => `
       <tr>
-        <td>${c.name || ''}</td>
-        <td>${c.phone || '-'}</td>
-        <td>${c.email || '-'}</td>
+        <td>${this._esc(c.name || '')}</td>
+        <td>${this._esc(c.phone || '-')}</td>
+        <td>${this._esc(c.email || '-')}</td>
         <td>${this.currencyFormat(c.total_due || 0)}</td>
-        <td><button class="btn btn-sm btn-primary edit-customer" data-id="${c.id}">${I18n.t('common.edit', 'Edit')}</button></td>
+        <td>${this.hasAction('customer.write') ? `<button class="btn btn-sm btn-primary edit-customer" data-id="${c.id}">${I18n.t('common.edit', 'Edit')}</button>` : '—'}</td>
       </tr>
     `).join('')
     tbody.querySelectorAll('.edit-customer').forEach(btn => {
@@ -1593,9 +1594,9 @@ let App = {
     const customer = id ? this.customers.find(c => c.id === id) : null
     const title = customer ? I18n.t('customer.edit', 'Edit Customer') : I18n.t('customer.add', 'Add Customer')
     let html = `<h3>${title}</h3>
-      <div class="form-group"><label data-i18n="customer.name">Name</label><input id="c-name" value="${customer ? customer.name || '' : ''}"></div>
-      <div class="form-group"><label data-i18n="customer.phone">Phone</label><input id="c-phone" value="${customer ? customer.phone || '' : ''}"></div>
-      <div class="form-group"><label data-i18n="customer.email">Email</label><input id="c-email" value="${customer ? customer.email || '' : ''}"></div>
+      <div class="form-group"><label data-i18n="customer.name">Name</label><input id="c-name" value="${this._esc(customer?.name || '')}"></div>
+      <div class="form-group"><label data-i18n="customer.phone">Phone</label><input id="c-phone" value="${this._esc(customer?.phone || '')}"></div>
+      <div class="form-group"><label data-i18n="customer.email">Email</label><input id="c-email" value="${this._esc(customer?.email || '')}"></div>
       <div class="btn-group">
         <button class="btn btn-primary" id="c-save">${I18n.t('common.save', 'Save')}</button>
         <button class="btn btn-secondary" id="c-cancel">${I18n.t('common.cancel', 'Cancel')}</button>
@@ -1603,10 +1604,11 @@ let App = {
     this.showModal(html)
     document.getElementById('c-save').onclick = async () => {
       const data = {
-        name: document.getElementById('c-name').value,
-        phone: document.getElementById('c-phone').value,
-        email: document.getElementById('c-email').value,
+        name: document.getElementById('c-name').value.trim(),
+        phone: document.getElementById('c-phone').value.trim(),
+        email: document.getElementById('c-email').value.trim(),
       }
+      if (!data.name) { alert(I18n.t('customer.name_required', 'Customer name is required.')); return }
       try {
         if (customer) {
           await this.api('PUT', `/customers/${customer.id}`, data)

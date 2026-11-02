@@ -16,6 +16,8 @@ Rolling code back does not require deleting the new metadata tables.
 Supported on terminals: fully paid sales using active configured payment-method
 names (including **Cash, Orange Money and Credit Card**), local HTML/PDF receipts,
 cashier sessions, existing customer selection, local reporting, English/French,
+customer creation by authorized cashiers/managers/admins and customer contact
+editing by managers/admins,
 automatic retry and manual synchronization. Admins and managers can create/edit
 products and categories offline, including images, prices, costs and stock
 adjustments. Admins can also change company details/logo, POS settings and delivery
@@ -26,7 +28,7 @@ existing product-management permissions; admin-only settings stay admin-only.
 The original role-based screens are visible, including Settings for admins and
 Products for managers. The local Users screen is a read-only list of users verified
 on that terminal. Account/password/role administration, server backup/restore,
-credit, cancellations, deletion, bulk import, customer editing
+credit, cancellations, deletion, bulk import
 and purchasing use the central application. Their controls are hidden or explicitly
 disabled with explanatory notices, rather than pretending an unsupported write
 was saved. Server role definitions and normal online APIs are unchanged.
@@ -128,7 +130,12 @@ IDs, including when another server record used the same numeric ID while the
 terminal was disconnected. Historical local orders/receipts therefore keep valid
 product references. Existing already-queued events remain compatible with the new
 protocol, and metadata is upgraded additively. Customer records still originate
-centrally. Historical sale prices/subtotals are retained, not repriced.
+centrally or are created offline with stable device-scoped UUIDs. A locally created
+customer can be selected immediately; the customer event is synchronized before
+dependent sales and remapped safely if a central numeric ID collides. Customer
+contact edits use field-level conflict review, while credit limits and balances
+cannot be edited through offline synchronization. Historical sale prices/subtotals
+are retained, not repriced.
 
 Payment-method selection is recordkeeping, matching the central POS workflow.
 Choosing Orange Money or Credit Card does not initiate, authorize or verify a

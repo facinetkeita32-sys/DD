@@ -257,7 +257,8 @@ def get_my_permissions():
             'screens': get_role_screens(role),
             'actions': [name for name in get_role_actions(role)
                         if name in ('order.create', 'session.open', 'session.close', 'product.create',
-                                    'product.write', 'settings.read', 'settings.write', 'report.read', 'user.read')],
+                                    'product.write', 'customer.create', 'customer.write',
+                                    'settings.read', 'settings.write', 'report.read', 'user.read')],
         })
     return success_response({
         'role': role,

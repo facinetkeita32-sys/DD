@@ -16,6 +16,10 @@ EDITABLE = {
         'image', 'tax_ids', 'pos_categ_ids', 'track_serial', 'is_favorite', 'color', 'expiration_date',
     },
     'product.category': {'name', 'parent_id', 'description', 'active', 'sequence'},
+    # Customer contact details only. Credit limits and balances remain under
+    # the central business workflow and cannot be overwritten by a terminal.
+    'res.partner': {'name', 'email', 'phone', 'mobile', 'street', 'city', 'state',
+                    'zip_code', 'country', 'vat', 'company_type', 'image', 'notes'},
     'pos.config': {'name', 'currency_id', 'iface_available_qty', 'iface_display_categ',
                    'iface_print_bill', 'iface_search', 'iface_barcode', 'limit_categories',
                    'category_ids', 'default_partner_id', 'payment_method_ids', 'receipt_header',
@@ -33,6 +37,8 @@ ROUTES = {
     'api.bulk_update_products': ('product.product', 'ids'),
     'api.create_product_category': ('product.category', None),
     'api.update_product_category': ('product.category', 'cat_id'),
+    'api.create_customer': ('res.partner', None),
+    'api.update_customer': ('res.partner', 'customer_id'),
     'api.update_config': ('pos.config', 'config'),
     'api.update_company': ('res.company', 'company'),
     'api.create_delivery_zone': ('delivery.zone', None),
@@ -140,6 +146,8 @@ def decode(device_id, model, values):
 def permission(model, creating):
     if model in ('product.product', 'product.category'):
         return 'product.create' if creating else 'product.write'
+    if model == 'res.partner':
+        return 'customer.create' if creating else 'customer.write'
     return 'settings.write'
 
 
@@ -168,6 +176,8 @@ def validate_values(model, values):
         raise SyncError('A name is required.')
     if 'type' in values and values['type'] not in ('product', 'consu', 'service'):
         raise SyncError('Invalid product type.')
+    if 'company_type' in values and values['company_type'] not in ('person', 'company'):
+        raise SyncError('Invalid customer type.')
 
 
 def _conflict(model, values, current, message):
@@ -211,6 +221,9 @@ def apply_change(device_id, payload, user):
                                                               ('parent_id', '=', values.get('parent_id') or False)], limit=1):
             raise SyncError('A category with this name already exists on the server.', 409, 'catalog_conflict',
                             details={'model': model, 'duplicate_name': values.get('name')})
+        if model == 'res.partner':
+            values['customer'] = True
+            values['active'] = True
         record = env[model].create(values)
         store.put('applied', key, {'server_id': record.id})
     else:

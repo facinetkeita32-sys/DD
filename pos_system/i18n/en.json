@@ -1,4 +1,5 @@
 {
+  "customer.name_required": "Customer name is required.",
   "receipt.email_pending": "Synchronize this order and its payments before emailing the receipt. The email has not been queued.",
   "receipt.email_uncertain": "Email delivery could not be confirmed. Check your connection and the recipient's inbox before retrying.",
   "receipt.email_access": "This receipt is unavailable for your account or terminal.",

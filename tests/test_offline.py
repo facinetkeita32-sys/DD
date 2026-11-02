@@ -168,8 +168,108 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(before['orders'], after['orders'])
         self.assertEqual(before['products'], after['products'])
         self.assertEqual([], after['queue'])
-        for path in ('/api/customers', '/api/orders/1/cancel', '/api/backup/restore', '/api/system/init'):
+        for path in ('/api/orders/1/cancel', '/api/backup/restore', '/api/system/init'):
             self.assertEqual(403, self.call('local', path, {})[0], path)
+
+    def test_cashier_customer_creation_collision_restart_and_linked_sale_sync_once(self):
+        self.pair()
+        self.login('cashier1', '1234')
+        permissions = self.call('local', '/api/auth/permissions')[1]['data']
+        self.assertIn('customer.create', permissions['actions'])
+        self.assertNotIn('customer.write', permissions['actions'])
+        self.state('local', {'online': False})
+        code, customer = self.call('local', '/api/customers', {
+            'name': 'Offline customer', 'phone': '620123456', 'email': 'customer@example.test',
+        })
+        self.assertEqual(200, code, customer)
+        local_id = customer['data']['id']
+        self.assertEqual(403, self.call('local', f'/api/customers/{local_id}', {'name': 'Not allowed'}, method='PUT')[0])
+        self.login('admin', 'admin', 'server')
+        code, remote = self.call('server', '/api/customers', {'name': 'Central customer', 'phone': '111'})
+        self.assertEqual(200, code, remote)
+        self.assertEqual(local_id, remote['data']['id'])
+        product = self.state('local')['products'][0]
+        code, sale = self.call('local', '/api/orders', {
+            'partner_id': local_id,
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [{'payment_method_id': 1, 'amount': product['price']}],
+        })
+        self.assertEqual(200, code, sale)
+        sale_reference = sale['data']['name']
+        self.processes['local'].terminate()
+        self.processes['local'].wait(timeout=5)
+        self.start('local')
+        self.state('local', {'online': False})
+        self.login('cashier1', '1234')
+        self.assertEqual('Offline customer', self.call('local', f'/api/customers/{local_id}')[1]['data']['name'])
+        terminal = self.state('local', {'online': True, 'drop_kind': 'catalog', 'sync': True})
+        self.assertTrue(any(row['status'] == 'pending' for _, row in terminal['queue']))
+        terminal = self.state('local', {'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        central_customers = self.call('server', '/api/customers')[1]['data']
+        matches = [row for row in central_customers if row['name'] == 'Offline customer']
+        self.assertEqual(1, len(matches))
+        self.assertNotEqual(local_id, matches[0]['id'])
+        self.assertEqual('620123456', matches[0]['phone'])
+        self.assertEqual('customer@example.test', matches[0]['email'])
+        central_orders = self.call('server', '/api/orders')[1]['data']
+        self.assertEqual(1, len(central_orders))
+        self.assertEqual(sale_reference, central_orders[0]['name'])
+        self.assertEqual(matches[0]['id'], central_orders[0]['partner_id']['id'])
+        self.assertEqual('Offline customer', central_orders[0]['partner_name'])
+        local_customers = self.call('local', '/api/customers')[1]['data']
+        self.assertEqual(local_id, next(row['id'] for row in local_customers if row['name'] == 'Offline customer'))
+        self.assertNotEqual(local_id, next(row['id'] for row in local_customers if row['name'] == 'Central customer'))
+        self.state('local', {'sync': True})
+        self.assertEqual(1, len([row for row in self.call('server', '/api/customers')[1]['data'] if row['name'] == 'Offline customer']))
+
+    def test_customer_creation_validation_rollback_and_manager_edit_permissions(self):
+        self.pair()
+        self.state('local', {'online': False, 'capture_error': True})
+        before = self.call('local', '/api/customers')[1]['data']
+        self.assertEqual(400, self.call('local', '/api/customers', {'name': 'Rollback customer'})[0])
+        self.assertEqual(before, self.call('local', '/api/customers')[1]['data'])
+        self.state('local', {'capture_error': False})
+        self.assertEqual(400, self.call('local', '/api/customers', {'name': '   '})[0])
+        self.assertEqual(400, self.call('local', '/api/customers', {'name': 'Bad balance', 'total_due': 999})[0])
+        self.state('local', {'online': True})
+        self.login('manager1', 'manager123')
+        self.state('local', {'online': False})
+        created = self.call('local', '/api/customers', {'name': 'Manager customer'})[1]['data']
+        self.assertEqual(200, self.call('local', f'/api/customers/{created["id"]}', {
+            'phone': '987654321', 'email': 'manager@example.test',
+        }, method='PUT')[0])
+        self.assertEqual(400, self.call('local', f'/api/customers/{created["id"]}', {'total_due': 1}, method='PUT')[0])
+        terminal = self.state('local', {'online': True, 'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        server = next(row for row in self.call('server', '/api/customers')[1]['data'] if row['name'] == 'Manager customer')
+        self.assertEqual('987654321', server['phone'])
+        self.assertEqual('manager@example.test', server['email'])
+        self.assertEqual(0, server['total_due'])
+
+    def test_server_rejects_forged_customer_balance_or_cashier_edits(self):
+        self.pair()
+        cashier = self.login('cashier1', '1234')
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.call('local', '/api/customers', {'name': 'Cashier created'})[0])
+        terminal = self.state('local')
+        operation = next(row['operation'] for _, row in terminal['queue']
+                         if row['operation'].get('kind') == 'catalog')
+        grant = dict(terminal['grants'])[str(cashier['id'])]
+        settings = terminal['client']
+        headers = {'Authorization': 'Bearer ' + settings['credential'],
+                   'X-POS-Server': settings['server_id'], 'X-POS-Epoch': settings['epoch']}
+        forged = copy.deepcopy(operation)
+        forged['id'] = str(uuid.uuid4())
+        forged['data']['values']['total_due'] = 5000
+        self.assertEqual(400, self.call('server', '/api/offline/push', {'operation': forged}, headers=headers)[0])
+        forged = copy.deepcopy(operation)
+        forged['id'] = str(uuid.uuid4())
+        forged['grant'] = {'id': grant['id'], 'token': grant['token']}
+        forged['data'].update(action='update', record={'id': 1},
+                              values={'name': 'Unauthorized edit'}, base={'name': 'Walk-in Customer'})
+        self.assertEqual(403, self.call('server', '/api/offline/push', {'operation': forged}, headers=headers)[0])
+        self.assertEqual('Walk-in Customer', self.call('server', '/api/customers/1')[1]['data']['name'])
 
     def test_pending_sale_and_partial_payments_survive_restart_and_retry(self):
         self.pair()

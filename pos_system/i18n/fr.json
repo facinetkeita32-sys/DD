@@ -50,7 +50,7 @@
   "offline.conflict_help": "Conservez la base de ce terminal. Les opérations en attente restent enregistrées. Demandez à un responsable de résoudre les conflits de stock, d’autorisation ou de restauration avant de réessayer.",
   "offline.sync_now": "Synchroniser maintenant",
   "offline.terminals": "Terminaux hors ligne",
-  "offline.revoke_hint": "La révocation prend effet à la reconnexion du terminal. Les autorisations hors ligne expirent au bout de sept jours.",
+  "offline.revoke_hint": "La révocation prend effet à la reconnexion du terminal. Les nouvelles autorisations hors ligne expirent au bout de 30 jours.",
   "offline.revoke": "Révoquer",
   "offline.revoked": "Révoqué",
   "offline.no_devices": "Aucun terminal enregistré.",

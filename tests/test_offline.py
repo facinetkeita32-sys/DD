@@ -381,6 +381,8 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(403, code)
         self.pair()
         user = self.login('cashier1', '1234')
+        grant = dict(self.state('local')['grants'])[str(user['id'])]
+        self.assertEqual(30 * 86400, grant['expires_at'] - grant['issued_at'])
         self.state('local', {'online': False})
         self.call('local', '/api/auth/logout', {})
         self.assertEqual(401, self.call('local', '/api/auth/login', {'login': 'cashier2', 'password': '5678'})[0])
@@ -389,6 +391,9 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(401, self.call('local', '/api/auth/login', {'login': 'cashier1', 'password': '1234'})[0])
         self.state('local', {'online': True})
         self.login('cashier1', '1234')
+        renewed = dict(self.state('local')['grants'])[str(user['id'])]
+        self.assertEqual(30 * 86400, renewed['expires_at'] - renewed['issued_at'])
+        self.assertNotEqual(grant['id'], renewed['id'])
         credentials = self.state('local')['client']
         headers = {'Authorization': 'Bearer ' + credentials['credential'],
                    'X-POS-Server': credentials['server_id'], 'X-POS-Epoch': credentials['epoch']}

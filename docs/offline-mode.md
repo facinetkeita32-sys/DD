@@ -97,7 +97,7 @@ online login on that terminal before they can sign in offline there.
 - The desktop caches only a salted Werkzeug password verifier for users who
   actually authenticated there. It never downloads server passwords or all user
   hashes. Passwords/verifiers are omitted from terminal login responses.
-- Offline login and new sales require an unexpired **seven-day** grant for that
+- Offline login and new sales require an unexpired **30-day** grant for that
   user/device. Online login renews the grant. A wrong password rejected online
   does not fall back to accepting an older offline password.
 - Server revocations are learned on reconnection, not while disconnected.
@@ -106,6 +106,9 @@ online login on that terminal before they can sign in offline there.
 - Uploads retain the original sale's grant. Sales created within its validity
   can arrive after it expires; user/device revocation still requires a manager
   to reconcile unsent events.
+- Existing seven-day grants retain their original expiry. After updating the
+  server, each user must sign in online on each terminal to receive a new
+  30-day grant; issuing a new grant does not extend an already-issued grant.
 - Local sessions use a per-installation key/cookie name, normal inactivity and
   session-generation checks. Restart requires local sign-in, not internet.
 
@@ -261,7 +264,7 @@ by the ordinary retry button.
 
 `python -m unittest discover -s tests -v` runs existing regression tests plus real
 HTTP tests with independent temporary server and terminal databases. The offline
-tests cover first pairing/login, hashed local passwords, seven-day expiry, restart
+tests cover first pairing/login, hashed local passwords, 30-day authorization and expiry, restart
 while disconnected, atomic rollback, payment-method validity, lost acknowledgements,
 exactly-once retry, stock conflicts, revocation, and restored-server epoch changes.
 They also cover admin/manager offline edits, cashier restrictions, server-side

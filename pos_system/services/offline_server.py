@@ -32,6 +32,7 @@ REFERENCE_MODELS = {
     'pos.category', 'pos.payment.method', 'pos.tax', 'delivery.zone',
     'product.product', 'res.partner',
 }
+OFFLINE_AUTHORIZATION_DAYS = 30
 
 
 class SyncError(ValueError):
@@ -81,7 +82,8 @@ def issue_grant(device_id, user):
     now = time.time()
     key, secret = str(uuid.uuid4()), secrets.token_urlsafe(32)
     grant = {'id': key, 'device_id': device_id, 'user_id': user.id, 'issued_at': now,
-             'expires_at': now + 7 * 86400, 'epoch': store.get('meta', 'identity')['epoch']}
+             'expires_at': now + OFFLINE_AUTHORIZATION_DAYS * 86400,
+             'epoch': store.get('meta', 'identity')['epoch']}
     store.put('grants', key, dict(grant, token_digest=digest(secret)))
     return dict(grant, token=secret, user=public_user(user))
 

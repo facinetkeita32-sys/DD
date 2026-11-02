@@ -39,7 +39,7 @@ def before_request():
         return jsonify(error='This operation is unavailable on an offline terminal.'), 403
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
         from .offline_catalog import ROUTES
-        allowed = (request.endpoint in ('api.create_order', 'api.create_session', 'api.open_session', 'api.close_session')
+        allowed = (request.endpoint in ('api.create_order', 'api.pay_order', 'api.create_session', 'api.open_session', 'api.close_session')
                    or request.endpoint in ROUTES
                    or request.path in ('/api/auth/logout', '/api/settings/language', '/api/offline/sync')
                    or request.endpoint == 'offline.resolve_conflict')
@@ -47,7 +47,7 @@ def before_request():
             return jsonify(error='Use the central server for deletion, user-security changes, credit and electronic payments.'), 403
     from .offline_catalog import ROUTES
     editing = request.endpoint in ROUTES
-    if editing or request.endpoint in ('api.create_order', 'api.create_session', 'api.open_session', 'api.close_session'):
+    if editing or request.endpoint in ('api.create_order', 'api.pay_order', 'api.create_session', 'api.open_session', 'api.close_session'):
         if request.endpoint == 'api.create_order':
             from collections import Counter
             from ..models.product_product import ProductProduct
@@ -69,6 +69,22 @@ def before_request():
                     raise SyncError('Insufficient local stock.')
             except (SyncError, TypeError, ValueError, KeyError, AttributeError) as error:
                 return jsonify(error=str(error) if isinstance(error, SyncError) else 'Invalid sale.'), 400
+        if request.endpoint == 'api.pay_order':
+            from ..models.pos_order import PosOrder
+            from ..models.pos_payment_method import PosPaymentMethod
+            from .offline_server import _finite
+            try:
+                data = request.get_json() or {}
+                amount = _finite(data.get('amount'))
+                method_id = data.get('payment_method_id')
+                records = PosOrder.browse((request.view_args or {}).get('order_id', 0))
+                methods = PosPaymentMethod.browse(method_id) if type(method_id) is int else []
+                if amount <= 0 or not methods or not methods[0].active:
+                    raise SyncError('Enter a positive amount and select an active payment method.')
+                if not records or not store.get('meta', f'local:pos.order:{records[0].id}'):
+                    raise SyncError('Only orders created on this terminal can be paid here.', 409)
+            except (SyncError, ValueError, TypeError, AttributeError) as error:
+                return jsonify(error=str(error) if isinstance(error, SyncError) else 'Invalid payment.'), getattr(error, 'status', 400)
         transaction = atomic()
         transaction.__enter__()
         g.offline_transaction = transaction
@@ -136,9 +152,10 @@ def after_request(response):
             capture_change(edit['model'], edit['before'], ids, edit['creating'], g.user_id)
         else:
             from .offline_client import capture
-            kind = 'sale' if request.endpoint == 'api.create_order' else 'session'
+            kind = ('sale' if request.endpoint == 'api.create_order' else
+                    'payment' if request.endpoint == 'api.pay_order' else 'session')
             result = data.get('data') or {}
-            record_id = result.get('id') or (request.view_args or {}).get('session_id')
+            record_id = result.get('id') or (request.view_args or {}).get('order_id') or (request.view_args or {}).get('session_id')
             record = capture(kind, record_id, g.user_id)
             if isinstance(data.get('data'), dict):
                 data['data']['name'] = record.name

@@ -22,7 +22,7 @@ if mode == 'server':
     ResUsers.create({'name': 'Manager', 'login': 'manager1', 'password': 'manager123',
                      'role': 'manager', 'active': True})
 baseline = backup_service.export_full_backup()
-control = {'online': True, 'drop_ack': False, 'capture_error': False}
+control = {'online': True, 'drop_ack': False, 'drop_kind': '', 'capture_error': False}
 real_request = offline_client.request_server
 real_capture = offline_client.capture
 real_capture_change = offline_client.capture_change
@@ -32,8 +32,9 @@ def transport(config, path, body=None, credential=None):
     if not control['online']:
         raise offline_client.NetworkUnavailable('Simulated disconnection')
     result = real_request(config, path, body, credential)
-    if path == 'push' and control['drop_ack']:
+    if path == 'push' and (control['drop_ack'] or control['drop_kind'] == body['operation']['kind']):
         control['drop_ack'] = False
+        control['drop_kind'] = ''
         raise offline_client.NetworkUnavailable('Acknowledgement lost after commit')
     return result
 

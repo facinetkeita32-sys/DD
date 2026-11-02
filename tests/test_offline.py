@@ -164,13 +164,94 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(400, self.sale()[0])
         self.state('local', {'capture_error': False})
         self.assertEqual(400, self.sale(method=999999)[0])
-        self.assertEqual(400, self.sale(amount=1)[0])
         after = self.state('local')
         self.assertEqual(before['orders'], after['orders'])
         self.assertEqual(before['products'], after['products'])
         self.assertEqual([], after['queue'])
         for path in ('/api/customers', '/api/orders/1/cancel', '/api/backup/restore', '/api/system/init'):
             self.assertEqual(403, self.call('local', path, {})[0], path)
+
+    def test_pending_sale_and_partial_payments_survive_restart_and_retry(self):
+        self.pair()
+        self.state('local', {'online': False})
+        product = self.state('local')['products'][0]
+        code, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 2, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [], 'partner_id': 1,
+        })
+        self.assertEqual(200, code, result)
+        order = result['data']
+        self.assertEqual('pending', order['state'])
+        total = product['price'] * 2
+        self.assertEqual(total, order['remaining'])
+        local_id = order['id']
+        code, first = self.call('local', f'/api/orders/{local_id}/pay', {'amount': total / 2, 'payment_method_id': 2})
+        self.assertEqual(200, code, first)
+        self.assertEqual(total / 2, first['data']['remaining'])
+        self.processes['local'].terminate()
+        self.processes['local'].wait(timeout=5)
+        self.start('local')
+        self.state('local', {'online': False})
+        self.login('admin', 'admin')
+        code, second = self.call('local', f'/api/orders/{local_id}/pay', {'amount': total / 2, 'payment_method_id': 4})
+        self.assertEqual(200, code, second)
+        self.assertEqual('paid', second['data']['state'])
+        self.assertEqual(400, self.call('local', f'/api/orders/{local_id}/pay', {'amount': 1, 'payment_method_id': 1})[0])
+        self.state('local', {'online': True, 'drop_kind': 'payment', 'sync': True})
+        intermediate = self.call('server', '/api/orders')[1]['data']
+        self.assertEqual(1, len(intermediate[0]['payments']))
+        self.state('local', {'sync': True})
+        central = self.call('server', '/api/orders')[1]['data']
+        self.assertEqual(1, len(central))
+        self.assertEqual('paid', central[0]['state'])
+        self.assertEqual(total, central[0]['amount_paid'])
+        self.assertEqual(2, len(central[0]['payments']))
+        self.assertEqual({'Orange Money', 'Credit Card'}, {p['payment_method_name'] for p in central[0]['payments']})
+        self.assertEqual(product['quantity'] - 2, self.state('server')['products'][0]['quantity'])
+
+    def test_payment_queue_failure_rolls_back_payment_and_order(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        order_id = result['data']['id']
+        before = self.call('local', f'/api/orders/{order_id}')[1]['data']
+        queue = self.state('local')['queue']
+        self.state('local', {'capture_error': True})
+        self.assertEqual(400, self.call('local', f'/api/orders/{order_id}/pay', {
+            'amount': product['price'], 'payment_method_id': 1,
+        })[0])
+        self.state('local', {'capture_error': False})
+        self.assertEqual(before, self.call('local', f'/api/orders/{order_id}')[1]['data'])
+        self.assertEqual(queue, self.state('local')['queue'])
+
+    def test_central_payment_conflict_does_not_duplicate_or_overpay(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        local_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.call('local', f'/api/orders/{local_id}/pay', {'amount': product['price'], 'payment_method_id': 1})[0])
+        self.login('admin', 'admin', 'server')
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {'amount': product['price'], 'payment_method_id': 1})[0])
+        terminal = self.state('local', {'online': True, 'sync': True})
+        self.assertEqual('payment_conflict', terminal['client']['error'])
+        pending = [row for _, row in terminal['queue'] if row['status'] == 'conflict']
+        self.assertEqual(1, len(pending))
+        review = self.call('local', '/api/offline/conflicts')[1]['data']
+        self.assertEqual('payment', review[0]['kind'])
+        self.assertEqual(central_id, review[0]['server']['server_order_id'])
+        self.assertEqual(0, review[0]['server']['remaining'])
+        server_order = self.call('server', '/api/orders')[1]['data'][0]
+        self.assertEqual(product['price'], server_order['amount_paid'])
+        self.assertEqual(1, len(server_order['payments']))
 
     def test_stock_conflict_and_revocation_never_drop_pending_sales(self):
         self.pair()

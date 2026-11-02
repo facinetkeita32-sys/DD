@@ -226,8 +226,8 @@ def capture(kind, record_id, user_id):
     check_access(user_id)
     if kind == 'sale':
         record = PosOrder.browse(record_id)[0]
-        if record.state != 'paid':
-            raise SyncError('Offline mode supports fully paid sales only.')
+        if record.state not in ('paid', 'pending'):
+            raise SyncError('Unsupported order state.')
         payload = dict(record._data)
         payload['uuid'] = _uuid('pos.order', record_id)
         settings = config()
@@ -252,6 +252,23 @@ def capture(kind, record_id, user_id):
             methods = PosPaymentMethod.browse(payment['payment_method_id'])
             if not methods or not methods[0].active:
                 raise SyncError('Select an active configured payment method.')
+    elif kind == 'payment':
+        record = PosOrder.browse(record_id)[0]
+        payment_id = max((p.id for p in PosPayment.search([('order_id', '=', record_id)])), default=0)
+        payments = PosPayment.browse(payment_id)
+        if not payments:
+            raise SyncError('The payment could not be queued.')
+        payment = payments[0]
+        from .offline_catalog import reference
+        payload = {'uuid': _uuid('pos.payment', payment.id),
+                   'order_uuid': _uuid('pos.order', record.id),
+                   'method_ref': reference('pos.payment.method', payment._data.get('payment_method_id')),
+                   'amount': payment.amount, 'payment_date': payment._data.get('payment_date'),
+                   'reference': payment._data.get('reference') or ''}
+        from ..models.pos_payment_method import PosPaymentMethod
+        methods = PosPaymentMethod.browse(payment._data.get('payment_method_id') or 0)
+        if not methods or not methods[0].active:
+            raise SyncError('Select an active configured payment method.')
     else:
         record = PosSession.browse(record_id)[0]
         if record._data.get('user_id') != user_id:
@@ -349,7 +366,7 @@ def synchronize():
                 store.put('meta', 'client', settings)
         except (SyncError, NetworkUnavailable) as error:
             with atomic():
-                if isinstance(error, SyncError) and error.code == 'catalog_conflict' and queue:
+                if isinstance(error, SyncError) and error.code in ('catalog_conflict', 'payment_conflict') and queue:
                     conflict_key, conflict_row = queue[0]
                     conflict_row.update(status='conflict', conflict=error.details or {}, message=str(error))
                     store.put('outbox', conflict_key, conflict_row)

@@ -1,4 +1,11 @@
 {
+  "offline.payment_conflict_title": "Paiement à vérifier",
+  "offline.payment_conflict_hint": "La commande centrale a changé avant la synchronisation de ce paiement hors ligne. Un responsable doit vérifier le paiement réel et la commande centrale.",
+  "offline.local_order": "Identifiant de commande locale",
+  "offline.server_order": "Identifiant de commande centrale",
+  "offline.offline_payment": "Paiement enregistré hors ligne",
+  "offline.server_remaining": "Dernier solde central connu",
+  "offline.payment_conflict_preserved": "Ce paiement reste enregistré et la synchronisation est suspendue. Ne le ressaisissez pas et ne le supprimez pas ; conservez la base du terminal pendant la réconciliation.",
   "receipt.preview": "Aperçu du reçu",
   "receipt.loading": "Chargement du reçu…",
   "receipt.ready": "Reçu prêt. Choisissez Imprimer pour sélectionner votre imprimante.",

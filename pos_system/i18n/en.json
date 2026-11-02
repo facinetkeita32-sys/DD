@@ -1,4 +1,11 @@
 {
+  "offline.payment_conflict_title": "Payment needs review",
+  "offline.payment_conflict_hint": "The central order changed before this offline payment could synchronize. A manager must verify the actual payment and the central order.",
+  "offline.local_order": "Local order ID",
+  "offline.server_order": "Central order ID",
+  "offline.offline_payment": "Recorded offline payment",
+  "offline.server_remaining": "Last known central balance",
+  "offline.payment_conflict_preserved": "This payment remains saved and synchronization is paused. Do not re-enter or delete it; preserve the terminal database while it is reconciled.",
   "receipt.preview": "Receipt preview",
   "receipt.loading": "Loading the receipt…",
   "receipt.ready": "Receipt ready. Choose Print to select your printer.",

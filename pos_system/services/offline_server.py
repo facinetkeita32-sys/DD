@@ -213,8 +213,8 @@ def _sale(device_id, payload, user, company_id):
     if 'delivery_ref' in payload:
         payload['delivery_zone_id'] = resolve(device_id, 'delivery.zone', payload['delivery_ref'])
     lines, payments = payload.get('lines'), payload.get('payments')
-    if not isinstance(lines, list) or not lines or len(lines) > 500 or not isinstance(payments, list) or not payments:
-        raise SyncError('A sale must contain lines and payments.')
+    if not isinstance(lines, list) or not lines or len(lines) > 500 or not isinstance(payments, list):
+        raise SyncError('A sale must contain valid lines and payments.')
     quantities, total = Counter(), 0
     for line in lines:
         qty, price, discount = (_finite(line.get('qty')), _finite(line.get('price_unit')),
@@ -245,8 +245,9 @@ def _sale(device_id, payload, user, company_id):
         if amount < 0:
             raise SyncError('Invalid payment amount.')
         paid += amount
-    if paid < total - .01 or abs(paid - _finite(payload.get('amount_paid'))) > .000001:
-        raise SyncError('Offline sales must be fully paid.')
+    if abs(paid - _finite(payload.get('amount_paid'))) > .000001:
+        raise SyncError('Payment totals do not match.')
+    pending = paid < total - .01
     customer = payload.get('partner_id') or False
     if customer and not ResPartner.browse(customer):
         raise SyncError('Customer requires reconciliation.', 409, 'conflict')
@@ -268,7 +269,8 @@ def _sale(device_id, payload, user, company_id):
     values['amount_tax'] = _finite(payload.get('amount_tax', 0))
     values.update(name=name, pos_reference=name, user_id=user.id, company_id=company_id,
                   session_id=session_id, partner_id=customer, delivery_cost=delivery,
-                  amount_total=total, amount_paid=paid, amount_change=max(0, paid - total), state='paid')
+                  amount_total=total, amount_paid=paid, amount_change=0 if pending else max(0, paid - total),
+                  state='pending' if pending else 'paid')
     record = PosOrder.create(values)
     for line in lines:
         fields = ('product_id', 'product_name', 'qty', 'price_unit', 'discount', 'price_subtotal')
@@ -280,7 +282,40 @@ def _sale(device_id, payload, user, company_id):
                            'reference': payment.get('reference') or ''})
     for pid, qty in quantities.items():
         products[pid].write({'available_qty': max(0, products[pid].available_qty - qty)})
+    store.put('applied', _resource(device_id, 'order', payload['uuid']), {'server_id': record.id})
     return record.id
+
+
+def _later_payment(device_id, payload, user):
+    from .offline_catalog import resolve
+    mapping = store.get('applied', _resource(device_id, 'order', payload['order_uuid']))
+    records = PosOrder.browse(mapping['server_id']) if mapping else []
+    if not records:
+        raise SyncError('The original order must synchronize first.', 409, 'payment_conflict')
+    order = records[0]
+    amount = _finite(payload.get('amount'))
+    if amount <= 0:
+        raise SyncError('Payment amount must be positive.')
+    method_id = resolve(device_id, 'pos.payment.method', payload.get('method_ref'))
+    methods = PosPaymentMethod.browse(method_id)
+    if not methods or not methods[0].active:
+        raise SyncError('The recorded payment method is unavailable.', 409, 'payment_conflict')
+    paid = float(order._data.get('amount_paid') or 0)
+    total = float(order._data.get('amount_total') or 0)
+    remaining = total - paid
+    if order.state != 'pending' or amount > remaining + .01:
+        raise SyncError('The server order changed or the payment exceeds its remaining balance; payment remains queued.',
+                        409, 'payment_conflict', details={'server_order_id': order.id,
+                        'state': order.state, 'remaining': max(0, round(remaining, 2)),
+                        'amount': amount})
+    payment = PosPayment.create({'order_id': order.id, 'payment_method_id': method_id,
+                                 'amount': amount, 'payment_date': payload.get('payment_date'),
+                                 'reference': payload.get('reference') or ''})
+    updated = paid + amount
+    order.write({'amount_paid': updated, 'amount_change': 0,
+                 'state': 'paid' if total - updated <= .01 else 'pending'})
+    return {'order_id': order.id, 'payment_id': payment.id,
+            'amount_paid': updated, 'remaining': round(total - updated, 2), 'state': order.state}
 
 
 def apply_operation(device_id, device_row, operation):
@@ -291,7 +326,7 @@ def apply_operation(device_id, device_row, operation):
         payload = operation['data']
         uuid.UUID(payload['uuid'])
         kind = operation['kind']
-        if kind not in ('sale', 'session', 'catalog'):
+        if kind not in ('sale', 'session', 'catalog', 'payment'):
             raise SyncError('Unsupported operation.')
         fingerprint = digest(json.dumps(operation, sort_keys=True, separators=(',', ':')))
         with atomic():
@@ -316,12 +351,17 @@ def apply_operation(device_id, device_row, operation):
                 from .offline_catalog import apply_change
                 resource = apply_change(device_id, payload, users[0])
                 server_id = resource['server_id']
+            elif kind == 'payment':
+                payment_receipt = _later_payment(device_id, payload, users[0])
+                server_id = payment_receipt['payment_id']
             else:
                 server_id = (_sale(device_id, payload, users[0], device_row.get('company_id'))
                              if kind == 'sale' else _session(device_id, payload, users[0]))
             receipt = {'id': key, 'server_id': server_id, 'kind': kind}
             if resource:
                 receipt['resource'] = resource
+            if kind == 'payment':
+                receipt['payment'] = payment_receipt
             store.put('applied', key, {'device_id': device_id, 'digest': fingerprint, 'receipt': receipt})
             return receipt
     except SyncError:

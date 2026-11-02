@@ -114,7 +114,14 @@ def conflicts():
     if not store.local_mode():
         raise SyncError('This endpoint is local only.', 404)
     from ..services.offline_catalog import conflicts_for
-    return success(conflicts_for(g.user))
+    result = conflicts_for(g.user)
+    if g.user_role in ('admin', 'manager'):
+        for key, row in store.all_rows('outbox'):
+            if row.get('status') == 'conflict' and row['operation'].get('kind') == 'payment':
+                result.append({'id': key, 'kind': 'payment', 'local_id': row['local_id'],
+                               'amount': row['operation']['data'].get('amount'),
+                               'server': row.get('conflict', {})})
+    return success(result)
 
 
 @offline_bp.post('/conflicts/<operation_id>/resolve')

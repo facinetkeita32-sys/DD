@@ -48,7 +48,7 @@ def server_url(value):
     return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, '', '', ''))
 
 
-def request_server(config, path, body=None, credential=None):
+def request_server(config, path, body=None, credential=None, timeout=8):
     headers = {'Content-Type': 'application/json'}
     if credential or config.get('credential'):
         headers['Authorization'] = 'Bearer ' + (credential or config['credential'])
@@ -70,7 +70,7 @@ def request_server(config, path, body=None, credential=None):
                                      data=json.dumps(body).encode() if body is not None else None,
                                      headers=headers)
     try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=8) as response:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
             result = json.load(response)
             if not result.get('success'):
                 raise SyncError('Invalid synchronization response.', 502)
@@ -323,6 +323,32 @@ def capture_change(model, before, record_ids, creating, user_id):
 def pending():
     return sorted([(key, row) for key, row in store.all_rows('outbox') if row['status'] not in ('sent', 'superseded')],
                   key=lambda item: item[1]['sequence'])
+
+
+def prepare_receipt_email(order_id, user_id, address, lang):
+    """Capture only device-scoped, acknowledged sale identifiers under the lock."""
+    from ..models.pos_order import PosOrder
+    from ..models.res_users import ResUsers
+    from ..permissions import role_has_screen
+    check_access(user_id)
+    orders = PosOrder.browse(order_id)
+    users = ResUsers.browse(user_id)
+    if not orders or not users or not role_has_screen(users[0].role, 'orders'):
+        raise SyncError('Receipt not found or access denied.', 403, 'receipt_access')
+    if users[0].role == 'cashier' and orders[0]._data.get('user_id') != user_id:
+        raise SyncError('Receipt not found or access denied.', 403, 'receipt_access')
+    rows = [(key, row) for key, row in store.all_rows('outbox')
+            if row.get('local_id') == order_id and row.get('operation', {}).get('kind') in ('sale', 'payment')]
+    sales = [(key, row) for key, row in rows if row['operation']['kind'] == 'sale']
+    if len(sales) != 1 or sales[0][1].get('status') != 'sent' or any(
+            row.get('status') != 'sent' for _, row in rows):
+        raise SyncError('Synchronize this order and its payments before emailing the receipt.', 409, 'receipt_pending')
+    key, row = sales[0]
+    if row.get('receipt', {}).get('id') != key or row['receipt'].get('kind') != 'sale':
+        raise SyncError('The order acknowledgement could not be verified.', 409, 'receipt_pending')
+    grant = store.get('grants', str(user_id))
+    return dict(config()), {'sale_operation_id': key, 'email': address, 'lang': lang,
+                            'grant': {'id': grant['id'], 'token': grant['token']}}
 
 
 def synchronize():

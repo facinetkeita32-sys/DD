@@ -195,6 +195,30 @@ Its data stays in the same application-data folder; pairing and pending operatio
 remain available after signing in again. Updating Hostinger alone does not replace
 the executable/assets already installed on a desktop.
 
+## Email and WhatsApp receipts
+
+On a desktop terminal, **Email** uses the central server's existing SMTP settings;
+SMTP credentials are never downloaded to the terminal. The order and all its
+locally recorded payments must be acknowledged by the server first. Until then,
+the terminal reports that synchronization is needed. Email requests are **not**
+queued for automatic sending: reconnect, synchronize, and choose Email again.
+
+The server verifies the terminal credential, server epoch, current user's active
+grant and order access, and the server acknowledgement belonging to that same
+terminal. It sends a text summary plus a PDF attachment. A cashier can email their
+own terminal orders; admin/manager roles can email acknowledged orders from their
+terminal. The server does not accept a client-supplied numeric server-order ID.
+The email request releases the database lock before remote network/SMTP I/O.
+
+A successful response means the configured SMTP server accepted the message; it
+does not guarantee inbox delivery. A timeout or SMTP failure is reported as
+unconfirmed delivery: check the recipient and mail service before retrying to avoid
+duplicates. A desktop/server version with this endpoint is required on both sides.
+
+**WhatsApp** builds a local text summary and opens WhatsApp in the user's external
+browser. The user reviews and sends it there; this requires connectivity and a
+working WhatsApp session. The app does not queue WhatsApp messages or attach a PDF.
+
 ## Stock conflicts and server recovery
 
 Offline stock cannot be reserved across disconnected terminals. If a sale cannot
@@ -242,6 +266,10 @@ connection, explicit language selection, read-only behavior and safe HTML text.
 Browser checks exercise the in-app preview, print action and PDF download without
 opening a new browser session. Native Windows checks visually confirm the embedded
 print preview and detect/cancel the Save As dialog; no paper job is submitted.
+Mock-SMTP integration checks cover pending-order rejection, successful server
+delivery with PDF, disconnected/failed delivery, user/device authorization,
+invalid recipients, and that email requests do not mutate the sync queue. No real
+email is sent by these tests.
 Neither installed POS data nor the Hostinger database is used by these tests.
 Launcher regression checks also verify duplicate-instance rejection, release of
 the OS lock on exit, and preservation of the private session key after restarting.

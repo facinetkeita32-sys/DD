@@ -1,4 +1,7 @@
 import threading
+import hmac
+import time
+import uuid
 from flask import Blueprint, jsonify, request, session, g
 
 from ..services import offline_store as store
@@ -96,6 +99,62 @@ def push():
     from ..services.offline_server import apply_operation
     key, row = server_device()
     return success(apply_operation(key, row, body().get('operation')))
+
+
+@offline_bp.post('/receipt-email')
+def receipt_email():
+    """Send only a server-acknowledged order from the authenticated device."""
+    from ..permissions import role_has_screen
+    from ..services.offline_server import digest
+    from ..services.receipt_service import get_order_data, build_share_text, generate_receipt_pdf
+    from ..services.email_service import send_receipt_email
+    from ..odoo_orm import _db_lock
+    key, _ = server_device()
+    data = body()
+    try:
+        operation_id = str(uuid.UUID(data['sale_operation_id']))
+        grant_data = data['grant']
+        grant = store.get('grants', grant_data['id'])
+        if (not grant or grant['device_id'] != key or grant['epoch'] != store.get('meta', 'identity')['epoch']
+                or grant['expires_at'] < time.time()
+                or not hmac.compare_digest(grant['token_digest'], digest(grant_data['token']))):
+            raise SyncError('User authorization is invalid or expired.', 403, 'receipt_access')
+        users = ResUsers.browse(grant['user_id'])
+        if not users or not users[0].active or not role_has_screen(users[0].role, 'orders'):
+            raise SyncError('Receipt access is not authorized.', 403, 'receipt_access')
+        applied = store.get('applied', operation_id)
+        receipt = applied.get('receipt', {}) if applied else {}
+        if (not applied or applied.get('device_id') != key or receipt.get('kind') != 'sale'
+                or receipt.get('id') != operation_id or type(receipt.get('server_id')) is not int):
+            raise SyncError('The synchronized order could not be verified.', 404, 'receipt_pending')
+        order_id = receipt['server_id']
+        order = get_order_data(order_id)
+        if not order or (users[0].role == 'cashier' and order['_data'].get('user_id') != users[0].id):
+            raise SyncError('Receipt not found or access denied.', 403, 'receipt_access')
+        address = data.get('email')
+        if (not isinstance(address, str) or not address.strip() or '@' not in address
+                or len(address) > 254 or '\r' in address or '\n' in address):
+            raise SyncError('Customer email is required.', 400, 'receipt_address')
+        address = address.strip()
+        lang = data.get('lang') if data.get('lang') in ('en', 'fr') else 'en'
+        text = build_share_text(order_id, lang=lang)
+        pdf = generate_receipt_pdf(order_id, lang=lang)
+        if not text or not pdf:
+            raise SyncError('Receipt could not be prepared.', 500, 'receipt_prepare')
+        # Order reference may be user-edited: avoid header injection.
+        reference = str(order['_data'].get('name') or order_id).replace('\r', '').replace('\n', '')
+    except SyncError:
+        raise
+    except (KeyError, AttributeError, TypeError, ValueError) as error:
+        raise SyncError('Invalid receipt request.', 400, 'receipt_invalid') from error
+    if g.pop('db_lock_held', False):
+        _db_lock.release()
+    ok, _message = send_receipt_email(address, f'Receipt {reference}', text,
+                                      pdf_bytes=pdf, filename='receipt.pdf')
+    if not ok:
+        raise SyncError('Email delivery could not be confirmed. Check server email settings and recipient before retrying.',
+                        502, 'receipt_delivery_unknown')
+    return success({'message': 'Receipt sent successfully.'})
 
 
 @offline_bp.post('/sync')

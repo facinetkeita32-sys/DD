@@ -40,6 +40,7 @@ def before_request():
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
         from .offline_catalog import ROUTES
         allowed = (request.endpoint in ('api.create_order', 'api.pay_order', 'api.create_session', 'api.open_session', 'api.close_session')
+                   or request.endpoint == 'api.send_receipt_email'
                    or request.endpoint in ROUTES
                    or request.path in ('/api/auth/logout', '/api/settings/language', '/api/offline/sync')
                    or request.endpoint == 'offline.resolve_conflict')

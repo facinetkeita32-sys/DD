@@ -150,7 +150,11 @@ let App = {
     try {
       const res = await fetch('/api' + path, opts)
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Request failed')
+      if (!res.ok) {
+        const error = new Error(json.error || 'Request failed')
+        error.code = json.code
+        throw error
+      }
       return json
     } catch(e) {
       if (e.message.includes('401') || e.message.includes('Unauthorized')) {
@@ -1463,15 +1467,19 @@ let App = {
       const to = document.getElementById('receipt-email-to').value.trim()
       if (!to || !to.includes('@')) { alert(I18n.t('receipt.email_invalid', 'Enter a valid email address')); return }
       const status = document.getElementById('receipt-email-status')
+      const button = document.getElementById('receipt-email-send')
+      button.disabled = true
       status.textContent = I18n.t('common.loading', 'Loading...') + '...'
       try {
-        const res = await this.api('POST', `/receipt/${id}/email`, { email: to })
+        const res = await this.api('POST', `/receipt/${id}/email`, { email: to, lang: I18n.currentLang })
         status.style.color = 'var(--success)'
-        status.textContent = res.message || 'Sent'
+        status.textContent = this.offlineMode ? I18n.t('receipt.email_sent', 'Receipt sent successfully.') : res.message || 'Sent'
       } catch(e) {
         status.style.color = 'var(--danger)'
-        status.textContent = 'Error: ' + e.message
-      }
+        const key = {receipt_pending: 'receipt.email_pending', receipt_delivery_unknown: 'receipt.email_uncertain',
+          receipt_access: 'receipt.email_access'}[e.code]
+        status.textContent = key ? I18n.t(key, e.message) : 'Error: ' + e.message
+      } finally { button.disabled = false }
     }
   },
 

@@ -571,6 +571,95 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(before['products'], after['products'])
         self.assertEqual(before['queue'], after['queue'])
 
+    def test_receipt_email_uses_server_after_sync_with_pdf_and_no_local_smtp(self):
+        self.pair()
+        self.state('local', {'online': False})
+        code, sale = self.sale()
+        self.assertEqual(200, code, sale)
+        order_id = sale['data']['id']
+        email = f'/api/receipt/{order_id}/email'
+        before = self.state('local')['queue']
+        code, result = self.call('local', email, {'email': 'customer@example.test', 'lang': 'fr'})
+        self.assertEqual(409, code, result)
+        self.assertEqual('receipt_pending', result['code'])
+        self.assertEqual(before, self.state('local')['queue'])
+        self.assertEqual([], self.state('server')['mails'])
+        self.state('local', {'online': True, 'sync': True})
+        before = self.state('local')['queue']
+        code, result = self.call('local', email, {'email': 'customer@example.test', 'lang': 'fr'})
+        self.assertEqual(200, code, result)
+        central = self.state('server')
+        self.assertEqual(1, len(central['mails']))
+        mail = central['mails'][0]
+        self.assertEqual('customer@example.test', mail['to'])
+        self.assertIn(sale['data']['name'], mail['body'])
+        self.assertIn('Payé', mail['body'])
+        self.assertTrue(mail['pdf'])
+        self.assertEqual([], self.state('local')['mails'])
+        self.assertEqual(before, self.state('local')['queue'])
+
+    def test_receipt_email_pending_payment_and_connection_failures_are_explicit(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        _, sale = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        order_id = sale['data']['id']
+        self.state('local', {'sync': True})
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.call('local', f'/api/orders/{order_id}/pay', {
+            'amount': product['price'], 'payment_method_id': 1,
+        })[0])
+        code, result = self.call('local', f'/api/receipt/{order_id}/email', {'email': 'customer@example.test'})
+        self.assertEqual(409, code, result)
+        self.assertEqual('receipt_pending', result['code'])
+        self.state('local', {'online': True, 'sync': True})
+        self.state('local', {'online': False})
+        code, result = self.call('local', f'/api/receipt/{order_id}/email', {'email': 'customer@example.test'})
+        self.assertEqual(503, code, result)
+        self.assertEqual('receipt_delivery_unknown', result['code'])
+        self.assertEqual([], self.state('server')['mails'])
+        self.state('local', {'online': True})
+        self.state('server', {'mail_failure': True})
+        code, result = self.call('local', f'/api/receipt/{order_id}/email', {'email': 'customer@example.test'})
+        self.assertEqual(502, code, result)
+        self.assertEqual('receipt_delivery_unknown', result['code'])
+        self.assertEqual([], self.state('server')['mails'])
+
+    def test_receipt_email_rejects_forged_or_other_cashier_order(self):
+        self.pair()
+        _, sale = self.sale()
+        order_id = sale['data']['id']
+        self.state('local', {'sync': True})
+        terminal = self.state('local')
+        settings = terminal['client']
+        operation = next(key for key, row in terminal['queue'] if row['operation']['kind'] == 'sale')
+        admin = next(user for user in terminal['users'] if user['login'] == 'admin')
+        grant = dict(terminal['grants'])[str(admin['id'])]
+        headers = {'Authorization': 'Bearer ' + settings['credential'],
+                   'X-POS-Server': settings['server_id'], 'X-POS-Epoch': settings['epoch']}
+        base = {'sale_operation_id': operation, 'email': 'customer@example.test',
+                'grant': {'id': grant['id'], 'token': grant['token']}}
+        forged = copy.deepcopy(base)
+        forged['grant']['token'] = 'forged'
+        self.assertEqual(403, self.call('server', '/api/offline/receipt-email', forged, headers=headers)[0])
+        forged = copy.deepcopy(base)
+        forged['sale_operation_id'] = str(uuid.uuid4())
+        self.assertEqual(404, self.call('server', '/api/offline/receipt-email', forged, headers=headers)[0])
+        forged = copy.deepcopy(base)
+        forged['email'] = 'customer@example.test\r\nBcc:bad@example.test'
+        self.assertEqual(400, self.call('server', '/api/offline/receipt-email', forged, headers=headers)[0])
+        cashier = self.login('cashier1', '1234')
+        code, result = self.call('local', f'/api/receipt/{order_id}/email', {'email': 'customer@example.test'})
+        self.assertEqual(403, code, result)
+        self.assertEqual('receipt_access', result['code'])
+        cashier_grant = dict(self.state('local')['grants'])[str(cashier['id'])]
+        forged = copy.deepcopy(base)
+        forged['grant'] = {'id': cashier_grant['id'], 'token': cashier_grant['token']}
+        self.assertEqual(403, self.call('server', '/api/offline/receipt-email', forged, headers=headers)[0])
+        self.assertEqual([], self.state('server')['mails'])
+
     def test_receipt_html_escapes_names_before_embedding(self):
         self.pair()
         self.state('local', {'online': False})

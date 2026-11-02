@@ -14,6 +14,7 @@ from pos_system.models.product_product import ProductProduct
 from pos_system.models.pos_payment_method import PosPaymentMethod
 from pos_system.models.res_users import ResUsers
 from pos_system.services import offline_store as store, backup_service
+from pos_system.services import email_service
 
 mode = sys.argv[1]
 if mode == 'server':
@@ -22,16 +23,17 @@ if mode == 'server':
     ResUsers.create({'name': 'Manager', 'login': 'manager1', 'password': 'manager123',
                      'role': 'manager', 'active': True})
 baseline = backup_service.export_full_backup()
-control = {'online': True, 'drop_ack': False, 'drop_kind': '', 'capture_error': False}
+control = {'online': True, 'drop_ack': False, 'drop_kind': '', 'capture_error': False, 'mail_failure': False}
+mails = []
 real_request = offline_client.request_server
 real_capture = offline_client.capture
 real_capture_change = offline_client.capture_change
 
 
-def transport(config, path, body=None, credential=None):
+def transport(config, path, body=None, credential=None, timeout=8):
     if not control['online']:
         raise offline_client.NetworkUnavailable('Simulated disconnection')
-    result = real_request(config, path, body, credential)
+    result = real_request(config, path, body, credential, timeout=timeout)
     if path == 'push' and (control['drop_ack'] or control['drop_kind'] == body['operation']['kind']):
         control['drop_ack'] = False
         control['drop_kind'] = ''
@@ -58,6 +60,17 @@ def capture_change(*args, **kwargs):
 
 
 offline_client.capture_change = capture_change
+
+
+def fake_mail(to_email, subject, body, pdf_bytes=None, filename='receipt.pdf'):
+    if control['mail_failure']:
+        return False, 'Simulated SMTP error'
+    mails.append({'to': to_email, 'subject': subject, 'body': body,
+                  'pdf': bool(pdf_bytes and pdf_bytes.startswith(b'%PDF')), 'filename': filename})
+    return True, 'Email sent'
+
+
+email_service.send_receipt_email = fake_mail
 
 
 @app.route('/__test', methods=['GET', 'POST'])
@@ -88,6 +101,7 @@ def debug():
         'products': [dict(id=row.id, price=row.list_price, quantity=row.available_qty) for row in ProductProduct.search([])],
         'queue': store.all_rows('outbox'), 'client': offline_client.config(),
         'grants': store.all_rows('grants'),
+        'mails': mails,
         'users': [dict(id=row.id, login=row.login, password=row.password) for row in ResUsers.search([])],
         'identity': store.get('meta', 'identity'),
     })

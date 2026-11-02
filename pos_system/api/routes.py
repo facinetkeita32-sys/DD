@@ -943,12 +943,33 @@ def send_receipt_email(order_id):
     d = get_order_data(order_id)
     if not d:
         return error_response('Order not found', 404)
-    to_email = (data.get('email') or d.get('partner_email') or '').strip()
-    if not to_email or '@' not in to_email:
+    to_email = data.get('email') or d.get('partner_email') or ''
+    if not isinstance(to_email, str):
+        return error_response('Customer email is required', 400)
+    to_email = to_email.strip()
+    if not to_email or '@' not in to_email or '\r' in to_email or '\n' in to_email:
         return error_response('Customer email is required', 400)
     lang = data.get('lang') or session.get('lang', 'en')
     if lang not in ('en', 'fr'):
         lang = 'en'
+    from ..services.offline_store import local_mode
+    if local_mode():
+        from ..services.offline_client import prepare_receipt_email, request_server, NetworkUnavailable
+        from ..services.offline_server import SyncError
+        from ..odoo_orm import _db_lock
+        try:
+            settings, payload = prepare_receipt_email(order_id, g.user_id, to_email, lang)
+            # The request contains a detached snapshot. Do not block sales while
+            # waiting for the remote SMTP server.
+            if g.pop('db_lock_held', False):
+                _db_lock.release()
+            result = request_server(settings, 'receipt-email', payload, timeout=45)
+            return success_response(message=result['message'])
+        except NetworkUnavailable:
+            return jsonify(success=False, error='Could not confirm delivery. Check the server and recipient before retrying.',
+                           code='receipt_delivery_unknown'), 503
+        except SyncError as e:
+            return jsonify(success=False, error=str(e), code=e.code), e.status
     ref = d['_data'].get('name', '') or f"order_{order_id}"
     subject = f"Receipt {ref}"
     body = build_share_text(order_id, lang=lang) or f"Receipt {ref}\nTotal: {d['_data'].get('amount_total', 0)}"

@@ -1,4 +1,8 @@
 {
+  "receipt.email_pending": "Synchronize this order and its payments before emailing the receipt. The email has not been queued.",
+  "receipt.email_uncertain": "Email delivery could not be confirmed. Check your connection and the recipient's inbox before retrying.",
+  "receipt.email_access": "This receipt is unavailable for your account or terminal.",
+  "receipt.email_sent": "Receipt sent successfully.",
   "settings.phone": "Store phone number",
   "settings.street": "Street / location",
   "settings.city": "City",

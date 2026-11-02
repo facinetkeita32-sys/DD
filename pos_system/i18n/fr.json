@@ -1,4 +1,8 @@
 {
+  "receipt.email_pending": "Synchronisez cette commande et ses paiements avant d’envoyer le reçu. L’e-mail n’a pas été mis en attente.",
+  "receipt.email_uncertain": "L’envoi de l’e-mail n’a pas pu être confirmé. Vérifiez la connexion et la boîte du destinataire avant de réessayer.",
+  "receipt.email_access": "Ce reçu n’est pas accessible avec ce compte ou ce terminal.",
+  "receipt.email_sent": "Reçu envoyé avec succès.",
   "settings.phone": "Numéro de téléphone du magasin",
   "settings.street": "Adresse / emplacement",
   "settings.city": "Ville",

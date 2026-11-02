@@ -332,6 +332,10 @@
           <label data-i18n="settings.company">Company Name</label>
           <input type="text" id="settings-company">
         </div>
+        <div class="form-group"><label for="settings-phone" data-i18n="settings.phone">Store phone number</label><input type="tel" id="settings-phone" autocomplete="tel"></div>
+        <div class="form-group"><label for="settings-street" data-i18n="settings.street">Street / location</label><input type="text" id="settings-street" autocomplete="street-address"></div>
+        <div class="form-group"><label for="settings-city" data-i18n="settings.city">City</label><input type="text" id="settings-city" autocomplete="address-level2"></div>
+        <div class="form-group"><label for="settings-website" data-i18n="settings.facebook_url">Website or Facebook page URL</label><input type="url" id="settings-website" placeholder="https://www.facebook.com/yourpage" maxlength="500"><p class="offline-help" data-i18n="settings.facebook_hint">A Facebook page URL prints as a QR code on receipts.</p></div>
         <div class="form-group">
           <label data-i18n="settings.low_stock">Low Stock Threshold</label>
           <input type="number" id="settings-low-stock" min="0" step="1" value="5">

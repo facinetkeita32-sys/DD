@@ -586,6 +586,55 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertIn('&lt;img', html)
         self.assertIn('&lt;script&gt;bad()', html)
 
+    def test_receipt_company_contact_facebook_qr_and_offline_sync(self):
+        self.pair()
+        self.state('local', {'online': False})
+        values = {'name': 'Shop Test', 'phone': '+224 620 12 34 56',
+                  'street': 'Quartier Test', 'city': 'Conakry',
+                  'website': 'https://www.facebook.com/ShopWithDD'}
+        code, result = self.call('local', '/api/company', values, method='PUT')
+        self.assertEqual(200, code, result)
+        code, sale = self.sale()
+        self.assertEqual(200, code, sale)
+        order = sale['data']['id']
+        code, html = self.call('local', f'/api/receipt/{order}/html?lang=fr')
+        self.assertEqual(200, code)
+        self.assertIn('+224 620 12 34 56', html)
+        self.assertIn('Quartier Test', html)
+        self.assertIn('Conakry', html)
+        self.assertIn('Retrouvez-nous sur Facebook', html)
+        self.assertIn('data:image/svg+xml;base64,', html)
+        request = urllib.request.Request(self.urls['local'] + f'/api/receipt/{order}/pdf?lang=fr')
+        with self.local.open(request, timeout=10) as response:
+            self.assertTrue(response.read().startswith(b'%PDF'))
+        terminal = self.state('local', {'online': True, 'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        company = self.call('server', '/api/company')[1]['data']
+        for key, value in values.items():
+            self.assertEqual(value, company[key])
+        central_order = self.call('server', '/api/orders')[1]['data'][0]
+        code, central_html = self.call('server', f'/api/receipt/{central_order["id"]}/html?lang=en')
+        self.assertEqual(200, code)
+        self.assertIn('Find us on Facebook', central_html)
+        self.assertIn('+224 620 12 34 56', central_html)
+        self.assertIn('data:image/svg+xml;base64,', central_html)
+
+    def test_receipt_qr_only_for_facebook_https_and_empty_settings_are_safe(self):
+        self.pair()
+        _, sale = self.sale()
+        order = sale['data']['id']
+        for website in ('', 'https://example.com', 'http://facebook.com/test',
+                        'https://facebook.com.attacker.test/page', 'https://facebook.com:99999/test'):
+            self.assertEqual(200, self.call('local', '/api/company', {'website': website}, method='PUT')[0])
+            code, html = self.call('local', f'/api/receipt/{order}/html')
+            self.assertEqual(200, code)
+            self.assertNotIn('data:image/svg+xml;base64,', html, website)
+        self.assertEqual(200, self.call('local', '/api/company', {
+            'website': 'https://m.facebook.com/example', 'phone': '', 'street': '', 'city': '',
+        }, method='PUT')[0])
+        html = self.call('local', f'/api/receipt/{order}/html')[1]
+        self.assertIn('data:image/svg+xml;base64,', html)
+
     def test_orange_money_and_credit_card_names_receipts_and_sync(self):
         self.pair()
         methods = self.call('local', '/api/payment-methods')[1]['data']

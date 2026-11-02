@@ -1773,6 +1773,9 @@ let App = {
     ).join('')
     if (this.company) {
       document.getElementById('settings-company').value = this.company.name || ''
+      for (const field of ['phone', 'street', 'city', 'website']) {
+        document.getElementById('settings-' + field).value = this.company[field] || ''
+      }
       this.displayLogo(this.company.logo)
     }
     document.getElementById('settings-low-stock').value = this.lowStockThreshold ?? 5
@@ -1872,6 +1875,9 @@ let App = {
     const companyName = document.getElementById('settings-company').value
     const companyData = {}
     if (companyName) companyData.name = companyName
+    for (const field of ['phone', 'street', 'city', 'website']) {
+      companyData[field] = document.getElementById('settings-' + field).value.trim()
+    }
     if (this._newLogoBase64 !== null) companyData.logo = this._newLogoBase64
     if (Object.keys(companyData).length) {
       await this.api('PUT', '/company', companyData)

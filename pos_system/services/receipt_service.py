@@ -2,6 +2,8 @@ import base64
 import io
 from datetime import datetime
 from html import escape
+from urllib.parse import urlsplit
+import qrcode
 from fpdf import FPDF
 from ..odoo_orm import env
 from ..models.pos_order import PosOrder
@@ -125,6 +127,7 @@ RECEIPT_LABELS = {
         'print': 'Print',
         'close': 'Close',
         'delivery': 'Delivery',
+        'facebook': 'Find us on Facebook',
     },
     'fr': {
         'receipt': 'REÇU',
@@ -149,6 +152,7 @@ RECEIPT_LABELS = {
         'print': 'Imprimer',
         'close': 'Fermer',
         'delivery': 'Livraison',
+        'facebook': 'Retrouvez-nous sur Facebook',
     },
 }
 
@@ -156,6 +160,31 @@ RECEIPT_LABELS = {
 def _(key, lang='en'):
     labels = RECEIPT_LABELS.get(lang, RECEIPT_LABELS['en'])
     return labels.get(key, RECEIPT_LABELS['en'].get(key, key))
+
+
+def facebook_qr_matrix(url):
+    """Build QR modules locally; existing non-Facebook website values are ignored."""
+    if not isinstance(url, str) or not url or len(url) > 500 or any(c.isspace() for c in url):
+        return None
+    try:
+        parsed = urlsplit(url)
+        host = (parsed.hostname or '').lower().rstrip('.')
+        if (parsed.scheme.lower() != 'https' or parsed.username or parsed.password
+                or parsed.port not in (None, 443) or host not in ('facebook.com', 'www.facebook.com', 'm.facebook.com', 'web.facebook.com', 'fb.com', 'www.fb.com')):
+            return None
+        qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=1, border=4)
+        qr.add_data(url)
+        qr.make(fit=True)
+        return qr.get_matrix()
+    except (ValueError, OverflowError, qrcode.exceptions.DataOverflowError):
+        return None
+
+
+def qr_svg_data(matrix):
+    size = len(matrix)
+    paths = ''.join(f'M{x} {y}h1v1h-1z' for y, row in enumerate(matrix) for x, dark in enumerate(row) if dark)
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path d="{paths}" fill="black"/></svg>'
+    return base64.b64encode(svg.encode('ascii')).decode('ascii')
 
 
 def build_share_text(order_id, lang='en'):
@@ -197,6 +226,7 @@ def generate_receipt_html(order_id, lang='en'):
     payments = d['payments']
     company = {key: escape(str(value or ''), quote=True) for key, value in d['company'].items()}
     currency = d.get('currency', {})
+    facebook_qr = facebook_qr_matrix(d['company'].get('website'))
 
     def money(amount):
         return escape(currency_format(amount, currency), quote=True)
@@ -263,6 +293,7 @@ def generate_receipt_html(order_id, lang='en'):
   body {{ font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; color: #000; }}
   .receipt {{ max-width: 80mm; margin: 0 auto; }}
   .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 6px auto; }}
+  .receipt-qr {{ display: block; width: 32mm; height: 32mm; margin: 3mm auto; image-rendering: pixelated; }}
   h2 {{ text-align: center; font-size: 14px; margin: 4px 0; }}
   .company-info {{ text-align: center; font-size: 11px; margin-bottom: 6px; }}
   .header-line {{ text-align: center; font-size: 16px; font-weight: bold; margin: 8px 0; letter-spacing: 2px; }}
@@ -343,6 +374,8 @@ def generate_receipt_html(order_id, lang='en'):
   </table>
 
   {company.get('receipt_footer', '') and '<div class="divider"></div><div class="footer">' + company['receipt_footer'] + '</div>'}
+
+  {f'<div class="divider"></div><div class="footer">{_("facebook", lang)}<img class="receipt-qr" alt="Facebook QR" src="data:image/svg+xml;base64,{qr_svg_data(facebook_qr)}"></div>' if facebook_qr else ''}
 
   <div class="divider"></div>
   <div class="footer" style="font-size:9px">{_('generated', lang)} - {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
@@ -613,6 +646,27 @@ def generate_receipt_pdf(order_id, lang='en'):
         pdf.set_x(left)
         pdf.cell(page_w, 4, company['receipt_footer'], align='C')
         pdf.ln(4)
+
+    # Footer line
+    facebook_qr = facebook_qr_matrix(company.get('website'))
+    if facebook_qr:
+        qr_size = 32
+        if pdf.get_y() + qr_size + 14 > pdf.h - pdf.b_margin:
+            pdf.add_page()
+        pdf.ln(3)
+        pdf.set_x(left)
+        pdf.set_font('Courier', '', 8)
+        pdf.cell(page_w, 4, _('facebook', lang), align='C')
+        pdf.ln(5)
+        origin_x = left + (page_w - qr_size) / 2
+        origin_y = pdf.get_y()
+        module = qr_size / len(facebook_qr)
+        pdf.set_fill_color(0, 0, 0)
+        for row_index, row in enumerate(facebook_qr):
+            for column_index, dark in enumerate(row):
+                if dark:
+                    pdf.rect(origin_x + column_index * module, origin_y + row_index * module, module, module, 'F')
+        pdf.set_y(origin_y + qr_size + 2)
 
     # Footer line
     pdf.set_x(left)

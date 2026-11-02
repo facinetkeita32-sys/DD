@@ -176,6 +176,20 @@ USB printer from working; a Wi-Fi/Ethernet printer still requires its local netw
 connection. Choose the receipt printer and its supported paper width in the print
 dialog. Opening the dialog confirms the software path, not physical paper output.
 
+Company phone, street/location and city are editable in Settings and appear on
+HTML and PDF receipts. The existing company **website** field can contain the
+HTTPS Facebook page URL; a 32 mm Facebook QR code is generated locally on both
+receipt formats. Ordinary non-Facebook website values remain stored unchanged
+and do not produce a QR code. The URL is optional and must use `https://` with
+`facebook.com`, `www.facebook.com`, `m.facebook.com`, `web.facebook.com`,
+`fb.com`, or `www.fb.com` (default HTTPS port). Enter the actual page URL in
+Settings; no particular store address or Facebook account is hard-coded.
+Offline admin edits use the existing company-settings queue and synchronize when
+connected. The QR is embedded locally without a web QR service, so receipt
+generation does not require internet. Install the additional `qrcode` dependency
+from `requirements.txt` on the VPS and rebuild installed desktop packages before
+using this feature. No business table or schema migration is needed.
+
 Updating the desktop requires closing the application and replacing the executable.
 Its data stays in the same application-data folder; pairing and pending operations
 remain available after signing in again. Updating Hostinger alone does not replace

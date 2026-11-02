@@ -1,4 +1,9 @@
 {
+  "settings.phone": "Store phone number",
+  "settings.street": "Street / location",
+  "settings.city": "City",
+  "settings.facebook_url": "Website or Facebook page URL",
+  "settings.facebook_hint": "A Facebook page URL prints as a QR code on receipts.",
   "offline.payment_conflict_title": "Payment needs review",
   "offline.payment_conflict_hint": "The central order changed before this offline payment could synchronize. A manager must verify the actual payment and the central order.",
   "offline.local_order": "Local order ID",

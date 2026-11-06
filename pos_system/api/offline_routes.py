@@ -196,6 +196,38 @@ def resolve_conflict(operation_id):
     return success({'queued': True})
 
 
+@offline_bp.post('/conflicts/<operation_id>/retry-payment')
+@login_required
+def retry_payment_conflict(operation_id):
+    """Retry the original immutable payment, never delete or replace it."""
+    if not store.local_mode():
+        raise SyncError('This endpoint is local only.', 404)
+    if g.user_role not in ('admin', 'manager'):
+        raise SyncError('Only a manager can review payment conflicts.', 403, 'permission')
+    from ..services.offline_client import config, pending, synchronize
+    from ..services.unit_of_work import atomic
+    try:
+        key = str(uuid.UUID(operation_id))
+    except (ValueError, TypeError, AttributeError) as error:
+        raise SyncError('Invalid payment conflict.', 400) from error
+    with atomic():
+        settings = config()
+        queue = pending()
+        if not settings or settings.get('blocked'):
+            raise SyncError('Terminal authorization must be resolved first.', 409, 'grant')
+        if not queue or queue[0][0] != key:
+            raise SyncError('Only the first pending operation can be retried.', 409, 'conflict')
+        row = queue[0][1]
+        if row.get('status') != 'conflict' or row.get('operation', {}).get('kind') != 'payment':
+            raise SyncError('Payment conflict not found.', 404)
+        row['status'] = 'pending'
+        store.put('outbox', key, row)
+        settings['error'] = None
+        store.put('meta', 'client', settings)
+    threading.Thread(target=synchronize, daemon=True).start()
+    return success({'scheduled': True})
+
+
 @offline_bp.get('/devices')
 @login_required
 def devices():

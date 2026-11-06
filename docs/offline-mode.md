@@ -244,6 +244,31 @@ new product cannot simply be discarded if pending sales could depend on it.
 Review creates a new event ID at the same queue position and retains the original
 as superseded history. The server rechecks both the role and comparison base.
 
+### Pay Later payment conflicts
+
+If a later payment was recorded locally but the central order has changed, the
+terminal preserves that exact payment and stops its queue. A manager/admin can
+open the status indicator → **Review synchronization conflict** to see the local
+order ID, server order ID, recorded amount and last known central balance. An
+unavailable central balance is shown as `—`, not zero.
+
+Check the current central order and the real-world payment first. After the
+underlying issue has been resolved and the payment still needs to be applied,
+choose **Retry this payment**. This requeues the *same* event and the server
+checks the current amount and state again. If it is still a duplicate or would
+overpay, it remains in conflict; no central payment is added. Repeated retries
+never issue a new event ID or remove the local payment. The retry is restricted
+to admin/manager users, and only the first queued conflict can be retried.
+
+If the payment is a duplicate or an additional real payment that needs a refund
+or credit, do **not** retry it or re-enter it. A manager must reconcile the real
+transaction; a UI for archiving a duplicate, refunds or customer credit remains
+unimplemented. Preserve the terminal database and contact the application
+maintainer for an audited resolution. In particular, do not edit the queue or
+delete a payment from either database merely to clear the status. Payments made
+on other terminals/central orders are not automatically imported into the local
+order history. The server remains the reference for its current balance.
+
 A successful central restore rotates a persistent database epoch within the restore
 transaction. Paired terminals detect the change and block synchronization/new
 activity rather than blindly replaying orders against the restored database.
@@ -280,6 +305,9 @@ Mock-SMTP integration checks cover pending-order rejection, successful server
 delivery with PDF, disconnected/failed delivery, user/device authorization,
 invalid recipients, and that email requests do not mutate the sync queue. No real
 email is sent by these tests.
+Payment-conflict tests cover manager/cashier authorization, unchanged payment
+UUIDs, an unsafe retry remaining in conflict, a corrected central record allowing
+one successful retry, and repeated sync without duplicates.
 Neither installed POS data nor the Hostinger database is used by these tests.
 Launcher regression checks also verify duplicate-instance rejection, release of
 the OS lock on exit, and preservation of the private session key after restarting.

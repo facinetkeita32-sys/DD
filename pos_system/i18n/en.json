@@ -1,4 +1,7 @@
 {
+  "offline.payment_retry": "Retry this payment",
+  "offline.payment_retry_hint": "After checking the central order and resolving the cause, retry the same saved payment. The server will check the current balance again. If it is a duplicate, do not retry it; preserve the terminal data and request reconciliation assistance.",
+  "offline.payment_retry_confirm": "Have you reviewed the central order and confirmed this saved payment still needs to be applied? The server will check the balance again.",
   "customer.name_required": "Customer name is required.",
   "receipt.email_pending": "Synchronize this order and its payments before emailing the receipt. The email has not been queued.",
   "receipt.email_uncertain": "Email delivery could not be confirmed. Check your connection and the recipient's inbox before retrying.",

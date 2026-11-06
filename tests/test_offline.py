@@ -353,6 +353,63 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(product['price'], server_order['amount_paid'])
         self.assertEqual(1, len(server_order['payments']))
 
+    def test_manager_retries_original_payment_only_after_review(self):
+        self.pair()
+        self.login('cashier1', '1234')
+        self.login('manager1', 'manager123')
+        self.login('admin', 'admin')
+        product = self.state('local')['products'][0]
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        order_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.call('local', f'/api/orders/{order_id}/pay', {
+            'amount': product['price'], 'payment_method_id': 1,
+        })[0])
+        self.login('admin', 'admin', 'server')
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {
+            'amount': product['price'], 'payment_method_id': 1,
+        })[0])
+        self.state('local', {'online': True, 'sync': True})
+        conflict = next((key, row) for key, row in self.state('local')['queue'] if row['status'] == 'conflict')
+        conflict_id, original = conflict
+        path = f'/api/offline/conflicts/{conflict_id}/retry-payment'
+        self.login('cashier1', '1234')
+        self.assertEqual(403, self.call('local', path, {})[0])
+        self.assertEqual('conflict', dict(self.state('local')['queue'])[conflict_id]['status'])
+        self.login('manager1', 'manager123')
+        self.assertEqual(200, self.call('local', path, {})[0])
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            saved = dict(self.state('local')['queue'])[conflict_id]
+            if saved['status'] == 'conflict':
+                break
+            time.sleep(.05)
+        self.assertEqual('conflict', saved['status'])
+        self.assertEqual(original['operation'], saved['operation'])
+        self.assertEqual(1, len(self.call('server', '/api/orders')[1]['data'][0]['payments']))
+        # The central issue is corrected only in this isolated fixture.
+        self.state('server', {'reopen_order': central_id})
+        self.assertEqual(200, self.call('local', path, {})[0])
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            saved = dict(self.state('local')['queue'])[conflict_id]
+            if saved['status'] == 'sent':
+                break
+            time.sleep(.05)
+        self.assertEqual('sent', saved['status'])
+        self.assertEqual(original['operation'], saved['operation'])
+        order = self.call('server', '/api/orders')[1]['data'][0]
+        self.assertEqual(product['price'], order['amount_paid'])
+        self.assertEqual(1, len(order['payments']))
+        self.assertEqual(409, self.call('local', path, {})[0])
+        self.state('local', {'sync': True})
+        self.assertEqual(1, len(self.call('server', '/api/orders')[1]['data'][0]['payments']))
+
     def test_stock_conflict_and_revocation_never_drop_pending_sales(self):
         self.pair()
         self.assertEqual(200, self.sale()[0])

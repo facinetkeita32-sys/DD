@@ -1,4 +1,7 @@
 {
+  "offline.payment_retry": "Réessayer ce paiement",
+  "offline.payment_retry_hint": "Après avoir vérifié la commande centrale et résolu la cause, réessayez le même paiement enregistré. Le serveur vérifiera à nouveau le solde actuel. S’il s’agit d’un doublon, ne le renvoyez pas ; conservez les données du terminal et demandez une assistance de réconciliation.",
+  "offline.payment_retry_confirm": "Avez-vous vérifié la commande centrale et confirmé que ce paiement enregistré doit encore être appliqué ? Le serveur vérifiera à nouveau le solde.",
   "customer.name_required": "Le nom du client est obligatoire.",
   "receipt.email_pending": "Synchronisez cette commande et ses paiements avant d’envoyer le reçu. L’e-mail n’a pas été mis en attente.",
   "receipt.email_uncertain": "L’envoi de l’e-mail n’a pas pu être confirmé. Vérifiez la connexion et la boîte du destinataire avant de réessayer.",

@@ -10,6 +10,7 @@ from pos_system.main import app
 from flask import request, jsonify
 from pos_system.models.pos_order import PosOrder
 from pos_system.models.pos_session import PosSession
+from pos_system.models.pos_payment import PosPayment
 from pos_system.models.product_product import ProductProduct
 from pos_system.models.pos_payment_method import PosPaymentMethod
 from pos_system.models.res_users import ResUsers
@@ -95,6 +96,12 @@ def debug():
         if body.get('restore'):
             result = backup_service.restore_from_data(None, baseline)
             assert result['success'], result
+        if body.get('reopen_order'):
+            # Test-only simulation of an externally corrected central record.
+            order = PosOrder.browse(body['reopen_order'])[0]
+            for payment in PosPayment.search([('order_id', '=', order.id)]):
+                payment.unlink()
+            order.write({'amount_paid': 0, 'amount_change': 0, 'state': 'pending'})
     return jsonify({
         'orders': [dict(row._data, id=row.id) for row in PosOrder.search([])],
         'sessions': [dict(row._data, id=row.id) for row in PosSession.search([])],

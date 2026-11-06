@@ -43,7 +43,7 @@ def before_request():
                    or request.endpoint == 'api.send_receipt_email'
                    or request.endpoint in ROUTES
                    or request.path in ('/api/auth/logout', '/api/settings/language', '/api/offline/sync')
-                   or request.endpoint == 'offline.resolve_conflict')
+                   or request.endpoint in ('offline.resolve_conflict', 'offline.retry_payment_conflict'))
         if not allowed:
             return jsonify(error='Use the central server for deletion, user-security changes, credit and electronic payments.'), 403
     from .offline_catalog import ROUTES

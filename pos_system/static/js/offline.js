@@ -133,7 +133,17 @@ const Offline = {
       const row = result.data[0]
       if (!row) { alert(this.t('no_conflicts')); return }
       if (row.kind === 'payment') {
-        app.showModal(`<h3>${escape(this.t('payment_conflict_title'))}</h3><p class="offline-help">${escape(this.t('payment_conflict_hint'))}</p><p>${escape(this.t('local_order'))}: ${escape(row.local_id)}</p><p>${escape(this.t('server_order'))}: ${escape(row.server?.server_order_id ?? '—')}</p><p>${escape(this.t('offline_payment'))}: ${escape(app.currencyFormat(row.amount))}</p><p>${escape(this.t('server_remaining'))}: ${escape(app.currencyFormat(row.server?.remaining ?? 0))}</p><p class="offline-help">${escape(this.t('payment_conflict_preserved'))}</p><div class="btn-group"><button type="button" class="btn btn-secondary" id="offline-conflict-close">${escape(I18n.t('common.close', 'Close'))}</button></div>`)
+        const remaining = row.server?.remaining == null ? '—' : app.currencyFormat(row.server.remaining)
+        app.showModal(`<h3>${escape(this.t('payment_conflict_title'))}</h3><p class="offline-help">${escape(this.t('payment_conflict_hint'))}</p><p>${escape(this.t('local_order'))}: ${escape(row.local_id)}</p><p>${escape(this.t('server_order'))}: ${escape(row.server?.server_order_id ?? '—')}</p><p>${escape(this.t('offline_payment'))}: ${escape(app.currencyFormat(row.amount))}</p><p>${escape(this.t('server_remaining'))}: ${escape(remaining)}</p><p class="offline-help">${escape(this.t('payment_conflict_preserved'))}</p><p class="offline-help">${escape(this.t('payment_retry_hint'))}</p><div class="btn-group"><button type="button" class="btn btn-primary" id="offline-payment-retry">${escape(this.t('payment_retry'))}</button><button type="button" class="btn btn-secondary" id="offline-conflict-close">${escape(I18n.t('common.close', 'Close'))}</button></div>`)
+        document.getElementById('offline-payment-retry').onclick = async e => {
+          if (!confirm(this.t('payment_retry_confirm'))) return
+          e.target.disabled = true
+          try {
+            await app.api('POST', `/offline/conflicts/${row.id}/retry-payment`, {})
+            app.closeModal()
+            await this.refresh(app)
+          } catch (error) { e.target.disabled = false; alert(error.message) }
+        }
         document.getElementById('offline-conflict-close').onclick = () => app.closeModal()
         return
       }

@@ -1,5 +1,6 @@
 import base64
 import io
+import math
 from datetime import datetime
 from html import escape
 from urllib.parse import urlsplit
@@ -244,7 +245,7 @@ def generate_receipt_html(order_id, lang='en'):
         disc = float(ld.get('discount', 0) or 0)
         subtotal = float(ld.get('price_subtotal', 0) or (qty * price * (1 - disc / 100)))
         items_rows += f'''<tr>
-            <td style="padding:4px 0">{name}</td>
+            <td>{name}</td>
             <td style="text-align:center">{qty}</td>
             <td style="text-align:right">{money(price)}</td>
             <td style="text-align:right">{money(subtotal)}</td>
@@ -288,26 +289,27 @@ def generate_receipt_html(order_id, lang='en'):
 <meta charset="UTF-8">
 <title>{_('receipt', lang)} - {ref}</title>
 <style>
-  @page {{ margin: 0; size: 80mm auto; }}
+  @page {{ margin: 0; }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; color: #000; }}
+  body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-variant-numeric: tabular-nums; padding: 5px; color: #000; }}
   .receipt {{ max-width: 80mm; margin: 0 auto; }}
-  .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 6px auto; }}
-  .receipt-qr {{ display: block; width: 32mm; height: 32mm; margin: 3mm auto; image-rendering: pixelated; }}
-  h2 {{ text-align: center; font-size: 14px; margin: 4px 0; }}
-  .company-info {{ text-align: center; font-size: 11px; margin-bottom: 6px; }}
-  .header-line {{ text-align: center; font-size: 16px; font-weight: bold; margin: 8px 0; letter-spacing: 2px; }}
-  .divider {{ border-top: 1px dashed #000; margin: 6px 0; }}
-  .info-grid {{ display: flex; justify-content: space-between; font-size: 11px; margin: 4px 0; }}
+  .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 3px auto; }}
+  .receipt-qr {{ display: block; width: 32mm; height: 32mm; margin: 2mm auto; image-rendering: pixelated; }}
+  h2 {{ text-align: center; font-size: 15px; font-weight: 700; margin: 2px 0; }}
+  .company-info {{ text-align: center; font-size: 11px; margin-bottom: 3px; overflow-wrap: anywhere; }}
+  .header-line {{ text-align: center; font-size: 15px; font-weight: 700; margin: 4px 0; letter-spacing: 1px; }}
+  .divider {{ border-top: 1px dashed #000; margin: 3px 0; }}
+  .info-grid {{ display: flex; justify-content: space-between; gap: 4px; font-size: 11px; margin: 2px 0; }}
+  .info-grid span {{ min-width: 0; overflow-wrap: anywhere; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
-  th {{ border-bottom: 1px solid #000; padding: 4px 0; text-align: left; }}
-  td {{ padding: 2px 0; }}
+  th {{ border-bottom: 1px solid #000; padding: 2px 0; text-align: left; }}
+  td {{ padding: 1px 0; overflow-wrap: anywhere; }}
   .totals-table td {{ border: none; padding: 2px 4px; }}
   .total-row {{ font-weight: bold; font-size: 13px; }}
-  .footer {{ text-align: center; margin-top: 8px; font-size: 11px; }}
-  .payment-info {{ margin-top: 6px; }}
+  .footer {{ text-align: center; margin-top: 4px; font-size: 11px; }}
+  .payment-info {{ margin-top: 3px; }}
   .status-badge {{ display: inline-block; padding: 2px 8px; border: 1px solid #000; font-weight: bold; font-size: 10px; }}
-  @media print {{ body {{ padding: 10px; }} .no-print {{ display: none; }} }}
+  @media print {{ body {{ padding: 3px; }} .no-print {{ display: none; }} }}
   .no-print {{ text-align: center; margin-top: 12px; }}
   .no-print button {{ padding: 8px 24px; font-size: 14px; cursor: pointer; background: #2563eb; color: #fff; border: none; border-radius: 4px; }}
 </style>
@@ -390,8 +392,8 @@ def generate_receipt_html(order_id, lang='en'):
 
 
 class ReceiptPDF(FPDF):
-    def __init__(self):
-        super().__init__(orientation='P', unit='mm', format=(80, 297))
+    def __init__(self, height=297):
+        super().__init__(orientation='P', unit='mm', format=(80, height))
         self.set_auto_page_break(auto=True, margin=5)
 
     def header(self):
@@ -406,13 +408,37 @@ def generate_receipt_pdf(order_id, lang='en'):
     if not d:
         return None
 
+    # Measure the real content on a tall, single page first. Rendering again
+    # at its measured length avoids feeding a fixed 297 mm for a short receipt.
+    # The very tall measurement page stays below PDF's 14,400-point limit.
+    measured = _render_receipt_pdf(d, lang, 4990)
+    if measured.page_no() == 1:
+        height = min(4990, max(30, math.ceil(measured.get_y() + 10)))
+        pdf = _render_receipt_pdf(d, lang, height)
+        # If a large image/layout unexpectedly causes a page break, preserve all
+        # content using the existing multi-page behavior rather than clipping it.
+        if pdf.page_no() != 1:
+            pdf = _render_receipt_pdf(d, lang, 297)
+    else:
+        pdf = _render_receipt_pdf(d, lang, 297)
+
+    result = pdf.output(dest='S')
+    if isinstance(result, bytearray):
+        return bytes(result)
+    if isinstance(result, str):
+        return result.encode('latin-1')
+    return result
+
+
+def _render_receipt_pdf(d, lang, page_height):
+
     data = d['_data']
     lines = d['lines']
     payments = d['payments']
     company = d['company']
     currency = d.get('currency', {})
 
-    pdf = ReceiptPDF()
+    pdf = ReceiptPDF(page_height)
     pdf.add_page()
     pdf.set_margins(5, 5, 5)
 
@@ -433,13 +459,13 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Company name
     pdf.set_y(max(y, pdf.get_y()))
-    pdf.set_font('Courier', 'B', 10)
+    pdf.set_font('Helvetica', 'B', 10)
     pdf.set_x(left)
     pdf.cell(page_w, 5, company.get('name', ''), align='C')
     pdf.ln(5)
 
     # Company info
-    pdf.set_font('Courier', '', 7)
+    pdf.set_font('Helvetica', '', 7)
     info_lines = []
     if company.get('street'):
         info_lines.append(company['street'])
@@ -469,19 +495,19 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Dashed line
     pdf.ln(1)
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(4)
 
     # Receipt header
-    pdf.set_font('Courier', 'B', 12)
+    pdf.set_font('Helvetica', 'B', 12)
     pdf.set_x(left)
     pdf.cell(page_w, 6, _('receipt', lang).upper(), align='C')
     pdf.ln(6)
 
     # Dashed line
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(4)
 
@@ -496,10 +522,10 @@ def generate_receipt_pdf(order_id, lang='en'):
     remaining = round(total - paid, 2)
 
     # Order info
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.set_x(left)
-    pdf.cell(page_w, 4, f"{_('order', lang)}: {ref}  {_('status', lang)}: {state.upper()}")
-    pdf.ln(4)
+    # Long offline references wrap rather than extending beyond the paper.
+    pdf.multi_cell(page_w, 4, f"{_('order', lang)}: {ref}  {_('status', lang)}: {state.upper()}")
     pdf.set_x(left)
     pdf.cell(page_w, 4, f"{_('date', lang)}: {date_val}")
     pdf.ln(4)
@@ -524,12 +550,12 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Dashed line
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(4)
 
     # Items header
-    pdf.set_font('Courier', 'B', 8)
+    pdf.set_font('Helvetica', 'B', 8)
     col_w = [28, 8, 18, 16]
     headers = [_('item', lang), _('qty', lang), _('price', lang), _('total', lang)]
     pdf.set_x(left)
@@ -537,7 +563,7 @@ def generate_receipt_pdf(order_id, lang='en'):
         pdf.cell(col_w[i], 4, h)
     pdf.ln(4)
 
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.set_x(left)
     pdf.cell(page_w, 2, '-' * 70, align='C')
     pdf.ln(3)
@@ -560,12 +586,12 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Dashed line
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(4)
 
     # Totals
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.set_x(left)
     pdf.cell(page_w - 20, 4, f"{_('subtotal', lang)}:", align='R')
     pdf.cell(20, 4, currency_format(items_total, currency), align='R')
@@ -582,7 +608,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     pdf.cell(20, 4, currency_format(0, currency), align='R')
     pdf.ln(4)
 
-    pdf.set_font('Courier', 'B', 9)
+    pdf.set_font('Helvetica', 'B', 9)
     pdf.set_x(left)
     pdf.cell(page_w - 20, 5, f"{_('total', lang).upper()}:", align='R')
     pdf.cell(20, 5, currency_format(total, currency), align='R')
@@ -591,7 +617,7 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Receipt header text
     if company.get('receipt_header'):
         pdf.set_x(left)
-        pdf.set_font('Courier', '', 7)
+        pdf.set_font('Helvetica', '', 7)
         pdf.cell(page_w, 3, '-' * 70, align='C')
         pdf.ln(3)
         pdf.set_x(left)
@@ -600,15 +626,15 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Payment info
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(3)
-    pdf.set_font('Courier', 'B', 8)
+    pdf.set_font('Helvetica', 'B', 8)
     pdf.set_x(left)
     pdf.cell(page_w, 4, _('payment', lang), align='C')
     pdf.ln(5)
 
-    pdf.set_font('Courier', '', 8)
+    pdf.set_font('Helvetica', '', 8)
     for pmt in payments:
         pd = pmt['_data']
         pmt_name = pmt['payment_method_name']
@@ -624,12 +650,12 @@ def generate_receipt_pdf(order_id, lang='en'):
     pdf.ln(4)
 
     if remaining > 0.01:
-        pdf.set_font('Courier', 'B', 8)
+        pdf.set_font('Helvetica', 'B', 8)
         pdf.set_x(left)
         pdf.cell(page_w - 20, 4, f"{_('remaining', lang)}:", align='R')
         pdf.cell(20, 4, currency_format(remaining, currency), align='R')
         pdf.ln(4)
-        pdf.set_font('Courier', '', 8)
+        pdf.set_font('Helvetica', '', 8)
 
     pdf.set_x(left)
     pdf.cell(page_w - 20, 4, f"{_('change', lang)}:", align='R')
@@ -639,10 +665,10 @@ def generate_receipt_pdf(order_id, lang='en'):
     # Receipt footer
     if company.get('receipt_footer'):
         pdf.set_x(left)
-        pdf.set_font('Courier', '', 8)
+        pdf.set_font('Helvetica', '', 8)
         pdf.cell(page_w, 3, '-' * 70, align='C')
         pdf.ln(3)
-        pdf.set_font('Courier', '', 8)
+        pdf.set_font('Helvetica', '', 8)
         pdf.set_x(left)
         pdf.cell(page_w, 4, company['receipt_footer'], align='C')
         pdf.ln(4)
@@ -655,7 +681,7 @@ def generate_receipt_pdf(order_id, lang='en'):
             pdf.add_page()
         pdf.ln(3)
         pdf.set_x(left)
-        pdf.set_font('Courier', '', 8)
+        pdf.set_font('Helvetica', '', 8)
         pdf.cell(page_w, 4, _('facebook', lang), align='C')
         pdf.ln(5)
         origin_x = left + (page_w - qr_size) / 2
@@ -670,16 +696,10 @@ def generate_receipt_pdf(order_id, lang='en'):
 
     # Footer line
     pdf.set_x(left)
-    pdf.set_font('Courier', '', 7)
+    pdf.set_font('Helvetica', '', 7)
     pdf.cell(page_w, 3, '-' * 70, align='C')
     pdf.ln(3)
     pdf.set_x(left)
     pdf.cell(page_w, 3, _('generated', lang), align='C')
 
-    # Return as bytes
-    result = pdf.output(dest='S')
-    if isinstance(result, bytearray):
-        return bytes(result)
-    if isinstance(result, str):
-        return result.encode('latin-1')
-    return result
+    return pdf

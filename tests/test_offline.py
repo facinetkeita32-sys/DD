@@ -3,6 +3,7 @@ import http.cookiejar
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import socket
@@ -885,11 +886,15 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(200, code)
         self.assertIn('<html lang="fr">', html)
         self.assertIn('REÇU', html)
+        self.assertIn('font-family: Arial, Helvetica, sans-serif', html)
         self.assertIn(sale['data']['name'], html)
         request = urllib.request.Request(self.urls['local'] + f'/api/receipt/{order_id}/pdf?lang=fr')
         with self.local.open(request, timeout=10) as response:
             self.assertEqual('application/pdf', response.headers.get_content_type())
-            self.assertTrue(response.read().startswith(b'%PDF'))
+            pdf = response.read()
+            self.assertTrue(pdf.startswith(b'%PDF'))
+            self.assertIn(b'/BaseFont /Helvetica', pdf)
+            self.assertNotIn(b'/BaseFont /Courier', pdf)
         after = self.state('local')
         self.assertEqual(before['orders'], after['orders'])
         self.assertEqual(before['products'], after['products'])
@@ -1031,6 +1036,37 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertIn('Find us on Facebook', central_html)
         self.assertIn('+224 620 12 34 56', central_html)
         self.assertIn('data:image/svg+xml;base64,', central_html)
+
+    def test_pdf_receipt_page_length_tracks_content_without_cropping(self):
+        self.pair()
+        self.state('local', {'online': False})
+        self.assertEqual(200, self.call('local', '/api/company', {
+            'website': 'https://www.facebook.com/ShopWithDD',
+        }, method='PUT')[0])
+        product = self.state('local')['products'][0]
+
+        def receipt(line_count):
+            payload = {
+                'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}
+                          for _ in range(line_count)],
+                'payments': [{'payment_method_id': 1, 'amount': product['price'] * line_count}],
+            }
+            code, order = self.call('local', '/api/orders', payload)
+            self.assertEqual(200, code, order)
+            with self.local.open(self.urls['local'] + f'/api/receipt/{order["data"]["id"]}/pdf', timeout=15) as response:
+                data = response.read()
+            self.assertTrue(data.startswith(b'%PDF'))
+            self.assertEqual(1, len(re.findall(rb'/Type\s*/Page\b', data)))
+            size = re.search(rb'/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]', data)
+            self.assertIsNotNone(size)
+            return float(size.group(1)) * 25.4 / 72, float(size.group(2)) * 25.4 / 72
+
+        short_width, short_height = receipt(1)
+        long_width, long_height = receipt(35)
+        self.assertAlmostEqual(80, short_width, delta=.1)
+        self.assertAlmostEqual(80, long_width, delta=.1)
+        self.assertLess(short_height, 220)  # Includes the 32 mm Facebook QR.
+        self.assertGreater(long_height, short_height + 100)
 
     def test_receipt_qr_only_for_facebook_https_and_empty_settings_are_safe(self):
         self.pair()

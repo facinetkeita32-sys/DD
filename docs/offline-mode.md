@@ -211,6 +211,20 @@ USB printer from working; a Wi-Fi/Ethernet printer still requires its local netw
 connection. Choose the receipt printer and its supported paper width in the print
 dialog. Opening the dialog confirms the software path, not physical paper output.
 
+Receipt HTML uses compact spacing and leaves page size to the selected printer
+and driver rather than forcing a paper size. Select the printer's matching 58 mm
+or 80 mm roll/paper setting, disable browser headers/footers if offered, and check
+the print preview; actual cut position and additional feed are controlled by the
+printer driver and hardware. The downloadable PDF keeps its existing 80 mm width,
+but its page height follows the measured receipt content rather than a fixed
+297 mm for ordinary receipts. Extremely long receipts fall back to the previous
+multi-page layout if they exceed the PDF page-size limit. The Facebook QR remains
+32 mm, with its quiet zone, so reducing whitespace does not make it unscannable.
+The print preview uses a locally available Arial/Helvetica sans-serif stack, and
+the PDF uses the built-in Helvetica font; no internet or downloaded fonts are
+needed. Long offline order references wrap to stay within the PDF's printable
+width. The receipt's financial amounts and payment information are unchanged.
+
 Company phone, street/location and city are editable in Settings and appear on
 HTML and PDF receipts. The existing company **website** field can contain the
 HTTPS Facebook page URL; a 32 mm Facebook QR code is generated locally on both

@@ -9,6 +9,10 @@ const Offline = {
       if (!this.state?.local) return null
       app.offlineMode = true
       const setup = document.getElementById('offline-setup')
+      document.getElementById('offline-setup-lang').onchange = e => {
+        document.getElementById('login-lang').value = e.target.value
+        I18n.setLang(e.target.value)
+      }
       document.getElementById('login-box').hidden = !this.state.ready
       setup.hidden = this.state.ready
       setup.onsubmit = async e => {

@@ -11,6 +11,20 @@
 <div id="app">
   <div id="login-screen" class="screen active">
     <div class="login-container">
+      <section class="login-showcase" aria-labelledby="login-showcase-title">
+        <div class="login-showcase-content">
+          <p class="login-showcase-eyebrow" data-i18n="login.showcase_eyebrow">ALL YOUR BUSINESS IN ONE PLACE</p>
+          <h2 id="login-showcase-title" data-i18n="login.showcase_title">Point of Sale Management System</h2>
+          <div class="login-showcase-accent" aria-hidden="true"></div>
+          <div class="login-features">
+            <div class="login-feature"><span class="login-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19v-5M12 19V9M19 19V4"/></svg></span><div><h3 data-i18n="login.feature_sales">Sales &amp; Reports</h3><p data-i18n="login.feature_sales_desc">Keep track of your sales and reports</p></div></div>
+            <div class="login-feature"><span class="login-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9"/></svg></span><div><h3 data-i18n="login.feature_products">Product Management</h3><p data-i18n="login.feature_products_desc">Stock and inventory made simple</p></div></div>
+            <div class="login-feature"><span class="login-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2M5 5a3 3 0 0 0 0 5m14-5a3 3 0 0 1 0 5M3 14a5 5 0 0 0-1 3m19-3a5 5 0 0 1 1 3"/></svg></span><div><h3 data-i18n="login.feature_users">Multi-User</h3><p data-i18n="login.feature_users_desc">Easy to use with role-based access</p></div></div>
+          </div>
+        </div>
+        <div class="login-showcase-art" aria-hidden="true"><img src="images/Modern-POS.png" alt=""></div>
+      </section>
+      <div class="login-form-panel">
       <div class="login-box" id="login-box">
         <div class="login-logo" id="login-logo">🛒</div>
         <h1 data-i18n="app.name">Shop With DD POS</h1>
@@ -41,9 +55,11 @@
         <div class="form-group"><label for="offline-device" data-i18n="offline.device">Terminal name</label><input id="offline-device" maxlength="100" required placeholder="POS 01"></div>
         <div class="form-group"><label for="offline-manager" data-i18n="login.username">Username</label><input id="offline-manager" required autocomplete="username"></div>
         <div class="form-group"><label for="offline-password" data-i18n="login.password">Password</label><input id="offline-password" type="password" required autocomplete="current-password"></div>
+        <div class="form-group"><label for="offline-setup-lang" data-i18n="settings.language">Language</label><select id="offline-setup-lang"><option value="en">English</option><option value="fr">Français</option></select></div>
         <button class="btn btn-primary btn-block" type="submit" id="offline-enroll" data-i18n="offline.register">Register this terminal</button>
         <p id="offline-setup-message" class="error-message" role="status" aria-live="polite"></p>
       </form>
+      </div>
     </div>
   </div>
 

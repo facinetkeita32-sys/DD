@@ -282,6 +282,23 @@ def generate_receipt_html(order_id, lang='en'):
         delivery_contact_html = f'<div class="info-grid"><span><strong>{_("delivery", lang)}:</strong> {dz_name}</span></div><div class="info-grid"><span>{contact_str}</span></div>'
 
     html_lang = 'fr' if lang == 'fr' else 'en'
+    company_info = []
+    if company.get('street'):
+        company_info.append(company['street'])
+    locality = ', '.join(part for part in (company.get('city'), company.get('state')) if part)
+    if company.get('zip_code'):
+        locality = (locality + ' ' + company['zip_code']).strip()
+    if locality:
+        company_info.append(locality)
+    if company.get('country'):
+        company_info.append(company['country'])
+    if company.get('phone'):
+        company_info.append(_('tel', lang) + ': ' + company['phone'])
+    if company.get('email'):
+        company_info.append(company['email'])
+    if company.get('vat'):
+        company_info.append(_('tax_id', lang) + ': ' + company['vat'])
+    company_info_html = '<br>'.join(company_info)
 
     return f'''<!DOCTYPE html>
 <html lang="{html_lang}">
@@ -293,9 +310,9 @@ def generate_receipt_html(order_id, lang='en'):
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-variant-numeric: tabular-nums; padding: 5px; color: #000; }}
   .receipt {{ max-width: 80mm; margin: 0 auto; }}
-  .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 3px auto; }}
+  .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 0 auto 3px; }}
   .receipt-qr {{ display: block; width: 32mm; height: 32mm; margin: 2mm auto; image-rendering: pixelated; }}
-  h2 {{ text-align: center; font-size: 15px; font-weight: 700; margin: 2px 0; }}
+  h2 {{ text-align: center; font-size: 15px; font-weight: 700; margin: 0 0 2px; }}
   .company-info {{ text-align: center; font-size: 11px; margin-bottom: 3px; overflow-wrap: anywhere; }}
   .header-line {{ text-align: center; font-size: 15px; font-weight: 700; margin: 4px 0; letter-spacing: 1px; }}
   .divider {{ border-top: 1px dashed #000; margin: 3px 0; }}
@@ -309,7 +326,7 @@ def generate_receipt_html(order_id, lang='en'):
   .footer {{ text-align: center; margin-top: 4px; font-size: 11px; }}
   .payment-info {{ margin-top: 3px; }}
   .status-badge {{ display: inline-block; padding: 2px 8px; border: 1px solid #000; font-weight: bold; font-size: 10px; }}
-  @media print {{ body {{ padding: 3px; }} .no-print {{ display: none; }} }}
+  @media print {{ body {{ padding: 0 3px 3px; }} .no-print {{ display: none; }} }}
   .no-print {{ text-align: center; margin-top: 12px; }}
   .no-print button {{ padding: 8px 24px; font-size: 14px; cursor: pointer; background: #2563eb; color: #fff; border: none; border-radius: 4px; }}
 </style>
@@ -318,16 +335,7 @@ def generate_receipt_html(order_id, lang='en'):
 <div class="receipt">
   {logo_html}
   <h2>{company.get('name', '')}</h2>
-  <div class="company-info">
-    {(company.get('street') or '') and (company['street'] or '') + '<br>' or ''}
-    {(company.get('city') or '') and (company['city'] or '') or ''}
-    {(company.get('state') or '') and ', ' + (company['state'] or '') or ''}
-    {(company.get('zip_code') or '') and ' ' + (company['zip_code'] or '') or ''}
-    {(company.get('country') or '') and '<br>' + (company['country'] or '') or ''}
-    {(company.get('phone') or '') and '<br>' + _('tel', lang) + ': ' + (company['phone'] or '') or ''}
-    {(company.get('email') or '') and '<br>' + (company['email'] or '') or ''}
-    {(company.get('vat') or '') and '<br>' + _('tax_id', lang) + ': ' + (company['vat'] or '') or ''}
-  </div>
+  {f'<div class="company-info">{company_info_html}</div>' if company_info_html else ''}
 
   <div class="divider"></div>
   <div class="header-line">{_('receipt', lang)}</div>
@@ -439,13 +447,13 @@ def _render_receipt_pdf(d, lang, page_height):
     currency = d.get('currency', {})
 
     pdf = ReceiptPDF(page_height)
+    pdf.set_margins(5, 2, 5)
     pdf.add_page()
-    pdf.set_margins(5, 5, 5)
 
     page_w = 80 - 10
     left = 5
 
-    y = 5
+    y = 2
 
     # Logo
     if company.get('logo'):

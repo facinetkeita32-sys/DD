@@ -224,6 +224,9 @@ The print preview uses a locally available Arial/Helvetica sans-serif stack, and
 the PDF uses the built-in Helvetica font; no internet or downloaded fonts are
 needed. Long offline order references wrap to stay within the PDF's printable
 width. The receipt's financial amounts and payment information are unchanged.
+The HTML receipt removes unnecessary leading blank address lines and top padding;
+the PDF starts its content at a 2 mm top margin. A printer's unavoidable hardware
+margin or additional feed/cut cannot be controlled by the receipt layout.
 
 Company phone, street/location and city are editable in Settings and appear on
 HTML and PDF receipts. The existing company **website** field can contain the

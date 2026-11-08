@@ -1,4 +1,12 @@
 {
+  "login.showcase_eyebrow": "ALL YOUR BUSINESS IN ONE PLACE",
+  "login.showcase_title": "Point of Sale Management System",
+  "login.feature_sales": "Sales & Reports",
+  "login.feature_sales_desc": "Keep track of your sales and reports",
+  "login.feature_products": "Product Management",
+  "login.feature_products_desc": "Stock and inventory made simple",
+  "login.feature_users": "Multi-User",
+  "login.feature_users_desc": "Easy to use with role-based access",
   "offline.payment_retry": "Retry this payment",
   "offline.payment_retry_hint": "After checking the central order and resolving the cause, retry the same saved payment. The server will check the current balance again. If it is a duplicate, do not retry it; preserve the terminal data and request reconciliation assistance.",
   "offline.payment_retry_confirm": "Have you reviewed the central order and confirmed this saved payment still needs to be applied? The server will check the balance again.",

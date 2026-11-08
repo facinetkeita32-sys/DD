@@ -1084,6 +1084,18 @@ class OfflineIntegrationTests(unittest.TestCase):
         html = self.call('local', f'/api/receipt/{order}/html')[1]
         self.assertIn('data:image/svg+xml;base64,', html)
 
+    def test_receipt_company_details_have_no_leading_blank_line(self):
+        self.pair()
+        self.assertEqual(200, self.call('local', '/api/company', {
+            'street': '', 'city': '', 'state': '', 'zip_code': '',
+            'country': 'Guinea', 'phone': '+224 620 123456', 'email': '', 'vat': '',
+        }, method='PUT')[0])
+        _, sale = self.sale()
+        html = self.call('local', f'/api/receipt/{sale["data"]["id"]}/html?lang=en')[1]
+        self.assertIn('<div class="company-info">Guinea<br>Tel: +224 620 123456</div>', html)
+        self.assertNotIn('<div class="company-info"><br>', html)
+        self.assertIn('@media print { body { padding: 0 3px 3px; }', html)
+
     def test_orange_money_and_credit_card_names_receipts_and_sync(self):
         self.pair()
         methods = self.call('local', '/api/payment-methods')[1]['data']

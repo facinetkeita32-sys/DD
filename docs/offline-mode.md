@@ -13,7 +13,7 @@ business tables or columns are deleted, replaced, or migrated. Older application
 backups retain their existing registered-table schema and remain restorable.
 Rolling code back does not require deleting the new metadata tables.
 
-Supported on terminals: fully paid sales using active configured payment-method
+Supported on terminals: sales using active configured payment-method
 names (including **Cash, Orange Money and Credit Card**), local HTML/PDF receipts,
 cashier sessions, existing customer selection, local reporting, English/French,
 customer creation by authorized cashiers/managers/admins and customer contact
@@ -146,7 +146,32 @@ provider charge. There is no new gateway integration, confirmation workflow or
 fee calculation. Receipts and payment records retain the configured method name
 and amount; synchronization also retains any existing optional reference. Inactive
 or missing methods are rejected locally, or keep a queued sale pending if removed
-centrally before upload. Unpaid/credit sales remain unavailable offline.
+centrally before upload. Pay Later orders and later payments created on the
+terminal are queued in the same way; disputed payments require manager review.
+
+### Web payments on terminal-originated Pay Later orders
+
+After the terminal's Pay Later order has synchronized, a payment recorded against
+that order on the central website is downloaded to **that originating terminal**.
+The terminal requests payment snapshots only for its own acknowledged pending
+orders. The server validates the device, epoch and original sale acknowledgement;
+it does not expose arbitrary central order histories to a terminal.
+
+Once the local outbox is clear, central payment records are merged into the
+terminal's payment history and the order's paid amount, remaining balance and
+state are updated. Existing local payments are matched to acknowledged IDs (or,
+for original embedded payments, exact historical values) rather than recreated.
+Server payments receive durable mappings so repeated synchronization and desktop
+restarts do not duplicate them. A status revision refreshes an open Orders screen
+after actual changes. Central orders created elsewhere are not downloaded.
+
+The terminal rechecks its outbox after the network fetch: if a cashier added a
+local operation in the meantime, the snapshot is not applied, so an unsent payment
+is never overwritten. Mismatched totals, missing/mutated payments, canceled orders,
+or invalid payment mappings stop the merge for review rather than discarding local
+history. Conflicting local payments remain queued under the existing manager-review
+workflow. This update requires compatible server and desktop versions; no table
+schema change or migration is needed.
 
 Catalogue edits and their outbox entries commit together. Edits send only changed
 fields with their prior values: a server edit to an unrelated field is preserved;
@@ -265,9 +290,9 @@ or credit, do **not** retry it or re-enter it. A manager must reconcile the real
 transaction; a UI for archiving a duplicate, refunds or customer credit remains
 unimplemented. Preserve the terminal database and contact the application
 maintainer for an audited resolution. In particular, do not edit the queue or
-delete a payment from either database merely to clear the status. Payments made
-on other terminals/central orders are not automatically imported into the local
-order history. The server remains the reference for its current balance.
+delete a payment from either database merely to clear the status. The server
+remains the reference for its current balance. Only payments on the originating
+terminal's own synchronized orders are imported; orders created elsewhere are not.
 
 A successful central restore rotates a persistent database epoch within the restore
 transaction. Paired terminals detect the change and block synchronization/new
@@ -308,6 +333,9 @@ email is sent by these tests.
 Payment-conflict tests cover manager/cashier authorization, unchanged payment
 UUIDs, an unsafe retry remaining in conflict, a corrected central record allowing
 one successful retry, and repeated sync without duplicates.
+Web-payment tests cover full/partial payments, repeated pulls and terminal restart,
+matching original/local payments without duplication, device-scope authorization,
+invalid snapshots, and a new local payment recorded while a snapshot is in flight.
 Neither installed POS data nor the Hostinger database is used by these tests.
 Launcher regression checks also verify duplicate-instance rejection, release of
 the OS lock on exit, and preservation of the private session key after restarting.

@@ -108,8 +108,13 @@ const Offline = {
       return
     }
     try {
+      const previousRevision = this.state?.order_updates_revision || 0
       this.state = (await app.api('GET', '/offline/status')).data
       this.paint(app)
+      if ((this.state.order_updates_revision || 0) !== previousRevision) {
+        if (document.getElementById('screen-orders').classList.contains('active')) app.renderOrdersTable()
+        if (document.getElementById('screen-dashboard').classList.contains('active')) app.renderDashboard()
+      }
     } catch (error) { /* Keep the last known status; local sales do not wait for polling. */ }
   },
   details(app) {

@@ -381,11 +381,23 @@ def synchronize():
                         map_id(resource['model'], row['local_id'], resource['server_id'])
                     row.update(status='sent', receipt=receipt)
                     store.put('outbox', key, row)
+            from .offline_order_sync import pending_sales, apply_payment_snapshots
+            with _db_lock:
+                requested = pending_sales()
             snapshot = request_server(settings, 'catalogue')
+            order_snapshots = []
+            for offset in range(0, len(requested), 100):
+                ids = [key for key, _ in requested[offset:offset + 100]]
+                result = request_server(settings, 'order-payments', {'sale_operations': ids})
+                if not isinstance(result, dict) or not isinstance(result.get('orders'), list):
+                    raise SyncError('Invalid order payment response.', 409, 'order_sync_conflict')
+                order_snapshots.extend(result['orders'])
             with atomic():
                 if not pending():
                     apply_catalogue(snapshot)
                     _reload()
+                    if apply_payment_snapshots(order_snapshots, requested):
+                        settings['order_updates_revision'] = settings.get('order_updates_revision', 0) + 1
                 settings.update(last_sync=time.time(), connected=True, error=None,
                                 clock_offset=snapshot['server_time'] - time.time(),
                                 last_server_time=snapshot['server_time'])

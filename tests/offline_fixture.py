@@ -1,5 +1,6 @@
 """Test-only subprocess host. Never imported by the application."""
 import os
+import threading
 from pathlib import Path
 import sys
 
@@ -24,7 +25,10 @@ if mode == 'server':
     ResUsers.create({'name': 'Manager', 'login': 'manager1', 'password': 'manager123',
                      'role': 'manager', 'active': True})
 baseline = backup_service.export_full_backup()
-control = {'online': True, 'drop_ack': False, 'drop_kind': '', 'capture_error': False, 'mail_failure': False}
+control = {'online': True, 'drop_ack': False, 'drop_kind': '', 'capture_error': False,
+           'mail_failure': False, 'pause_order_snapshots': False, 'corrupt_order_snapshot': False}
+snapshot_waiting = threading.Event()
+snapshot_release = threading.Event()
 mails = []
 real_request = offline_client.request_server
 real_capture = offline_client.capture
@@ -35,6 +39,13 @@ def transport(config, path, body=None, credential=None, timeout=8):
     if not control['online']:
         raise offline_client.NetworkUnavailable('Simulated disconnection')
     result = real_request(config, path, body, credential, timeout=timeout)
+    if path == 'order-payments' and control['corrupt_order_snapshot'] and result['orders']:
+        result['orders'][0]['amount_total'] += 123
+    if path == 'order-payments' and control['pause_order_snapshots']:
+        snapshot_waiting.set()
+        if not snapshot_release.wait(15):
+            raise offline_client.NetworkUnavailable('Snapshot test timed out')
+        snapshot_waiting.clear()
     if path == 'push' and (control['drop_ack'] or control['drop_kind'] == body['operation']['kind']):
         control['drop_ack'] = False
         control['drop_kind'] = ''
@@ -81,6 +92,13 @@ def debug():
     if request.method == 'POST':
         body = request.get_json()
         control.update({key: body[key] for key in control if key in body})
+        if body.get('arm_snapshot_pause'):
+            snapshot_release.clear()
+            snapshot_waiting.clear()
+            control['pause_order_snapshots'] = True
+        if body.get('release_snapshot'):
+            control['pause_order_snapshots'] = False
+            snapshot_release.set()
         if 'stock' in body:
             ProductProduct.browse(body['product_id'])[0].write({'available_qty': body['stock']})
         if 'edit_product' in body:
@@ -109,6 +127,8 @@ def debug():
         'queue': store.all_rows('outbox'), 'client': offline_client.config(),
         'grants': store.all_rows('grants'),
         'mails': mails,
+        'snapshot_waiting': snapshot_waiting.is_set(),
+        'sync_busy': offline_client._sync_lock.locked(),
         'users': [dict(id=row.id, login=row.login, password=row.password) for row in ResUsers.search([])],
         'identity': store.get('meta', 'identity'),
     })

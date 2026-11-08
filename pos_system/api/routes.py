@@ -723,7 +723,13 @@ def get_order(order_id):
                 ld['product_name'] = product[0]._data.get('name', '')
         d['lines'].append(ld)
     payments = PosPayment().search([('order_id', '=', order.id)])
-    d['payments'] = [model_to_dict(p) for p in payments]
+    d['payments'] = []
+    for payment in payments:
+        payment_data = model_to_dict(payment)
+        methods = PosPaymentMethod.browse(payment._data.get('payment_method_id') or 0)
+        if methods:
+            payment_data['payment_method_name'] = methods[0]._data.get('name', '')
+        d['payments'].append(payment_data)
     d['remaining'] = round(float(d.get('amount_total',0) or 0) - float(d.get('amount_paid',0) or 0), 2)
     pid = order._data.get('partner_id', 0) or 0
     if pid:

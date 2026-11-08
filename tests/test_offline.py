@@ -353,6 +353,168 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertEqual(product['price'], server_order['amount_paid'])
         self.assertEqual(1, len(server_order['payments']))
 
+    def test_web_pay_later_payment_downloads_to_originating_terminal(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 2, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        local_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.login('admin', 'admin', 'server')
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {
+            'amount': product['price'] * 2, 'payment_method_id': 2,
+        })[0])
+        self.state('local', {'sync': True})
+        local = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual('paid', local['state'])
+        self.assertEqual(product['price'] * 2, local['amount_paid'])
+        self.assertEqual(0, local['remaining'])
+        self.assertEqual(1, len(local['payments']))
+        self.assertEqual(2, local['payments'][0]['payment_method_id']['id'])
+        self.assertEqual('Orange Money', local['payments'][0]['payment_method_name'])
+        revision = self.state('local')['client']['order_updates_revision']
+        self.state('local', {'sync': True})
+        self.assertEqual(1, len(self.call('local', f'/api/orders/{local_id}')[1]['data']['payments']))
+        self.assertEqual(revision, self.state('local')['client']['order_updates_revision'])
+        self.processes['local'].terminate()
+        self.processes['local'].wait(timeout=5)
+        self.start('local')
+        self.login('admin', 'admin')
+        self.state('local', {'sync': True})
+        restored = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual('paid', restored['state'])
+        self.assertEqual(1, len(restored['payments']))
+
+    def test_initial_and_later_terminal_payments_are_not_duplicated_by_partial_web_payments(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        price = product['price']
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 4, 'price_unit': price, 'discount': 0}],
+            'payments': [{'payment_method_id': 1, 'amount': price}],
+        })
+        local_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.assertEqual(200, self.call('local', f'/api/orders/{local_id}/pay', {
+            'amount': price, 'payment_method_id': 2,
+        })[0])
+        self.state('local', {'sync': True})
+        self.login('admin', 'admin', 'server')
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {
+            'amount': price, 'payment_method_id': 4,
+        })[0])
+        state = self.state('local', {'sync': True})
+        self.assertIsNone(state['client'].get('error'), state['client'])
+        detail = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual('pending', detail['state'])
+        self.assertEqual(price * 3, detail['amount_paid'])
+        self.assertEqual(price, detail['remaining'])
+        ids = [item['id'] for item in detail['payments']]
+        self.assertEqual(3, len(ids))
+        self.assertEqual(3, len(set(ids)))
+        self.state('local', {'sync': True})
+        self.assertEqual(ids, [item['id'] for item in self.call('local', f'/api/orders/{local_id}')[1]['data']['payments']])
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {
+            'amount': price, 'payment_method_id': 1,
+        })[0])
+        self.state('local', {'sync': True})
+        detail = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual('paid', detail['state'])
+        self.assertEqual(4, len(detail['payments']))
+        self.assertEqual(ids, [item['id'] for item in detail['payments'][:3]])
+
+    def test_order_payment_snapshots_reject_other_devices_and_unknown_ids(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 1, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        self.state('local', {'sync': True})
+        terminal = self.state('local')
+        settings = terminal['client']
+        sale = next(key for key, row in terminal['queue'] if row['operation']['kind'] == 'sale')
+        headers = {'Authorization': 'Bearer ' + settings['credential'],
+                   'X-POS-Server': settings['server_id'], 'X-POS-Epoch': settings['epoch']}
+        self.assertEqual(200, self.call('server', '/api/offline/order-payments', {'sale_operations': [sale]}, headers=headers)[0])
+        self.assertEqual(403, self.call('server', '/api/offline/order-payments', {'sale_operations': [str(uuid.uuid4())]}, headers=headers)[0])
+        self.assertEqual(400, self.call('server', '/api/offline/order-payments', {'sale_operations': [sale, sale]}, headers=headers)[0])
+        self.assertEqual(401, self.call('server', '/api/offline/order-payments', {'sale_operations': [sale]})[0])
+        code, registered = self.call('server', '/api/offline/register', {
+            'login': 'admin', 'password': 'admin', 'device_name': 'Different terminal',
+        })
+        self.assertEqual(200, code, registered)
+        other = registered['data']
+        other_headers = {'Authorization': 'Bearer ' + other['credential'],
+                         'X-POS-Server': other['server_id'], 'X-POS-Epoch': other['epoch']}
+        self.assertEqual(403, self.call('server', '/api/offline/order-payments', {'sale_operations': [sale]}, headers=other_headers)[0])
+
+    def test_snapshot_does_not_overwrite_a_payment_created_during_network_fetch(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        price = product['price']
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 4, 'price_unit': price, 'discount': 0}],
+            'payments': [],
+        })
+        local_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.login('admin', 'admin', 'server')
+        self.assertEqual(200, self.call('server', f'/api/orders/{central_id}/pay', {
+            'amount': price, 'payment_method_id': 1,
+        })[0])
+        self.state('local', {'arm_snapshot_pause': True})
+        self.assertEqual(200, self.call('local', '/api/offline/sync', {})[0])
+        try:
+            deadline = time.time() + 10
+            while time.time() < deadline and not self.state('local')['snapshot_waiting']:
+                time.sleep(.05)
+            self.assertTrue(self.state('local')['snapshot_waiting'])
+            self.assertEqual(200, self.call('local', f'/api/orders/{local_id}/pay', {
+                'amount': price, 'payment_method_id': 2,
+            })[0])
+        finally:
+            self.state('local', {'release_snapshot': True})
+        deadline = time.time() + 10
+        while time.time() < deadline and self.state('local')['sync_busy']:
+            time.sleep(.05)
+        local = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual(price, local['amount_paid'])
+        self.assertEqual(1, len(local['payments']))
+        self.assertEqual(1, sum(row['status'] == 'pending' for _, row in self.state('local')['queue']))
+        terminal = self.state('local', {'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        local = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual(price * 2, local['amount_paid'])
+        self.assertEqual(2, len(local['payments']))
+
+    def test_invalid_central_snapshot_rolls_back_without_losing_local_records(self):
+        self.pair()
+        product = self.state('local')['products'][0]
+        _, result = self.call('local', '/api/orders', {
+            'lines': [{'product_id': product['id'], 'qty': 2, 'price_unit': product['price'], 'discount': 0}],
+            'payments': [],
+        })
+        local_id = result['data']['id']
+        self.state('local', {'sync': True})
+        central_id = self.state('server')['orders'][0]['id']
+        self.login('admin', 'admin', 'server')
+        self.call('server', f'/api/orders/{central_id}/pay', {'amount': product['price'], 'payment_method_id': 1})
+        before = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        terminal = self.state('local', {'corrupt_order_snapshot': True, 'sync': True})
+        self.assertEqual('order_sync_conflict', terminal['client']['error'])
+        self.assertEqual(before, self.call('local', f'/api/orders/{local_id}')[1]['data'])
+        terminal = self.state('local', {'corrupt_order_snapshot': False, 'sync': True})
+        self.assertIsNone(terminal['client'].get('error'), terminal['client'])
+        detail = self.call('local', f'/api/orders/{local_id}')[1]['data']
+        self.assertEqual(product['price'], detail['amount_paid'])
+        self.assertEqual(1, len(detail['payments']))
+
     def test_manager_retries_original_payment_only_after_review(self):
         self.pair()
         self.login('cashier1', '1234')

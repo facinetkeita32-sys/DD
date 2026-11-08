@@ -51,7 +51,7 @@ def status():
         if settings and session.get('user_id'):
             users = ResUsers.browse(session['user_id'])
             is_manager = users and users[0].role in ('admin', 'manager')
-            result.update({key: settings.get(key) for key in ('connected', 'blocked', 'last_sync', 'error', 'device_name', 'server_url')})
+            result.update({key: settings.get(key) for key in ('connected', 'blocked', 'last_sync', 'error', 'device_name', 'server_url', 'order_updates_revision')})
             result['pending'] = sum(is_manager or row['user_id'] == session['user_id'] for _, row in pending())
     return success(result)
 
@@ -99,6 +99,14 @@ def push():
     from ..services.offline_server import apply_operation
     key, row = server_device()
     return success(apply_operation(key, row, body().get('operation')))
+
+
+@offline_bp.post('/order-payments')
+def order_payments():
+    """Only return payment state for sales acknowledged for this terminal."""
+    from ..services.offline_order_sync import server_payment_snapshots
+    key, _ = server_device()
+    return success({'orders': server_payment_snapshots(key, body().get('sale_operations'))})
 
 
 @offline_bp.post('/receipt-email')

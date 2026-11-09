@@ -1,6 +1,8 @@
 """Real HTTP integration tests with independent server and terminal SQLite DBs."""
 import http.cookiejar
+import base64
 import copy
+import io
 import json
 import os
 import re
@@ -1067,6 +1069,36 @@ class OfflineIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(80, long_width, delta=.1)
         self.assertLess(short_height, 220)  # Includes the 32 mm Facebook QR.
         self.assertGreater(long_height, short_height + 100)
+
+    def test_receipt_logo_spacing_preserves_original_and_actual_aspect(self):
+        from PIL import Image
+        self.pair()
+        self.state('local', {'online': False})
+        _, order = self.sale()
+        order_id = order['data']['id']
+
+        def pdf_height():
+            with self.local.open(self.urls['local'] + f'/api/receipt/{order_id}/pdf', timeout=15) as response:
+                data = response.read()
+            size = re.search(rb'/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]', data)
+            self.assertIsNotNone(size)
+            return float(size.group(2)) * 25.4 / 72, data
+
+        no_logo_height, _ = pdf_height()
+        buffer = io.BytesIO()
+        Image.new('RGB', (300, 50), 'navy').save(buffer, format='PNG')
+        logo = base64.b64encode(buffer.getvalue()).decode('ascii')
+        self.assertEqual(200, self.call('local', '/api/company', {'logo': logo}, method='PUT')[0])
+        html = self.call('local', f'/api/receipt/{order_id}/html')[1]
+        self.assertIn('class="receipt-logo"', html)
+        self.assertIn('display: block; margin: 0 auto;', html)
+        self.assertIn(logo, html)
+        with_logo_height, pdf = pdf_height()
+        # A 6:1 logo at 30 mm width occupies 5 mm, not the old fixed
+        # 15 mm box plus 2 mm gap. Allow rounding to whole millimetres.
+        self.assertAlmostEqual(5, with_logo_height - no_logo_height, delta=1.1)
+        self.assertIn(b'/Subtype /Image', pdf)
+        self.assertEqual(logo, self.call('local', '/api/company')[1]['data']['logo'])
 
     def test_receipt_qr_only_for_facebook_https_and_empty_settings_are_safe(self):
         self.pair()

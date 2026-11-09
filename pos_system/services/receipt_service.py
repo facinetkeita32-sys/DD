@@ -6,6 +6,7 @@ from html import escape
 from urllib.parse import urlsplit
 import qrcode
 from fpdf import FPDF
+from PIL import Image
 from ..odoo_orm import env
 from ..models.pos_order import PosOrder
 from ..models.pos_order_line import PosOrderLine
@@ -310,7 +311,7 @@ def generate_receipt_html(order_id, lang='en'):
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{ font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-variant-numeric: tabular-nums; padding: 5px; color: #000; }}
   .receipt {{ max-width: 80mm; margin: 0 auto; }}
-  .receipt-logo {{ max-width: 60mm; max-height: 30mm; display: block; margin: 0 auto 3px; }}
+  .receipt-logo {{ max-width: 60mm; max-height: 30mm; width: auto; height: auto; display: block; margin: 0 auto; }}
   .receipt-qr {{ display: block; width: 32mm; height: 32mm; margin: 2mm auto; image-rendering: pixelated; }}
   h2 {{ text-align: center; font-size: 15px; font-weight: 700; margin: 0 0 2px; }}
   .company-info {{ text-align: center; font-size: 11px; margin-bottom: 3px; overflow-wrap: anywhere; }}
@@ -459,9 +460,18 @@ def _render_receipt_pdf(d, lang, page_height):
     if company.get('logo'):
         try:
             img_data = base64.b64decode(company['logo'])
-            img_fp = io.BytesIO(img_data)
-            pdf.image(img_fp, x=left + page_w / 2 - 15, w=30, h=15)
-            y = pdf.get_y() + 2
+            with Image.open(io.BytesIO(img_data)) as image:
+                image_width, image_height = image.size
+            # Fit the real logo within the existing maximum size, preserving
+            # its proportions instead of reserving a fixed-height empty box.
+            scale = min(30 / image_width, 15 / image_height)
+            logo_width, logo_height = image_width * scale, image_height * scale
+            logo_top = pdf.get_y()
+            pdf.image(io.BytesIO(img_data), x=left + (page_w - logo_width) / 2,
+                      y=logo_top, w=logo_width, h=logo_height)
+            # Helvetica's glyphs extend slightly above the cell baseline;
+            # a tiny clearance avoids touching the image without a visible gap.
+            y = logo_top + logo_height + .4
         except Exception:
             pass
 

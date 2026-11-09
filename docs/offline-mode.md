@@ -227,6 +227,10 @@ width. The receipt's financial amounts and payment information are unchanged.
 The HTML receipt removes unnecessary leading blank address lines and top padding;
 the PDF starts its content at a 2 mm top margin. A printer's unavoidable hardware
 margin or additional feed/cut cannot be controlled by the receipt layout.
+The logo is placed immediately above the store name, with only a tiny PDF clearance.
+PDF logos are fitted within 30 × 15 mm while preserving their aspect ratio; their
+actual displayed height, rather than an empty fixed-height box, determines where
+the name starts. This only changes receipt rendering, not the saved logo itself.
 
 Company phone, street/location and city are editable in Settings and appear on
 HTML and PDF receipts. The existing company **website** field can contain the
